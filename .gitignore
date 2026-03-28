@@ -1,0 +1,9 @@
+*.jar
+!jar/3rd/*.jar
+!jar/spider.jar/**
+build/
+.gradle/
+Smali_classes/
+leodm.jar
+leodm.jar.md5
+**/.DS_Store

@@ -370,6 +370,21 @@ public class Leodanmu extends Spider {
         return "";
     }
 
+    @Override
+    public String liveContent(String url) throws Exception {
+        // 直播接口：客户端不一定调 init()，强制重新加载最新配置
+        // 这样用户在设置页修改 ext/apiUrl 后，直播也能实时生效
+        Activity context = Utils.getTopActivity();
+        if (context != null) {
+            // 强制重置，让 ensureConfig 重新从 SharedPreferences 加载
+            configLoaded = false;
+            ensureConfig(context);
+            log("liveContent: 配置已刷新，当前 apiUrls=" +
+                    DanmakuConfigManager.getConfig(context).getApiUrls());
+        }
+        return super.liveContent(url);
+    }
+
     private JSONObject createClass(String id, String name) throws Exception {
         JSONObject cls = new JSONObject();
         cls.put("type_id", id);
