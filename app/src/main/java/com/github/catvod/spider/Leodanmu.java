@@ -372,15 +372,14 @@ public class Leodanmu extends Spider {
 
     @Override
     public String liveContent(String url) throws Exception {
-        // 直播接口：客户端不一定调 init()，强制重新加载最新配置
-        // 这样用户在设置页修改 ext/apiUrl 后，直播也能实时生效
+        // 直播接口：JarLoader 缓存 Spider 实例，init() 只在第一次创建时调用一次。
+        // 若第一次创建时 ext 为空（顶层 spider 字段加载），apiUrls 不会被初始化。
+        // 必须每次从 SharedPreferences 强制重读，不能依赖 cachedExt 或内存缓存。
         Activity context = Utils.getTopActivity();
         if (context != null) {
-            // 强制重置，让 ensureConfig 重新从 SharedPreferences 加载
-            configLoaded = false;
-            ensureConfig(context);
-            log("liveContent: 配置已刷新，当前 apiUrls=" +
-                    DanmakuConfigManager.getConfig(context).getApiUrls());
+            DanmakuConfig freshConfig = DanmakuConfigManager.loadConfig(context);
+            DanmakuConfigManager.saveConfig(context, freshConfig);
+            log("liveContent: 配置已刷新，当前 apiUrls=" + freshConfig.getApiUrls());
         }
         return super.liveContent(url);
     }
