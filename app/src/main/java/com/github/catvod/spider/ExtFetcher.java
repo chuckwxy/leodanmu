@@ -69,7 +69,12 @@ public class ExtFetcher {
 
     /**
      * 通过反射从 TVBox 的 LiveConfig/VodConfig 拿订阅 URL。
+     * public 供外部验证调用。
      */
+    public static String getSubscriptionUrlPublic() {
+        return getSubscriptionUrl();
+    }
+
     private static String getSubscriptionUrl() {
         for (String className : CONFIG_CLASS_NAMES) {
             try {

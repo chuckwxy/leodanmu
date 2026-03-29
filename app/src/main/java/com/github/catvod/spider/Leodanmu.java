@@ -52,16 +52,20 @@ public class Leodanmu extends Spider {
     @Override
     public void init(Context context, String extend) throws Exception {
         super.init(context, extend);
-        // 如果 ext 为空（直播订阅场景），主动从订阅 JSON 里获取 ext
+        // 如果 ext 为空（直播订阅场景），Toast 验证反射能否拿到订阅 URL
         if (TextUtils.isEmpty(extend)) {
             try {
-                String fetchedExt = ExtFetcher.fetchExtFromSubscription(context);
-                if (!TextUtils.isEmpty(fetchedExt)) {
-                    extend = fetchedExt;
-                    log("init: 从订阅JSON获取到ext: " + extend);
-                }
+                String subUrl = ExtFetcher.getSubscriptionUrlPublic();
+                final String toastMsg = TextUtils.isEmpty(subUrl) ? "ExtFetcher: 拿不到订阅URL" : "订阅URL: " + subUrl;
+                log(toastMsg);
+                final Context ctx = context;
+                new android.os.Handler(android.os.Looper.getMainLooper()).post(new Runnable() {
+                    @Override public void run() {
+                        android.widget.Toast.makeText(ctx, toastMsg, android.widget.Toast.LENGTH_LONG).show();
+                    }
+                });
             } catch (Exception e) {
-                log("init: ExtFetcher异常: " + e.getMessage());
+                log("init: ExtFetcher验证异常: " + e.getMessage());
             }
         }
         // 缓存 ext，供不调用 init() 的客户端（直播等）后续使用
