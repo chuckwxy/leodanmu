@@ -52,6 +52,18 @@ public class Leodanmu extends Spider {
     @Override
     public void init(Context context, String extend) throws Exception {
         super.init(context, extend);
+        // 如果 ext 为空（直播订阅场景），主动从订阅 JSON 里获取 ext
+        if (TextUtils.isEmpty(extend)) {
+            try {
+                String fetchedExt = ExtFetcher.fetchExtFromSubscription(context);
+                if (!TextUtils.isEmpty(fetchedExt)) {
+                    extend = fetchedExt;
+                    log("init: 从订阅JSON获取到ext: " + extend);
+                }
+            } catch (Exception e) {
+                log("init: ExtFetcher异常: " + e.getMessage());
+            }
+        }
         // 缓存 ext，供不调用 init() 的客户端（直播等）后续使用
         if (!TextUtils.isEmpty(extend)) {
             cachedExt = extend;
