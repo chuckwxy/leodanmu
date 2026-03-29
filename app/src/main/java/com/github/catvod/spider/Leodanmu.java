@@ -52,6 +52,14 @@ public class Leodanmu extends Spider {
     @Override
     public void init(Context context, String extend) throws Exception {
         super.init(context, extend);
+        // 打印 init 收到的 ext（调试用）
+        {
+            final String extLog = "init ext=" + (TextUtils.isEmpty(extend) ? "(空)" : extend.substring(0, Math.min(extend.length(), 80)));
+            log(extLog);
+            final Context ctx2 = context;
+            new android.os.Handler(android.os.Looper.getMainLooper()).post(() ->
+                android.widget.Toast.makeText(ctx2, extLog, android.widget.Toast.LENGTH_LONG).show());
+        }
         // 如果 ext 为空（直播订阅场景），Toast 验证反射能否拿到订阅 URL
         if (TextUtils.isEmpty(extend)) {
             try {
