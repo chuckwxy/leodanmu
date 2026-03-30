@@ -60,20 +60,27 @@ public class Leodanmu extends Spider {
             new android.os.Handler(android.os.Looper.getMainLooper()).post(() ->
                 android.widget.Toast.makeText(ctx2, extLog, android.widget.Toast.LENGTH_LONG).show());
         }
-        // 如果 ext 为空（直播订阅场景），Toast 验证反射能否拿到订阅 URL
+        // 如果 ext 为空（直播订阅场景），尝试从订阅 JSON 自动获取 ext
         if (TextUtils.isEmpty(extend)) {
             try {
-                String subUrl = ExtFetcher.getSubscriptionUrlPublic();
-                final String toastMsg = TextUtils.isEmpty(subUrl) ? "ExtFetcher: 拿不到订阅URL" : "订阅URL: " + subUrl;
-                log(toastMsg);
-                final Context ctx = context;
-                new android.os.Handler(android.os.Looper.getMainLooper()).post(new Runnable() {
-                    @Override public void run() {
-                        android.widget.Toast.makeText(ctx, toastMsg, android.widget.Toast.LENGTH_LONG).show();
-                    }
-                });
+                String fetchedExt = ExtFetcher.fetchExtFromSubscription(context);
+                if (!TextUtils.isEmpty(fetchedExt)) {
+                    extend = fetchedExt;
+                    cachedExt = fetchedExt;
+                    configLoaded = false;
+                    log("init: 从订阅自动获取ext成功: " + fetchedExt.substring(0, Math.min(fetchedExt.length(), 80)));
+                    final String msg = "Leo弹幕: 已自动获取ext配置";
+                    final Context ctx = context;
+                    new android.os.Handler(android.os.Looper.getMainLooper()).post(new Runnable() {
+                        @Override public void run() {
+                            android.widget.Toast.makeText(ctx, msg, android.widget.Toast.LENGTH_LONG).show();
+                        }
+                    });
+                } else {
+                    log("init: ext为空且订阅中未找到ext，使用已保存配置");
+                }
             } catch (Exception e) {
-                log("init: ExtFetcher验证异常: " + e.getMessage());
+                log("init: ExtFetcher异常: " + e.getMessage());
             }
         }
         // 缓存 ext，供不调用 init() 的客户端（直播等）后续使用

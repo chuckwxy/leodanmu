@@ -79,8 +79,13 @@ public class ExtFetcher {
         for (String className : CONFIG_CLASS_NAMES) {
             try {
                 Class<?> clz = Class.forName(className);
+                Object instance = null;
+                try {
+                    java.lang.reflect.Method getMethod = clz.getMethod("get");
+                    instance = getMethod.invoke(null);
+                } catch (Exception ignored) {}
                 java.lang.reflect.Method m = clz.getMethod("getUrl");
-                Object result = m.invoke(null);
+                Object result = m.invoke(instance);
                 if (result instanceof String && !TextUtils.isEmpty((String) result)) {
                     Leodanmu.log("ExtFetcher: 从 " + className + " 获取到URL: " + result);
                     return (String) result;
