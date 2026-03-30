@@ -147,7 +147,7 @@ public class Leodanmu extends Spider {
         sCacheDir = new File(context.getCacheDir(), "leo_danmaku_cache");
         if (!sCacheDir.exists()) sCacheDir.mkdirs();
 
-        // 初始化配置
+        // 初始化配置（每次都更新，不受 initialized 保护）
         DanmakuConfig config = DanmakuConfigManager.loadConfig(context);
         if (!TextUtils.isEmpty(extend)) {
             if (extend.startsWith("http")) {
@@ -167,9 +167,9 @@ public class Leodanmu extends Spider {
                     log("解析JSON格式配置失败: " + e.getMessage());
                 }
             }
+            DanmakuConfigManager.saveConfig(context, config);
+            log("doInitWork: ext已应用，apiUrls=" + config.getApiUrls());
         }
-
-        DanmakuConfigManager.saveConfig(context, config);
 
         if (initialized) return;
 
