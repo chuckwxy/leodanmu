@@ -1,6 +1,7 @@
 package com.github.catvod.spider;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.text.TextUtils;
 
 import org.json.JSONArray;
@@ -14,6 +15,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 在 init() 收到空 ext 时，优先从 Ok影视宿主运行时已加载的配置 JSON 里提取 ext；
@@ -82,7 +84,7 @@ public class ExtFetcher {
         resetLastState();
         String ext = fetchExtFromRuntimeConfig();
         if (!TextUtils.isEmpty(ext)) return ext;
-        ext = fetchExtFromCandidateScan(context);
+        ext = fetchExtFromLiveSubscription(context);
         if (!TextUtils.isEmpty(ext)) return ext;
         return fetchExtFromSubscriptionUrlFallback();
     }
@@ -309,86 +311,149 @@ public class ExtFetcher {
         return null;
     }
 
-    private static String fetchExtFromCandidateScan(Context context) {
-        if (context == null) {
-            lastError = "candidate-scan-no-context";
+    private static String fetchExtFromLiveSubscription(Context context) {
+        String liveUrl = fetchLiveSubscriptionUrlFromPrefs(context);
+        if (TextUtils.isEmpty(liveUrl)) {
+            lastError = "live-subscription-url-empty";
             return null;
         }
-        List<String> notes = new ArrayList<>();
+
         try {
-            ClassLoader loader = context.getClassLoader();
-            for (String className : buildCandidateClassNames()) {
+            String json = fetchJsonByHostHttp(liveUrl);
+            if (TextUtils.isEmpty(json)) {
+                lastError = "live-subscription-json-empty";
+                return null;
+            }
+
+            String ext = extractExtFromUnknown(json);
+            if (!TextUtils.isEmpty(ext)) {
+                markSuccess("live-subscription", "shared_prefs", liveUrl);
+                return ext;
+            }
+
+            lastError = "ext-not-found-in-live-subscription-json";
+            return null;
+        } catch (Throwable e) {
+            lastError = e.getMessage();
+            return null;
+        }
+    }
+
+    private static String fetchLiveSubscriptionUrlFromPrefs(Context context) {
+        if (context == null) return null;
+        try {
+            String[] prefNames = new String[] {
+                    context.getPackageName() + "_preferences",
+                    "config",
+                    "setting",
+                    "settings",
+                    "live",
+                    "lives",
+                    "source",
+                    "sources"
+            };
+
+            for (String prefName : prefNames) {
                 try {
-                    Class<?> clz = Class.forName(className, false, loader);
-                    Object instance = getInstance(clz);
-
-                    String ext = fetchExtFromJsonMethods(clz, instance);
-                    if (!TextUtils.isEmpty(ext)) {
-                        scanNotes = joinNotes(notes, "hit-json:" + className);
-                        markSuccess("candidate-json", className, "json-method");
-                        return ext;
-                    }
-
-                    ext = fetchExtFromSitesMethods(clz, instance);
-                    if (!TextUtils.isEmpty(ext)) {
-                        scanNotes = joinNotes(notes, "hit-sites:" + className);
-                        markSuccess("candidate-sites", className, "sites-method");
-                        return ext;
-                    }
-
-                    ext = fetchExtFromFields(clz, instance);
-                    if (!TextUtils.isEmpty(ext)) {
-                        scanNotes = joinNotes(notes, "hit-field:" + className);
-                        markSuccess("candidate-field", className, "field-scan");
-                        return ext;
-                    }
-
-                    notes.add("miss:" + className);
+                    SharedPreferences sp = context.getSharedPreferences(prefName, Context.MODE_PRIVATE);
+                    Map<String, ?> all = sp.getAll();
+                    String found = findUrlInMap(prefName, all);
+                    if (!TextUtils.isEmpty(found)) return found;
                 } catch (Throwable ignored) {
                 }
             }
-            scanNotes = joinNotes(notes, "no-hit");
-            lastError = "candidate-scan-no-hit";
+
+            SharedPreferences sp = context.getSharedPreferences(context.getPackageName() + "_preferences", Context.MODE_PRIVATE);
+            String found = findUrlInMap(context.getPackageName() + "_preferences", sp.getAll());
+            if (!TextUtils.isEmpty(found)) return found;
         } catch (Throwable e) {
-            scanNotes = joinNotes(notes, "scan-ex:" + e.getMessage());
-            lastError = e.getMessage();
+            lastError = "pref-scan-ex:" + e.getMessage();
         }
         return null;
     }
 
-    private static List<String> buildCandidateClassNames() {
-        List<String> names = new ArrayList<>();
-        String[] prefixes = new String[] {
-                "com.fongmi.android.tv.api.config.",
-                "com.fongmi.android.tv.api.",
-                "com.github.tvbox.osc.api.config.",
-                "com.github.tvbox.osc.api.",
-                "com.github.catvod.api.config.",
-                "com.github.catvod.api.",
-                "com.ok.video.api.config.",
-                "com.ok.video.api.",
-                "com.oktv.api.config.",
-                "com.oktv.api.",
-                "com.player.ok.api.config.",
-                "com.player.ok.api."
-        };
-        for (String prefix : prefixes) {
-            for (String name : CLASS_SCAN_CANDIDATES) {
-                names.add(prefix + name);
+    private static String findUrlInMap(String prefName, Map<String, ?> all) {
+        if (all == null || all.isEmpty()) return null;
+        for (Map.Entry<String, ?> entry : all.entrySet()) {
+            String key = entry.getKey();
+            Object value = entry.getValue();
+            String text = value == null ? "" : String.valueOf(value).trim();
+            if (TextUtils.isEmpty(text)) continue;
+            if (!looksLikeLiveSubscriptionKey(key)) continue;
+            if (!looksLikeUrl(text)) continue;
+            scanNotes = prefName + "/" + key + "=" + text;
+            return text;
+        }
+        for (Map.Entry<String, ?> entry : all.entrySet()) {
+            Object value = entry.getValue();
+            String text = value == null ? "" : String.valueOf(value).trim();
+            if (looksLikeUrl(text) && looksLikeLiveSubscriptionValue(text)) {
+                scanNotes = prefName + "/" + entry.getKey() + "=" + text;
+                return text;
             }
         }
-        return names;
+        return null;
     }
 
-    private static String joinNotes(List<String> notes, String tail) {
-        if (tail != null && !tail.isEmpty()) notes.add(tail);
-        StringBuilder sb = new StringBuilder();
-        int max = Math.min(notes.size(), 12);
-        for (int i = 0; i < max; i++) {
-            if (i > 0) sb.append(" | ");
-            sb.append(notes.get(i));
+    private static boolean looksLikeLiveSubscriptionKey(String key) {
+        if (TextUtils.isEmpty(key)) return false;
+        String k = key.toLowerCase();
+        return (k.contains("live") || k.contains("直播") || k.contains("subscribe") || k.contains("source") || k.contains("config"))
+                && (k.contains("url") || k.contains("link") || k.contains("home") || k.contains("api") || k.contains("订阅"));
+    }
+
+    private static boolean looksLikeLiveSubscriptionValue(String value) {
+        String v = value.toLowerCase();
+        return v.contains("sub") || v.contains("txt") || v.contains("json") || v.contains("live");
+    }
+
+    private static boolean looksLikeUrl(String text) {
+        return !TextUtils.isEmpty(text) && (text.startsWith("http://") || text.startsWith("https://"));
+    }
+
+    private static String fetchJsonByHostHttp(String url) throws Exception {
+        String body = tryHostOkHttp(url);
+        if (!TextUtils.isEmpty(body)) {
+            scanNotes = appendScanNote(scanNotes, "host-http=ok");
+            return body;
         }
-        return sb.toString();
+        scanNotes = appendScanNote(scanNotes, "host-http=fallback");
+        return httpGet(url, 5000);
+    }
+
+    private static String tryHostOkHttp(String url) {
+        String[] classNames = new String[] {
+                "com.github.catvod.net.OkHttp",
+                "com.github.tvbox.osc.util.OkHttp",
+                "com.github.tvbox.osc.net.OkHttp",
+                "com.fongmi.android.tv.net.OkHttp",
+                "com.ok.video.net.OkHttp"
+        };
+        String[] methods = new String[] {"string", "get", "request"};
+        for (String className : classNames) {
+            try {
+                Class<?> clz = Class.forName(className);
+                for (String methodName : methods) {
+                    try {
+                        java.lang.reflect.Method m = clz.getMethod(methodName, String.class);
+                        Object result = m.invoke(null, url);
+                        if (result instanceof String && !TextUtils.isEmpty((String) result)) {
+                            markSuccess("host-http", className, methodName);
+                            return (String) result;
+                        }
+                    } catch (Throwable ignored) {
+                    }
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+        return null;
+    }
+
+    private static String appendScanNote(String base, String extra) {
+        if (TextUtils.isEmpty(base)) return extra;
+        if (TextUtils.isEmpty(extra)) return base;
+        return base + " | " + extra;
     }
 
     private static String fetchExtFromSubscriptionUrlFallback() {
