@@ -427,6 +427,95 @@ public class ExtFetcher {
         return v.matches("^[A-Za-z0-9+/=]+$");
     }
 
+    public static String getLastSource() {
+        return lastSource;
+    }
+
+    public static String getLastClassName() {
+        return lastClassName;
+    }
+
+    public static String getLastMethodName() {
+        return lastMethodName;
+    }
+
+    public static String getLastError() {
+        if (!TextUtils.isEmpty(scanNotes)) {
+            return TextUtils.isEmpty(lastError) ? scanNotes : (lastError + " | " + scanNotes);
+        }
+        return lastError;
+    }
+
+    private static void resetLastState() {
+        lastSource = "none";
+        lastClassName = "";
+        lastMethodName = "";
+        lastError = "";
+        scanNotes = "";
+        traceLogs.clear();
+        traceStep = 0;
+    }
+
+    private static void markSuccess(String source, String className, String methodName) {
+        lastSource = source;
+        lastClassName = className == null ? "" : className;
+        lastMethodName = methodName == null ? "" : methodName;
+        lastError = "";
+    }
+
+    private static String appendScanNote(String base, String extra) {
+        if (TextUtils.isEmpty(base)) return extra;
+        if (TextUtils.isEmpty(extra)) return base;
+        return base + " | " + extra;
+    }
+
+    private static boolean looksLikeUrl(String text) {
+        return !TextUtils.isEmpty(text) && (text.startsWith("http://") || text.startsWith("https://"));
+    }
+
+    private static String fetchJsonByHostHttp(String url) throws Exception {
+        trace("fetch json via host http: " + url);
+        String body = tryHostOkHttp(url);
+        if (!TextUtils.isEmpty(body)) {
+            scanNotes = appendScanNote(scanNotes, "host-http=ok");
+            trace("host http success");
+            return body;
+        }
+        scanNotes = appendScanNote(scanNotes, "host-http=fallback");
+        trace("host http miss, fallback httpGet");
+        return httpGet(url, 5000);
+    }
+
+    private static String tryHostOkHttp(String url) {
+        String[] classNames = new String[] {
+                "com.github.catvod.net.OkHttp",
+                "com.github.tvbox.osc.util.OkHttp",
+                "com.github.tvbox.osc.net.OkHttp",
+                "com.fongmi.android.tv.net.OkHttp",
+                "com.ok.video.net.OkHttp"
+        };
+        String[] methods = new String[] {"string", "get", "request"};
+        for (String className : classNames) {
+            try {
+                Class<?> clz = Class.forName(className);
+                for (String methodName : methods) {
+                    try {
+                        java.lang.reflect.Method m = clz.getMethod(methodName, String.class);
+                        Object result = m.invoke(null, url);
+                        if (result instanceof String && !TextUtils.isEmpty((String) result)) {
+                            markSuccess("host-http", className, methodName);
+                            trace("host http provider hit: " + className + "#" + methodName);
+                            return (String) result;
+                        }
+                    } catch (Throwable ignored) {
+                    }
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+        return null;
+    }
+
     public static String getSubscriptionUrlPublic() {
         return getSubscriptionUrl();
     }
