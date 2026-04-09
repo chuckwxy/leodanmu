@@ -52,37 +52,23 @@ public class Leodanmu extends Spider {
     @Override
     public void init(Context context, String extend) throws Exception {
         super.init(context, extend);
-        // 打印 init 收到的 ext（调试用）
-        {
-            final String extLog = "init ext=" + (TextUtils.isEmpty(extend) ? "(空)" : extend.substring(0, Math.min(extend.length(), 80)));
-            log(extLog);
-            final Context ctx2 = context;
-            new android.os.Handler(android.os.Looper.getMainLooper()).post(() ->
-                android.widget.Toast.makeText(ctx2, extLog, android.widget.Toast.LENGTH_LONG).show());
-        }
-        // 如果 ext 为空（直播订阅场景），尝试从订阅 JSON 自动获取 ext
+
         if (TextUtils.isEmpty(extend)) {
             try {
-                String fetchedExt = ExtFetcher.fetchExtFromSubscription(context);
+                String fetchedExt = ExtFetcher.fetchExtFromOkJson(context);
                 if (!TextUtils.isEmpty(fetchedExt)) {
                     extend = fetchedExt;
                     cachedExt = fetchedExt;
                     configLoaded = false;
-                    log("init: 从订阅自动获取ext成功: " + fetchedExt.substring(0, Math.min(fetchedExt.length(), 80)));
-                    final String msg = "Leo弹幕: 已自动获取ext配置";
-                    final Context ctx = context;
-                    new android.os.Handler(android.os.Looper.getMainLooper()).post(new Runnable() {
-                        @Override public void run() {
-                            android.widget.Toast.makeText(ctx, msg, android.widget.Toast.LENGTH_LONG).show();
-                        }
-                    });
+                    log("init: 从Ok影视配置JSON补到ext成功");
                 } else {
-                    log("init: ext为空且订阅中未找到ext，使用已保存配置");
+                    log("init: ext为空，未从Ok影视配置JSON补到ext，回落到已保存配置");
                 }
             } catch (Exception e) {
                 log("init: ExtFetcher异常: " + e.getMessage());
             }
         }
+
         // 缓存 ext，供不调用 init() 的客户端（直播等）后续使用
         if (!TextUtils.isEmpty(extend)) {
             cachedExt = extend;
