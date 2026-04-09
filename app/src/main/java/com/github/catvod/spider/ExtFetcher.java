@@ -9,20 +9,18 @@ import org.json.JSONObject;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
 
 /**
- * 在 init() 收到空 ext 时，优先从 Ok影视宿主运行时已加载的配置 JSON 里提取 ext；
- * 若拿不到，再兜底回退到订阅 URL 拉取 JSON。
- * 全程静默，不弹 Toast。
+ * 精简版 ext 获取器：
+ * 1. 直接从宿主 SharedPreferences 里的 config_1 拿订阅地址/配置
+ * 2. 必要时通过订阅 URL 拉一次 JSON 提取 ext
+ * 3. 使用内存缓存，避免 TV 端反复 HTTP / JSON 解析
  */
 public class ExtFetcher {
 
@@ -32,62 +30,18 @@ public class ExtFetcher {
     private static String lastError = "";
     private static final List<String> traceLogs = new ArrayList<>();
     private static int traceStep = 0;
-
-    private static final String[] CONFIG_CLASS_NAMES = {
-            "com.fongmi.android.tv.api.config.LiveConfig",
-            "com.fongmi.android.tv.api.config.VodConfig",
-            "com.fongmi.android.tv.api.LiveConfig",
-            "com.fongmi.android.tv.api.VodConfig",
-            "com.github.tvbox.osc.api.config.LiveConfig",
-            "com.github.tvbox.osc.api.config.VodConfig",
-            "com.github.tvbox.osc.api.LiveConfig",
-            "com.github.tvbox.osc.api.VodConfig",
-            "com.github.catvod.api.config.LiveConfig",
-            "com.github.catvod.api.config.VodConfig",
-            // Ok影视 / 魔改宿主兼容猜测
-            "com.ok影视.api.config.LiveConfig",
-            "com.ok影视.api.config.VodConfig",
-            "com.ok影视.tv.api.config.LiveConfig",
-            "com.ok影视.tv.api.config.VodConfig",
-            "com.ok.video.api.config.LiveConfig",
-            "com.ok.video.api.config.VodConfig",
-            "com.oktv.api.config.LiveConfig",
-            "com.oktv.api.config.VodConfig",
-            "com.player.ok.api.config.LiveConfig",
-            "com.player.ok.api.config.VodConfig"
-    };
-
-    private static final String[] INSTANCE_METHODS = {
-            "get", "getInstance", "instance"
-    };
-
-    private static final String[] JSON_METHODS = {
-            "getJson", "json", "getConfig", "getConfigJson", "toJson", "getData"
-    };
-
-    private static final String[] URL_METHODS = {
-            "getUrl", "url", "getConfigUrl"
-    };
-
-    private static final String[] SITES_METHODS = {
-            "getSites", "sites"
-    };
-
-    private static final String[] CLASS_SCAN_CANDIDATES = {
-            "Config", "LiveConfig", "VodConfig", "ApiConfig", "SourceConfig", "SiteConfig",
-            "Live", "Vod", "Spider", "JarLoader", "BaseLoader", "Loader", "Setting"
-    };
-
-    private static final String[] PACKAGE_SCAN_HINTS = {
-            "fongmi", "tvbox", "catvod", "ok", "影视", "player", "osc"
-    };
-
     private static String scanNotes = "";
+
+    private static String cachedSubscriptionUrl = null;
+    private static String cachedFetchedExt = null;
+    private static int cachedFetchedExtHash = 0;
+    private static long lastFetchTime = 0L;
+    private static final long FETCH_TTL_MS = 10 * 60 * 1000L;
 
     private static void trace(String msg) {
         traceStep += 1;
         traceLogs.add("[" + traceStep + "] " + msg);
-        if (traceLogs.size() > 120) traceLogs.remove(0);
+        if (traceLogs.size() > 80) traceLogs.remove(0);
     }
 
     public static String getTraceLog() {
@@ -97,115 +51,105 @@ public class ExtFetcher {
     }
 
     public static String fetchExtFromOkJson(Context context) {
+        return fetchExtFromSubscription(context);
+    }
+
+    public static String fetchExtFromSubscription(Context context) {
         resetLastState();
-        trace("enter fetchExtFromOkJson");
-        String ext = fetchExtFromRuntimeConfig();
+        trace("enter fetchExtFromSubscription");
+
+        long now = System.currentTimeMillis();
+        if (!TextUtils.isEmpty(cachedFetchedExt) && now - lastFetchTime < FETCH_TTL_MS) {
+            markSuccess("memory-cache", "ExtFetcher", "fetchExtFromSubscription");
+            trace("memory cache hit");
+            return cachedFetchedExt;
+        }
+
+        if (context == null) {
+            lastError = "no-context";
+            trace("no context");
+            return null;
+        }
+
+        String raw = readConfig1(context);
+        if (TextUtils.isEmpty(raw)) {
+            lastError = TextUtils.isEmpty(lastError) ? "config_1-empty" : lastError;
+            trace("config_1 empty");
+            return null;
+        }
+
+        String ext = null;
+        try {
+            String value = raw.trim();
+            if (looksLikeUrl(value)) {
+                cachedSubscriptionUrl = value;
+                trace("config_1 is subscription url");
+                String json = fetchJsonByHostHttp(value);
+                if (!TextUtils.isEmpty(json)) {
+                    ext = extractExtFromUnknown(json);
+                    if (!TextUtils.isEmpty(ext)) {
+                        markSuccess("subscription-url", context.getPackageName(), "config_1");
+                    } else {
+                        lastError = "subscription-json-no-ext";
+                    }
+                } else if (TextUtils.isEmpty(lastError)) {
+                    lastError = "subscription-fetch-empty";
+                }
+            } else if (value.startsWith("{") || value.startsWith("[")) {
+                trace("config_1 is direct json");
+                ext = extractExtFromUnknown(value);
+                if (!TextUtils.isEmpty(ext)) {
+                    markSuccess("subscription-json", context.getPackageName(), "config_1");
+                } else {
+                    lastError = "config-json-no-ext";
+                }
+            } else if (looksLikeBase64Json(value)) {
+                trace("config_1 is base64 json");
+                try {
+                    String decoded = new String(java.util.Base64.getDecoder().decode(value), java.nio.charset.StandardCharsets.UTF_8);
+                    ext = extractExtFromUnknown(decoded);
+                    if (!TextUtils.isEmpty(ext)) {
+                        markSuccess("subscription-base64", context.getPackageName(), "config_1");
+                    } else {
+                        lastError = "base64-json-no-ext";
+                    }
+                } catch (Throwable e) {
+                    lastError = "base64-decode-failed:" + e.getMessage();
+                }
+            } else {
+                lastError = "config_1-unsupported-format";
+            }
+        } catch (Throwable e) {
+            lastError = "fetch-ext-ex:" + e.getMessage();
+        }
+
         if (!TextUtils.isEmpty(ext)) {
-            trace("runtime-config hit");
-            return ext;
+            cachedFetchedExt = ext;
+            cachedFetchedExtHash = ext.hashCode();
+            lastFetchTime = now;
+            trace("ext fetched ok, hash=" + cachedFetchedExtHash);
         }
-        trace("runtime-config miss");
-        ext = fetchExtFromHostConfigs(context);
-        if (!TextUtils.isEmpty(ext)) {
-            trace("host-config hit");
-            return ext;
-        }
-        trace("host-config miss");
-        return null;
+        return ext;
     }
 
-    private static String fetchExtFromRuntimeConfig() {
-        trace("try runtime-config");
-        for (String className : CONFIG_CLASS_NAMES) {
-            try {
-                Class<?> clz = Class.forName(className);
-                Object instance = getInstance(clz);
-
-                String ext = fetchExtFromJsonMethods(clz, instance);
-                if (!TextUtils.isEmpty(ext)) {
-                    markSuccess("runtime-json", className, "json-method");
-                    Leodanmu.log("ExtFetcher: 从宿主运行时JSON拿到ext");
-                    return ext;
-                }
-
-                ext = fetchExtFromSitesMethods(clz, instance);
-                if (!TextUtils.isEmpty(ext)) {
-                    markSuccess("runtime-sites", className, "sites-method");
-                    Leodanmu.log("ExtFetcher: 从宿主运行时sites拿到ext");
-                    return ext;
-                }
-
-                ext = fetchExtFromFields(clz, instance);
-                if (!TextUtils.isEmpty(ext)) {
-                    markSuccess("runtime-field", className, "field-scan");
-                    Leodanmu.log("ExtFetcher: 从宿主运行时字段拿到ext");
-                    return ext;
-                }
-            } catch (Throwable ignored) {
+    private static String readConfig1(Context context) {
+        try {
+            String prefName = context.getPackageName() + "_preferences";
+            SharedPreferences sp = context.getSharedPreferences(prefName, Context.MODE_PRIVATE);
+            String raw = sp.getString("config_1", "");
+            if (!TextUtils.isEmpty(raw)) {
+                String preview = raw.substring(0, Math.min(raw.length(), 160)).replace("\n", " ");
+                scanNotes = appendScanNote(scanNotes, "config_1=" + preview);
+                return raw;
             }
-        }
-        lastError = "runtime-config-not-found";
-        trace("runtime-config no hit");
-        return null;
-    }
-
-    private static Object getInstance(Class<?> clz) {
-        for (String methodName : INSTANCE_METHODS) {
-            try {
-                Method method = clz.getMethod(methodName);
-                method.setAccessible(true);
-                return method.invoke(null);
-            } catch (Throwable ignored) {
-            }
-        }
-        return null;
-    }
-
-    private static String fetchExtFromJsonMethods(Class<?> clz, Object instance) {
-        for (String methodName : JSON_METHODS) {
-            try {
-                Method method = clz.getMethod(methodName);
-                method.setAccessible(true);
-                Object result = method.invoke(instance);
-                String ext = extractExtFromUnknown(result);
-                if (!TextUtils.isEmpty(ext)) return ext;
-            } catch (Throwable ignored) {
-            }
-        }
-        return null;
-    }
-
-    private static String fetchExtFromSitesMethods(Class<?> clz, Object instance) {
-        for (String methodName : SITES_METHODS) {
-            try {
-                Method method = clz.getMethod(methodName);
-                method.setAccessible(true);
-                Object result = method.invoke(instance);
-                String ext = extractExtFromSitesObject(result);
-                if (!TextUtils.isEmpty(ext)) return ext;
-            } catch (Throwable ignored) {
-            }
-        }
-        return null;
-    }
-
-    private static String fetchExtFromFields(Class<?> clz, Object instance) {
-        Field[] fields = clz.getDeclaredFields();
-        for (Field field : fields) {
-            try {
-                field.setAccessible(true);
-                Object value = field.get(instance);
-                String ext = extractExtFromUnknown(value);
-                if (!TextUtils.isEmpty(ext)) return ext;
-            } catch (Throwable ignored) {
-            }
+        } catch (Throwable e) {
+            lastError = "read-config_1-ex:" + e.getMessage();
         }
         return null;
     }
 
     private static String extractExtFromUnknown(Object source) {
         if (source == null) return null;
-
         try {
             if (source instanceof JSONObject) {
                 return extractExtFromJsonObject((JSONObject) source);
@@ -216,51 +160,21 @@ public class ExtFetcher {
             if (source instanceof String) {
                 String text = ((String) source).trim();
                 if (TextUtils.isEmpty(text)) return null;
-                if (text.startsWith("{")) {
-                    return extractExtFromJsonObject(new JSONObject(text));
-                }
-                if (text.startsWith("[")) {
-                    return extractExtFromSitesArray(new JSONArray(text));
-                }
-            }
-        } catch (Throwable ignored) {
-        }
-
-        return extractExtFromPojo(source);
-    }
-
-    private static String extractExtFromJsonObject(JSONObject root) {
-        if (root == null) return null;
-
-        JSONArray sites = root.optJSONArray("sites");
-        if (sites != null) {
-            return extractExtFromSitesArray(sites);
-        }
-
-        JSONObject site = root.optJSONObject("site");
-        if (site != null) {
-            return extractExtFromSiteObject(site);
-        }
-
-        return extractExtFromSiteObject(root);
-    }
-
-    private static String extractExtFromSitesObject(Object sitesObj) {
-        if (sitesObj == null) return null;
-        try {
-            if (sitesObj instanceof JSONArray) {
-                return extractExtFromSitesArray((JSONArray) sitesObj);
-            }
-            if (sitesObj instanceof java.util.List) {
-                java.util.List<?> list = (java.util.List<?>) sitesObj;
-                for (Object item : list) {
-                    String ext = extractExtFromPojo(item);
-                    if (!TextUtils.isEmpty(ext)) return ext;
-                }
+                if (text.startsWith("{")) return extractExtFromJsonObject(new JSONObject(text));
+                if (text.startsWith("[")) return extractExtFromSitesArray(new JSONArray(text));
             }
         } catch (Throwable ignored) {
         }
         return null;
+    }
+
+    private static String extractExtFromJsonObject(JSONObject root) {
+        if (root == null) return null;
+        JSONArray sites = root.optJSONArray("sites");
+        if (sites != null) return extractExtFromSitesArray(sites);
+        JSONObject site = root.optJSONObject("site");
+        if (site != null) return extractExtFromSiteObject(site);
+        return extractExtFromSiteObject(root);
     }
 
     private static String extractExtFromSitesArray(JSONArray sites) {
@@ -279,29 +193,11 @@ public class ExtFetcher {
         String api = site.optString("api", "");
         String key = site.optString("key", "");
         String name = site.optString("name", "");
-
         if (!isTargetSite(api, key, name)) return null;
 
         Object ext = site.opt("ext");
         if (ext instanceof JSONObject || ext instanceof JSONArray) return ext.toString();
         if (ext instanceof String && !TextUtils.isEmpty((String) ext)) return (String) ext;
-        return null;
-    }
-
-    private static String extractExtFromPojo(Object obj) {
-        if (obj == null) return null;
-        try {
-            Class<?> clz = obj.getClass();
-            String api = readStringMember(clz, obj, "getApi", "api");
-            String key = readStringMember(clz, obj, "getKey", "key");
-            String name = readStringMember(clz, obj, "getName", "name");
-            if (!isTargetSite(api, key, name)) return null;
-
-            Object ext = readMember(clz, obj, "getExt", "ext");
-            if (ext instanceof JSONObject || ext instanceof JSONArray) return ext.toString();
-            if (ext instanceof String && !TextUtils.isEmpty((String) ext)) return (String) ext;
-        } catch (Throwable ignored) {
-        }
         return null;
     }
 
@@ -317,115 +213,10 @@ public class ExtFetcher {
         return !TextUtils.isEmpty(text) && text.toLowerCase().contains(keyword.toLowerCase());
     }
 
-    private static String readStringMember(Class<?> clz, Object instance, String getterName, String fieldName) {
-        Object value = readMember(clz, instance, getterName, fieldName);
-        return value == null ? null : String.valueOf(value);
-    }
-
-    private static Object readMember(Class<?> clz, Object instance, String getterName, String fieldName) {
-        try {
-            Method method = clz.getMethod(getterName);
-            method.setAccessible(true);
-            return method.invoke(instance);
-        } catch (Throwable ignored) {
-        }
-        try {
-            Field field = clz.getDeclaredField(fieldName);
-            field.setAccessible(true);
-            return field.get(instance);
-        } catch (Throwable ignored) {
-        }
-        return null;
-    }
-
-    private static String fetchExtFromHostConfigs(Context context) {
-        trace("try host config_1");
-        if (context == null) {
-            lastError = "host-config-no-context";
-            trace("host config no context");
-            return null;
-        }
-        String prefName = context.getPackageName() + "_preferences";
-        try {
-            trace("read pref: " + prefName);
-            SharedPreferences sp = context.getSharedPreferences(prefName, Context.MODE_PRIVATE);
-            String key = "config_1";
-            String raw = sp.getString(key, "");
-            trace("read key: " + key);
-            if (TextUtils.isEmpty(raw)) {
-                lastError = "config_1-empty";
-                trace("config_1 empty");
-                return null;
-            }
-            String preview = raw.substring(0, Math.min(raw.length(), 160)).replace("\n", " ");
-            scanNotes = appendScanNote(scanNotes, key + "=" + preview);
-            trace("preview " + key + ": " + preview);
-
-            String ext = tryExtractExtFromConfigValue(key, raw);
-            if (!TextUtils.isEmpty(ext)) {
-                markSuccess("host-config", prefName, key);
-                trace("ext found from " + key);
-                return ext;
-            }
-
-            lastError = TextUtils.isEmpty(lastError) ? "config_1-no-hit" : lastError;
-            trace("no ext from config_1");
-            return null;
-        } catch (Throwable e) {
-            lastError = "host-config-ex:" + e.getMessage();
-            trace("host config exception: " + e.getMessage());
-            return null;
-        }
-    }
-
-    private static String tryExtractExtFromConfigValue(String key, String raw) throws Exception {
-        String value = raw == null ? "" : raw.trim();
-        if (TextUtils.isEmpty(value)) return null;
-
-        if (looksLikeUrl(value)) {
-            trace(key + " treated as url");
-            String json = fetchJsonByHostHttp(value);
-            if (TextUtils.isEmpty(json)) {
-                trace(key + " url fetched empty");
-                return null;
-            }
-            trace(key + " url fetched ok");
-            trace(key + " response preview: " + preview(json));
-            String ext = extractExtFromUnknown(json);
-            if (!TextUtils.isEmpty(ext)) return ext;
-            trace(key + " json has no ext");
-            return null;
-        }
-
-        if (value.startsWith("{") || value.startsWith("[")) {
-            trace(key + " treated as json");
-            String ext = extractExtFromUnknown(value);
-            if (!TextUtils.isEmpty(ext)) return ext;
-            trace(key + " direct json has no ext");
-            return null;
-        }
-
-        if (looksLikeBase64Json(value)) {
-            trace(key + " treated as base64-json");
-            try {
-                String decoded = new String(java.util.Base64.getDecoder().decode(value), java.nio.charset.StandardCharsets.UTF_8);
-                trace(key + " base64 decoded");
-                String ext = extractExtFromUnknown(decoded);
-                if (!TextUtils.isEmpty(ext)) return ext;
-                trace(key + " decoded json has no ext");
-            } catch (Throwable e) {
-                trace(key + " base64 decode failed: " + e.getMessage());
-            }
-        }
-
-        trace(key + " unsupported raw format");
-        return null;
-    }
-
     private static boolean looksLikeBase64Json(String value) {
         if (TextUtils.isEmpty(value) || value.length() < 16) return false;
         String v = value.trim();
-        if (v.startsWith("eyJ") || v.startsWith("W3si)")) return true;
+        if (v.startsWith("eyJ") || v.startsWith("W3si")) return true;
         return v.matches("^[A-Za-z0-9+/=]+$");
     }
 
@@ -477,98 +268,30 @@ public class ExtFetcher {
 
     private static String fetchJsonByHostHttp(String url) throws Exception {
         trace("fetch json via host http: " + url);
-        String body = tryHostOkHttp(url);
+        String body = httpGetOnWorker(url, 3000);
         if (!TextUtils.isEmpty(body)) {
             scanNotes = appendScanNote(scanNotes, "host-http=ok");
-            trace("host http success");
-            trace("host http body preview: " + preview(body));
             return body;
         }
-        scanNotes = appendScanNote(scanNotes, "host-http=fallback");
-        trace("host http provider miss");
-        trace("host http miss, fallback bg-httpGet");
-        return httpGetOnWorker(url, 5000);
-    }
-
-    private static String tryHostOkHttp(String url) {
-        String[] classNames = new String[] {
-                "com.fongmi.android.tv.net.OkHttp",
-                "com.github.catvod.net.OkHttp",
-                "com.github.tvbox.osc.util.OkHttp",
-                "com.github.tvbox.osc.net.OkHttp",
-                "com.ok.video.net.OkHttp"
-        };
-        String[] methods = new String[] {"string", "get", "request"};
-        for (String className : classNames) {
-            trace("try host provider: " + className);
-            try {
-                Class<?> clz = Class.forName(className);
-                for (String methodName : methods) {
-                    try {
-                        trace("try host method: " + className + "#" + methodName);
-                        java.lang.reflect.Method m = clz.getMethod(methodName, String.class);
-                        Object result = m.invoke(null, url);
-                        if (result instanceof String && !TextUtils.isEmpty((String) result)) {
-                            markSuccess("host-http", className, methodName);
-                            trace("host http provider hit: " + className + "#" + methodName);
-                            return (String) result;
-                        }
-                    } catch (Throwable ignored) {
-                    }
-                }
-            } catch (Throwable ignored) {
-            }
-        }
+        scanNotes = appendScanNote(scanNotes, "host-http=empty");
         return null;
-    }
-
-    private static String preview(String text) {
-        if (TextUtils.isEmpty(text)) return "<empty>";
-        String s = text.replace("\n", " ").replace("\r", " ").trim();
-        return s.substring(0, Math.min(s.length(), 200));
     }
 
     public static String getSubscriptionUrlPublic() {
-        return getSubscriptionUrl();
-    }
-
-    private static String getSubscriptionUrl() {
-        for (String className : CONFIG_CLASS_NAMES) {
-            try {
-                Class<?> clz = Class.forName(className);
-                Object instance = getInstance(clz);
-                for (String methodName : URL_METHODS) {
-                    try {
-                        Method m = clz.getMethod(methodName);
-                        m.setAccessible(true);
-                        Object result = m.invoke(instance);
-                        if (result instanceof String && !TextUtils.isEmpty((String) result)) {
-                            return (String) result;
-                        }
-                    } catch (Throwable ignored) {
-                    }
-                }
-            } catch (Throwable ignored) {
-            }
-        }
-        return null;
+        return cachedSubscriptionUrl;
     }
 
     private static String httpGetOnWorker(final String urlStr, final int timeoutMs) throws Exception {
-        trace("httpGetOnWorker dispatch");
         FutureTask<String> task = new FutureTask<>(new Callable<String>() {
             @Override
             public String call() throws Exception {
-                trace("httpGetOnWorker running in background");
                 return httpGet(urlStr, timeoutMs);
             }
         });
         Thread t = new Thread(task, "LeoDanmu-HttpWorker");
         t.start();
         try {
-            String body = task.get();
-            trace("httpGetOnWorker completed");
-            return body;
+            return task.get();
         } catch (Exception e) {
             Throwable cause = e.getCause();
             if (cause instanceof Exception) throw (Exception) cause;
@@ -579,7 +302,6 @@ public class ExtFetcher {
     private static String httpGet(String urlStr, int timeoutMs) throws Exception {
         HttpURLConnection conn = null;
         try {
-            trace("httpGet start: " + urlStr);
             URL url = new URL(urlStr);
             conn = (HttpURLConnection) url.openConnection();
             conn.setConnectTimeout(timeoutMs);
@@ -589,12 +311,8 @@ public class ExtFetcher {
             conn.setRequestProperty("User-Agent", "Mozilla/5.0 LeoDanmu/1.0");
             conn.setRequestProperty("Accept", "application/json,text/plain,*/*");
             int code = conn.getResponseCode();
-            trace("httpGet status: " + code);
-            String contentType = conn.getContentType();
-            trace("httpGet content-type: " + (contentType == null ? "-" : contentType));
             if (code != 200) {
-                String location = conn.getHeaderField("Location");
-                if (!TextUtils.isEmpty(location)) trace("httpGet location: " + location);
+                lastError = "http-status-" + code;
                 return null;
             }
             BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
@@ -602,13 +320,7 @@ public class ExtFetcher {
             String line;
             while ((line = reader.readLine()) != null) sb.append(line);
             reader.close();
-            String body = sb.toString();
-            trace("httpGet body preview: " + preview(body));
-            return body;
-        } catch (Exception e) {
-            trace("httpGet exception type: " + e.getClass().getName());
-            trace("httpGet exception message: " + e.getMessage());
-            throw e;
+            return sb.toString();
         } finally {
             if (conn != null) conn.disconnect();
         }

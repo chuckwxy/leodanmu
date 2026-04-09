@@ -33,11 +33,11 @@ public class Leodanmu extends Spider {
 
     // ext 懒加载缓存，兼容直播等不调用 init() 的客户端
     private static String cachedExt = null;
+    private static int cachedExtHash = 0;
     private static boolean configLoaded = false;
     private static final Object CONFIG_LOCK = new Object();
-    private static boolean autoPrefetchDone = false;
-    private static long lastAutoPrefetchTime = 0L;
-    private static final long AUTO_PREFETCH_MIN_INTERVAL = 5000L;
+    private static String lastAppliedExt = null;
+    private static int lastAppliedExtHash = 0;
 
     // Hook 诊断状态
     private static String hookLastStage = "idle";
@@ -70,16 +70,17 @@ public class Leodanmu extends Spider {
         updateHookStatus("init", "enter", "", "", extend, "");
         if (TextUtils.isEmpty(extend) && TextUtils.isEmpty(cachedExt)) {
             try {
-                String fetchedExt = ExtFetcher.fetchExtFromOkJson(context);
+                String fetchedExt = ExtFetcher.fetchExtFromSubscription(context);
                 if (!TextUtils.isEmpty(fetchedExt)) {
                     extend = fetchedExt;
                     cachedExt = fetchedExt;
+                    cachedExtHash = fetchedExt.hashCode();
                     configLoaded = false;
                     applyExtIfNeeded(context, fetchedExt, "init");
-                    log("init: 从Ok影视配置JSON补到ext成功");
+                    log("init: 从订阅配置补到ext成功");
                     updateHookStatus("init", ExtFetcher.getLastSource(), ExtFetcher.getLastClassName(), ExtFetcher.getLastMethodName(), fetchedExt, "");
                 } else {
-                    log("init: ext为空，未从Ok影视配置JSON补到ext，回落到缓存/已保存配置");
+                    log("init: ext为空，未从订阅配置补到ext，回落到缓存/已保存配置");
                     updateHookStatus("init", ExtFetcher.getLastSource(), ExtFetcher.getLastClassName(), ExtFetcher.getLastMethodName(), "", ExtFetcher.getLastError());
                 }
             } catch (Exception e) {
@@ -95,6 +96,7 @@ public class Leodanmu extends Spider {
         // 缓存 ext，供不调用 init() 的客户端（直播等）后续使用
         if (!TextUtils.isEmpty(extend)) {
             cachedExt = extend;
+            cachedExtHash = extend.hashCode();
             configLoaded = false; // 有新 ext，强制重新加载配置
         }
         doInitWork(context, extend);
@@ -108,21 +110,18 @@ public class Leodanmu extends Spider {
         if (configLoaded) return;
         synchronized (CONFIG_LOCK) {
             if (configLoaded) return;
-            // log("ensureConfig enter: ctx=" + (context == null ? "null" : context.getClass().getName())
-            //         + ", cachedExtEmpty=" + TextUtils.isEmpty(cachedExt)
-            //         + ", configLoaded=" + configLoaded);
             try {
-                if (!TextUtils.isEmpty(cachedExt)) {
-                    applyExtIfNeeded(context, cachedExt, "ensureConfig");
-                } else if (context != null) {
+                if (context != null) {
                     DanmakuConfig config = DanmakuConfigManager.getConfig(context);
-                    log("ensureConfig: 使用已保存配置, apiUrls=" + config.getApiUrls()
-                            + ", autoPush=" + config.isAutoPushEnabled()
-                            + ", pushToast=" + config.isPushToastEnabled()
-                            + ", theme=" + config.getTheme()
-                            + ", lpWidth=" + config.getLpWidth()
-                            + ", lpHeight=" + config.getLpHeight()
-                            + ", lpAlpha=" + config.getLpAlpha());
+                    if (config != null) {
+                        log("ensureConfig: 使用已保存配置, apiUrls=" + config.getApiUrls()
+                                + ", autoPush=" + config.isAutoPushEnabled()
+                                + ", pushToast=" + config.isPushToastEnabled()
+                                + ", theme=" + config.getTheme()
+                                + ", lpWidth=" + config.getLpWidth()
+                                + ", lpHeight=" + config.getLpHeight()
+                                + ", lpAlpha=" + config.getLpAlpha());
+                    }
                 } else {
                     log("ensureConfig: context为空，跳过配置预热");
                 }
@@ -165,13 +164,8 @@ public class Leodanmu extends Spider {
         sCacheDir = new File(context.getCacheDir(), "leo_danmaku_cache");
         if (!sCacheDir.exists()) sCacheDir.mkdirs();
 
-        // 初始化配置（每次都更新，不受 initialized 保护）
-        DanmakuConfig config = DanmakuConfigManager.loadConfig(context);
-        if (!TextUtils.isEmpty(extend)) {
-            applyExtIfNeeded(context, extend, "doInitWork");
-            config = DanmakuConfigManager.getConfig(context);
-            log("doInitWork: ext已应用，apiUrls=" + config.getApiUrls());
-        }
+        // 初始化配置缓存，不再在这里重复应用 ext，避免 TV 端重复解析/落盘
+        DanmakuConfig config = DanmakuConfigManager.getConfig(context);
 
         if (initialized) return;
 
@@ -280,24 +274,28 @@ public class Leodanmu extends Spider {
 
     private static void applyExtIfNeeded(Context context, String ext, String stage) {
         if (context == null || TextUtils.isEmpty(ext)) return;
+        int extHash = ext.hashCode();
+        if (!TextUtils.isEmpty(lastAppliedExt) && lastAppliedExtHash == extHash && TextUtils.equals(lastAppliedExt, ext)) {
+            log(stage + ": ext already applied, skip");
+            return;
+        }
         try {
-            DanmakuConfig config = DanmakuConfigManager.loadConfig(context);
+            DanmakuConfig config = DanmakuConfigManager.getConfig(context);
             if (config == null) config = new DanmakuConfig();
             boolean changed = false;
             if (ext.startsWith("{")) {
                 JSONObject jsonObject = new JSONObject(ext);
-                String before = config.toString();
                 if (jsonObject.has("apiUrls")) {
                     Object urlsObj = jsonObject.opt("apiUrls");
                     java.util.Set<String> newUrls = new java.util.HashSet<>();
                     if (urlsObj instanceof JSONArray) {
                         JSONArray arr = (JSONArray) urlsObj;
                         for (int i = 0; i < arr.length(); i++) {
-                            String url = arr.optString(i, "").replace("/", "/").trim();
+                            String url = arr.optString(i, "").trim();
                             if (!TextUtils.isEmpty(url)) newUrls.add(url);
                         }
                     } else {
-                        String url = jsonObject.optString("apiUrls", "").replace("/", "/").trim();
+                        String url = jsonObject.optString("apiUrls", "").trim();
                         if (!TextUtils.isEmpty(url)) newUrls.add(url);
                     }
                     if (!newUrls.isEmpty() && !newUrls.equals(config.getApiUrls())) {
@@ -354,11 +352,6 @@ public class Leodanmu extends Spider {
                         log(stage + ": save lpAlpha=" + config.getLpAlpha());
                     }
                 }
-                log(stage + ": ext json keys=" + jsonObject.toString().substring(0, Math.min(jsonObject.toString().length(), 320)));
-                if (!changed) {
-                    String after = config.toString();
-                    changed = !TextUtils.equals(before, after);
-                }
             } else if (ext.startsWith("http")) {
                 java.util.Set<String> mergedUrls = new java.util.HashSet<>(config.getApiUrls());
                 for (String url : ext.split(",")) {
@@ -374,14 +367,12 @@ public class Leodanmu extends Spider {
 
             if (changed) {
                 DanmakuConfigManager.saveConfig(context, config);
-                DanmakuConfig saved = DanmakuConfigManager.loadConfig(context);
-                log(stage + ": ext已自动保存到DanmakuConfig, final apiUrls=" + saved.getApiUrls()
-                        + ", autoPush=" + saved.isAutoPushEnabled()
-                        + ", pushToast=" + saved.isPushToastEnabled()
-                        + ", theme=" + saved.getTheme());
+                log(stage + ": ext已自动保存到DanmakuConfig");
             } else {
                 log(stage + ": ext unchanged, skip save");
             }
+            lastAppliedExt = ext;
+            lastAppliedExtHash = extHash;
         } catch (Exception e) {
             log(stage + ": ext自动保存失败: " + e.getClass().getName() + ": " + e.getMessage());
         }

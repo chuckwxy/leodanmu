@@ -385,7 +385,7 @@ public class DanmakuUIHelper {
         if (activity.isFinishing() || activity.isDestroyed()) return;
 
         try {
-            String fetchedExt = ExtFetcher.fetchExtFromOkJson(activity);
+            String fetchedExt = ExtFetcher.fetchExtFromSubscription(activity);
             if (!TextUtils.isEmpty(fetchedExt)) {
                 Leodanmu.saveFetchedExtToConfig(activity, fetchedExt, "configDialog");
                 Leodanmu.updateHookStatus("configDialog", ExtFetcher.getLastSource(), ExtFetcher.getLastClassName(), ExtFetcher.getLastMethodName(), fetchedExt, "");

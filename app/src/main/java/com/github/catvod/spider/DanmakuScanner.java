@@ -1496,7 +1496,7 @@ public class DanmakuScanner {
 
                             Leodanmu.log("[按钮点击] 打开搜索对话框");
                             try {
-                                String fetchedExt = ExtFetcher.fetchExtFromOkJson(activity);
+                                String fetchedExt = ExtFetcher.fetchExtFromSubscription(activity);
                                 if (!android.text.TextUtils.isEmpty(fetchedExt)) {
                                     Leodanmu.updateHookStatus("searchButton", ExtFetcher.getLastSource(), ExtFetcher.getLastClassName(), ExtFetcher.getLastMethodName(), fetchedExt, "");
                                     Leodanmu.log("[按钮点击] 搜索前主动hook成功");
