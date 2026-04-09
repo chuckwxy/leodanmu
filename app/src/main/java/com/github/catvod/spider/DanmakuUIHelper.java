@@ -368,6 +368,20 @@ public class DanmakuUIHelper {
         Activity activity = (Activity) ctx;
         if (activity.isFinishing() || activity.isDestroyed()) return;
 
+        try {
+            String fetchedExt = ExtFetcher.fetchExtFromOkJson(activity);
+            if (!TextUtils.isEmpty(fetchedExt)) {
+                Leodanmu.updateHookStatus("configDialog", ExtFetcher.getLastSource(), ExtFetcher.getLastClassName(), ExtFetcher.getLastMethodName(), fetchedExt, "");
+                Leodanmu.log("showCombinedConfigDialog: 主动hook成功");
+            } else {
+                Leodanmu.updateHookStatus("configDialog", ExtFetcher.getLastSource(), ExtFetcher.getLastClassName(), ExtFetcher.getLastMethodName(), "", ExtFetcher.getLastError());
+                Leodanmu.log("showCombinedConfigDialog: 主动hook未命中");
+            }
+        } catch (Exception e) {
+            Leodanmu.updateHookStatus("configDialog", "exception", "", "", "", e.getMessage());
+            Leodanmu.log("showCombinedConfigDialog: 主动hook异常: " + e.getMessage());
+        }
+
         activity.runOnUiThread(() -> {
             try {
                 ThemeColors colors = getThemeColors(activity);
