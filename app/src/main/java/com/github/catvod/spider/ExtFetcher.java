@@ -12,6 +12,8 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * 在 init() 收到空 ext 时，优先从 Ok影视宿主运行时已加载的配置 JSON 里提取 ext；
@@ -30,11 +32,23 @@ public class ExtFetcher {
             "com.fongmi.android.tv.api.config.VodConfig",
             "com.fongmi.android.tv.api.LiveConfig",
             "com.fongmi.android.tv.api.VodConfig",
-            // Ok影视可能存在的兼容类名，放宽匹配
+            "com.github.tvbox.osc.api.config.LiveConfig",
+            "com.github.tvbox.osc.api.config.VodConfig",
+            "com.github.tvbox.osc.api.LiveConfig",
+            "com.github.tvbox.osc.api.VodConfig",
+            "com.github.catvod.api.config.LiveConfig",
+            "com.github.catvod.api.config.VodConfig",
+            // Ok影视 / 魔改宿主兼容猜测
             "com.ok影视.api.config.LiveConfig",
             "com.ok影视.api.config.VodConfig",
+            "com.ok影视.tv.api.config.LiveConfig",
+            "com.ok影视.tv.api.config.VodConfig",
             "com.ok.video.api.config.LiveConfig",
-            "com.ok.video.api.config.VodConfig"
+            "com.ok.video.api.config.VodConfig",
+            "com.oktv.api.config.LiveConfig",
+            "com.oktv.api.config.VodConfig",
+            "com.player.ok.api.config.LiveConfig",
+            "com.player.ok.api.config.VodConfig"
     };
 
     private static final String[] INSTANCE_METHODS = {
@@ -53,9 +67,22 @@ public class ExtFetcher {
             "getSites", "sites"
     };
 
+    private static final String[] CLASS_SCAN_CANDIDATES = {
+            "Config", "LiveConfig", "VodConfig", "ApiConfig", "SourceConfig", "SiteConfig",
+            "Live", "Vod", "Spider", "JarLoader", "BaseLoader", "Loader", "Setting"
+    };
+
+    private static final String[] PACKAGE_SCAN_HINTS = {
+            "fongmi", "tvbox", "catvod", "ok", "影视", "player", "osc"
+    };
+
+    private static String scanNotes = "";
+
     public static String fetchExtFromOkJson(Context context) {
         resetLastState();
         String ext = fetchExtFromRuntimeConfig();
+        if (!TextUtils.isEmpty(ext)) return ext;
+        ext = fetchExtFromCandidateScan(context);
         if (!TextUtils.isEmpty(ext)) return ext;
         return fetchExtFromSubscriptionUrlFallback();
     }
@@ -282,6 +309,88 @@ public class ExtFetcher {
         return null;
     }
 
+    private static String fetchExtFromCandidateScan(Context context) {
+        if (context == null) {
+            lastError = "candidate-scan-no-context";
+            return null;
+        }
+        List<String> notes = new ArrayList<>();
+        try {
+            ClassLoader loader = context.getClassLoader();
+            for (String className : buildCandidateClassNames()) {
+                try {
+                    Class<?> clz = Class.forName(className, false, loader);
+                    Object instance = getInstance(clz);
+
+                    String ext = fetchExtFromJsonMethods(clz, instance);
+                    if (!TextUtils.isEmpty(ext)) {
+                        scanNotes = joinNotes(notes, "hit-json:" + className);
+                        markSuccess("candidate-json", className, "json-method");
+                        return ext;
+                    }
+
+                    ext = fetchExtFromSitesMethods(clz, instance);
+                    if (!TextUtils.isEmpty(ext)) {
+                        scanNotes = joinNotes(notes, "hit-sites:" + className);
+                        markSuccess("candidate-sites", className, "sites-method");
+                        return ext;
+                    }
+
+                    ext = fetchExtFromFields(clz, instance);
+                    if (!TextUtils.isEmpty(ext)) {
+                        scanNotes = joinNotes(notes, "hit-field:" + className);
+                        markSuccess("candidate-field", className, "field-scan");
+                        return ext;
+                    }
+
+                    notes.add("miss:" + className);
+                } catch (Throwable ignored) {
+                }
+            }
+            scanNotes = joinNotes(notes, "no-hit");
+            lastError = "candidate-scan-no-hit";
+        } catch (Throwable e) {
+            scanNotes = joinNotes(notes, "scan-ex:" + e.getMessage());
+            lastError = e.getMessage();
+        }
+        return null;
+    }
+
+    private static List<String> buildCandidateClassNames() {
+        List<String> names = new ArrayList<>();
+        String[] prefixes = new String[] {
+                "com.fongmi.android.tv.api.config.",
+                "com.fongmi.android.tv.api.",
+                "com.github.tvbox.osc.api.config.",
+                "com.github.tvbox.osc.api.",
+                "com.github.catvod.api.config.",
+                "com.github.catvod.api.",
+                "com.ok.video.api.config.",
+                "com.ok.video.api.",
+                "com.oktv.api.config.",
+                "com.oktv.api.",
+                "com.player.ok.api.config.",
+                "com.player.ok.api."
+        };
+        for (String prefix : prefixes) {
+            for (String name : CLASS_SCAN_CANDIDATES) {
+                names.add(prefix + name);
+            }
+        }
+        return names;
+    }
+
+    private static String joinNotes(List<String> notes, String tail) {
+        if (tail != null && !tail.isEmpty()) notes.add(tail);
+        StringBuilder sb = new StringBuilder();
+        int max = Math.min(notes.size(), 12);
+        for (int i = 0; i < max; i++) {
+            if (i > 0) sb.append(" | ");
+            sb.append(notes.get(i));
+        }
+        return sb.toString();
+    }
+
     private static String fetchExtFromSubscriptionUrlFallback() {
         String subscriptionUrl = getSubscriptionUrl();
         if (TextUtils.isEmpty(subscriptionUrl)) {
@@ -321,6 +430,9 @@ public class ExtFetcher {
     }
 
     public static String getLastError() {
+        if (!TextUtils.isEmpty(scanNotes)) {
+            return TextUtils.isEmpty(lastError) ? scanNotes : (lastError + " | " + scanNotes);
+        }
         return lastError;
     }
 
@@ -329,6 +441,7 @@ public class ExtFetcher {
         lastClassName = "";
         lastMethodName = "";
         lastError = "";
+        scanNotes = "";
     }
 
     private static void markSuccess(String source, String className, String methodName) {
