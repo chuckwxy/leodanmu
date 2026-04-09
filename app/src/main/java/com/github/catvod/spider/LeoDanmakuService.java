@@ -545,6 +545,12 @@ public class LeoDanmakuService {
     // ========== 修改：直接推送弹幕URL，使用动态端口和防重复推送 ==========
     public static void pushDanmakuDirect(DanmakuItem danmakuItem, Activity activity, boolean isAuto) {
         String danmakuUrl = danmakuItem.getDanmakuUrl();
+        Leodanmu.log("pushDanmakuDirect enter: title=" + danmakuItem.getTitle()
+                + ", ep=" + danmakuItem.getEpTitle()
+                + ", isAuto=" + isAuto
+                + ", url=" + danmakuUrl
+                + ", thread=" + Thread.currentThread().getName());
+        Leodanmu.log("pushDanmakuDirect stack: " + buildShortStack());
         if (TextUtils.isEmpty(danmakuUrl)) {
             Leodanmu.log("⚠️ 推送弹幕URL为空，跳过");
             return;
@@ -554,6 +560,9 @@ public class LeoDanmakuService {
 
         // 检查此URL的上次推送时间
         Long lastPush = lastPushTimes.get(danmakuUrl);
+        if (lastPush != null) {
+            Leodanmu.log("push duplicate probe hit: url=" + danmakuUrl + ", delta=" + (currentTime - lastPush) + "ms");
+        }
         if (lastPush != null && (currentTime - lastPush < PUSH_MIN_INTERVAL)) {
             Leodanmu.log("⚠️ 推送过于频繁 (同一URL)，跳过: " + danmakuUrl);
             return;
@@ -669,11 +678,13 @@ public class LeoDanmakuService {
             Leodanmu.log("推送地址: " + pushUrl);
 
             String pushResp = "";
+            Leodanmu.log("push request start: " + pushUrl);
             for (int i = 0; i < 3; i++) {
                 pushResp = NetworkUtils.robustHttpGet(pushUrl);
                 Leodanmu.log("推送尝试 " + (i + 1) + "/3: " + (!TextUtils.isEmpty(pushResp) ? "成功" : "失败"));
                 if (!TextUtils.isEmpty(pushResp) && pushResp.toLowerCase().contains("ok")) {
                     Leodanmu.log("✅ 推送成功");
+                    Leodanmu.log("push request success: " + pushUrl);
                     break;
                 }
                 if (i < 2) {
@@ -732,6 +743,21 @@ public class LeoDanmakuService {
                 Utils.safeShowToast(activity, "推送异常: " + e.getMessage());
             }
         }
+    }
+
+    private static String buildShortStack() {
+        StackTraceElement[] stack = Thread.currentThread().getStackTrace();
+        StringBuilder sb = new StringBuilder();
+        int count = 0;
+        for (StackTraceElement e : stack) {
+            String cls = e.getClassName();
+            if (cls.contains("Thread") || cls.contains("LeoDanmakuService")) continue;
+            if (count > 0) sb.append(" <- ");
+            sb.append(cls).append("#").append(e.getMethodName()).append(":").append(e.getLineNumber());
+            count++;
+            if (count >= 6) break;
+        }
+        return sb.toString();
     }
 
     // ========== 替换：DOM 解析统计弹幕条数 ==========

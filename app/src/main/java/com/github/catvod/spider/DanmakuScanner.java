@@ -1637,6 +1637,19 @@ public class DanmakuScanner {
                         // 确保按钮正确显示
                         btn.setVisibility(View.VISIBLE);
                         btn.setClickable(true);
+                        if (parent.getContext() instanceof Activity) {
+                            Activity activity = (Activity) parent.getContext();
+                            new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+                                @Override
+                                public void run() {
+                                    try {
+                                        Leodanmu.tryAutoPrefetchExt(activity, "scannerAutoPrefetch");
+                                    } catch (Exception e) {
+                                        Leodanmu.log("scannerAutoPrefetch exception: " + e.getMessage());
+                                    }
+                                }
+                            }, 800);
+                        }
                     }
                 });
 

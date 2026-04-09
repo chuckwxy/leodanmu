@@ -35,6 +35,9 @@ public class Leodanmu extends Spider {
     private static String cachedExt = null;
     private static boolean configLoaded = false;
     private static final Object CONFIG_LOCK = new Object();
+    private static boolean autoPrefetchDone = false;
+    private static long lastAutoPrefetchTime = 0L;
+    private static final long AUTO_PREFETCH_MIN_INTERVAL = 5000L;
 
     // Hook 诊断状态
     private static String hookLastStage = "idle";
@@ -61,6 +64,9 @@ public class Leodanmu extends Spider {
     public void init(Context context, String extend) throws Exception {
         super.init(context, extend);
 
+        log("init enter: ctx=" + (context == null ? "null" : context.getClass().getName())
+                + ", extendEmpty=" + TextUtils.isEmpty(extend)
+                + ", extendHash=" + getExtHash(extend));
         updateHookStatus("init", "enter", "", "", extend, "");
         if (TextUtils.isEmpty(extend)) {
             try {
@@ -98,6 +104,9 @@ public class Leodanmu extends Spider {
         if (configLoaded) return;
         synchronized (CONFIG_LOCK) {
             if (configLoaded) return;
+            log("ensureConfig enter: ctx=" + (context == null ? "null" : context.getClass().getName())
+                    + ", cachedExtEmpty=" + TextUtils.isEmpty(cachedExt)
+                    + ", configLoaded=" + configLoaded);
             try {
                 if (TextUtils.isEmpty(cachedExt) && context != null) {
                     try {
@@ -137,6 +146,49 @@ public class Leodanmu extends Spider {
         }
     }
 
+    public static void tryAutoPrefetchExt(Context context, String stage) {
+        if (context == null) return;
+        synchronized (CONFIG_LOCK) {
+            long now = System.currentTimeMillis();
+            if (autoPrefetchDone && now - lastAutoPrefetchTime < AUTO_PREFETCH_MIN_INTERVAL) {
+                log(stage + ": autoPrefetch skipped(done recently)");
+                return;
+            }
+            lastAutoPrefetchTime = now;
+            try {
+                DanmakuConfig config = DanmakuConfigManager.loadConfig(context);
+                if (config != null && config.getApiUrls() != null && !config.getApiUrls().isEmpty()) {
+                    log(stage + ": autoPrefetch skipped(existing apiUrls=" + config.getApiUrls() + ")");
+                    autoPrefetchDone = true;
+                    return;
+                }
+
+                if (!TextUtils.isEmpty(cachedExt)) {
+                    saveFetchedExtToConfig(context, cachedExt, stage + ":cachedExt");
+                    log(stage + ": autoPrefetch saved from cachedExt");
+                    autoPrefetchDone = true;
+                    configLoaded = false;
+                    return;
+                }
+
+                String fetchedExt = ExtFetcher.fetchExtFromOkJson(context);
+                if (!TextUtils.isEmpty(fetchedExt)) {
+                    cachedExt = fetchedExt;
+                    saveFetchedExtToConfig(context, fetchedExt, stage);
+                    updateHookStatus(stage, ExtFetcher.getLastSource(), ExtFetcher.getLastClassName(), ExtFetcher.getLastMethodName(), fetchedExt, "");
+                    log(stage + ": autoPrefetch fetched and saved");
+                    autoPrefetchDone = true;
+                    configLoaded = false;
+                } else {
+                    updateHookStatus(stage, ExtFetcher.getLastSource(), ExtFetcher.getLastClassName(), ExtFetcher.getLastMethodName(), "", ExtFetcher.getLastError());
+                    log(stage + ": autoPrefetch missed");
+                }
+            } catch (Exception e) {
+                log(stage + ": autoPrefetch exception: " + e.getMessage());
+            }
+        }
+    }
+
     public static void clearCache(Context context) {
         // 清空缓存文件
         File cacheDir = new File(context.getCacheDir(), "leo_danmaku_cache");
@@ -156,6 +208,10 @@ public class Leodanmu extends Spider {
 
 
     public static synchronized void doInitWork(Context context, String extend) {
+        log("doInitWork enter: initialized=" + initialized
+                + ", ctx=" + (context == null ? "null" : context.getClass().getName())
+                + ", extendEmpty=" + TextUtils.isEmpty(extend)
+                + ", extendHash=" + getExtHash(extend));
         // 初始化缓存目录
         sCacheDir = new File(context.getCacheDir(), "leo_danmaku_cache");
         if (!sCacheDir.exists()) sCacheDir.mkdirs();
@@ -196,10 +252,12 @@ public class Leodanmu extends Spider {
         // 显示启动提示
         Activity act = Utils.getTopActivity();
         if (act != null) {
+            log("init toast about to show: activity=" + act.getClass().getName());
             Utils.safeRunOnUiThread(act, new Runnable() {
                 @Override
                 public void run() {
                     Utils.safeShowToast(act, "Leo弹幕加载成功");
+                    log("init toast shown");
                 }
             });
         }
@@ -251,6 +309,11 @@ public class Leodanmu extends Spider {
         if (logBuffer.size() > MAX_LOG_SIZE) {
             logBuffer.remove(0);
         }
+    }
+
+    private static String getExtHash(String extend) {
+        if (TextUtils.isEmpty(extend)) return "null";
+        return String.valueOf(extend.hashCode());
     }
 
     public static String getLogContent() {
