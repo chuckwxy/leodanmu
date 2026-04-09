@@ -343,31 +343,39 @@ public class ExtFetcher {
             trace("host config no context");
             return null;
         }
+        String prefName = context.getPackageName() + "_preferences";
         try {
-            String prefName = context.getPackageName() + "_preferences";
             trace("read pref: " + prefName);
             SharedPreferences sp = context.getSharedPreferences(prefName, Context.MODE_PRIVATE);
             String[] keys = new String[] {"config_0", "config_1", "config_2"};
+            StringBuilder errs = new StringBuilder();
             for (String key : keys) {
-                String raw = sp.getString(key, "");
-                trace("read key: " + key);
-                if (TextUtils.isEmpty(raw)) {
-                    trace(key + " empty");
-                    continue;
-                }
-                String preview = raw.substring(0, Math.min(raw.length(), 160)).replace("\n", " ");
-                scanNotes = appendScanNote(scanNotes, key + "=" + preview);
-                trace("preview " + key + ": " + preview);
+                try {
+                    String raw = sp.getString(key, "");
+                    trace("read key: " + key);
+                    if (TextUtils.isEmpty(raw)) {
+                        trace(key + " empty");
+                        continue;
+                    }
+                    String preview = raw.substring(0, Math.min(raw.length(), 160)).replace("\n", " ");
+                    scanNotes = appendScanNote(scanNotes, key + "=" + preview);
+                    trace("preview " + key + ": " + preview);
 
-                String ext = tryExtractExtFromConfigValue(key, raw);
-                if (!TextUtils.isEmpty(ext)) {
-                    markSuccess("host-config", prefName, key);
-                    trace("ext found from " + key);
-                    return ext;
+                    String ext = tryExtractExtFromConfigValue(key, raw);
+                    if (!TextUtils.isEmpty(ext)) {
+                        markSuccess("host-config", prefName, key);
+                        trace("ext found from " + key);
+                        return ext;
+                    }
+                    trace("no ext from " + key);
+                } catch (Throwable e) {
+                    String msg = e.getMessage();
+                    if (errs.length() > 0) errs.append(" | ");
+                    errs.append(key).append(":").append(msg == null ? e.getClass().getSimpleName() : msg);
+                    trace(key + " exception: " + (msg == null ? e.getClass().getSimpleName() : msg));
                 }
-                trace("no ext from " + key);
             }
-            lastError = "config-keys-no-hit";
+            lastError = errs.length() > 0 ? ("config-keys-no-hit | " + errs) : "config-keys-no-hit";
             trace("config_0/1/2 all miss");
             return null;
         } catch (Throwable e) {
