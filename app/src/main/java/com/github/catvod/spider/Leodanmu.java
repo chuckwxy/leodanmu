@@ -64,9 +64,9 @@ public class Leodanmu extends Spider {
     public void init(Context context, String extend) throws Exception {
         super.init(context, extend);
 
-        log("init enter: ctx=" + (context == null ? "null" : context.getClass().getName())
-                + ", extendEmpty=" + TextUtils.isEmpty(extend)
-                + ", extendHash=" + getExtHash(extend));
+        // log("init enter: ctx=" + (context == null ? "null" : context.getClass().getName())
+        //         + ", extendEmpty=" + TextUtils.isEmpty(extend)
+        //         + ", extendHash=" + getExtHash(extend));
         updateHookStatus("init", "enter", "", "", extend, "");
         if (TextUtils.isEmpty(extend)) {
             try {
@@ -104,9 +104,9 @@ public class Leodanmu extends Spider {
         if (configLoaded) return;
         synchronized (CONFIG_LOCK) {
             if (configLoaded) return;
-            log("ensureConfig enter: ctx=" + (context == null ? "null" : context.getClass().getName())
-                    + ", cachedExtEmpty=" + TextUtils.isEmpty(cachedExt)
-                    + ", configLoaded=" + configLoaded);
+            // log("ensureConfig enter: ctx=" + (context == null ? "null" : context.getClass().getName())
+            //         + ", cachedExtEmpty=" + TextUtils.isEmpty(cachedExt)
+            //         + ", configLoaded=" + configLoaded);
             try {
                 if (TextUtils.isEmpty(cachedExt) && context != null) {
                     try {
@@ -208,10 +208,10 @@ public class Leodanmu extends Spider {
 
 
     public static synchronized void doInitWork(Context context, String extend) {
-        log("doInitWork enter: initialized=" + initialized
-                + ", ctx=" + (context == null ? "null" : context.getClass().getName())
-                + ", extendEmpty=" + TextUtils.isEmpty(extend)
-                + ", extendHash=" + getExtHash(extend));
+        // log("doInitWork enter: initialized=" + initialized
+        //         + ", ctx=" + (context == null ? "null" : context.getClass().getName())
+        //         + ", extendEmpty=" + TextUtils.isEmpty(extend)
+        //         + ", extendHash=" + getExtHash(extend));
         // 初始化缓存目录
         sCacheDir = new File(context.getCacheDir(), "leo_danmaku_cache");
         if (!sCacheDir.exists()) sCacheDir.mkdirs();
@@ -252,12 +252,12 @@ public class Leodanmu extends Spider {
         // 显示启动提示
         Activity act = Utils.getTopActivity();
         if (act != null) {
-            log("init toast about to show: activity=" + act.getClass().getName());
+            // log("init toast about to show: activity=" + act.getClass().getName());
             Utils.safeRunOnUiThread(act, new Runnable() {
                 @Override
                 public void run() {
                     Utils.safeShowToast(act, "Leo弹幕加载成功");
-                    log("init toast shown");
+                    // log("init toast shown");
                 }
             });
         }

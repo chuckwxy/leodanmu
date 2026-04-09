@@ -640,19 +640,19 @@ public class DanmakuUIHelper {
                 leftArea.addView(clearCacheBtn);
 
                 // 第六行：弹幕日志（追加，不改前面5行布局）
-                Button logBtn = createStaticBorderButton(activity, "弹幕日志");
-                logBtn.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
-                logBtn.setLayoutParams(new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(activity, 44)));
-                ((LinearLayout.LayoutParams) logBtn.getLayoutParams()).topMargin = dpToPx(activity, 8);
-                logBtn.setOnClickListener(v -> {
-                    try {
-                        showLogDialog(activity);
-                    } catch (Exception e) {
-                        Leodanmu.log("打开弹幕日志失败: " + e.getMessage());
-                    }
-                });
-                leftArea.addView(logBtn);
+                // Button logBtn = createStaticBorderButton(activity, "弹幕日志");
+                // logBtn.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
+                // logBtn.setLayoutParams(new LinearLayout.LayoutParams(
+                //         ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(activity, 44)));
+                // ((LinearLayout.LayoutParams) logBtn.getLayoutParams()).topMargin = dpToPx(activity, 8);
+                // logBtn.setOnClickListener(v -> {
+                //     try {
+                //         showLogDialog(activity);
+                //     } catch (Exception e) {
+                //         Leodanmu.log("打开弹幕日志失败: " + e.getMessage());
+                //     }
+                // });
+                // leftArea.addView(logBtn);
 
                 middleRow.addView(leftArea);
 
