@@ -355,8 +355,7 @@ public class ExtFetcher {
                     trace(key + " empty");
                     continue;
                 }
-                String preview = raw.substring(0, Math.min(raw.length(), 160)).replace("
-", " ");
+                String preview = raw.substring(0, Math.min(raw.length(), 160)).replace("\n", " ");
                 scanNotes = appendScanNote(scanNotes, key + "=" + preview);
                 trace("preview " + key + ": " + preview);
 
