@@ -118,19 +118,15 @@ public class Leodanmu extends Spider {
                 }
 
                 if (!TextUtils.isEmpty(cachedExt)) {
-                    DanmakuConfig config = DanmakuConfigManager.loadConfig(context);
-                    JSONObject json = null;
-                    if (cachedExt.startsWith("{")) {
-                        json = new JSONObject(cachedExt);
-                        config.updateFromJson(json);
-                    } else if (cachedExt.startsWith("http")) {
-                        for (String url : cachedExt.split(",")) {
-                            String trimmed = url.trim();
-                            if (!TextUtils.isEmpty(trimmed)) config.getApiUrls().add(trimmed);
-                        }
-                    }
-                    DanmakuConfigManager.saveConfig(context, config);
-                    log("ensureConfig: 配置已从 ext 加载");
+                    saveFetchedExtToConfig(context, cachedExt, "ensureConfig");
+                    DanmakuConfig reloaded = DanmakuConfigManager.loadConfig(context);
+                    log("ensureConfig: 配置已从 ext 加载, apiUrls=" + reloaded.getApiUrls()
+                            + ", autoPush=" + reloaded.isAutoPushEnabled()
+                            + ", pushToast=" + reloaded.isPushToastEnabled()
+                            + ", theme=" + reloaded.getTheme()
+                            + ", lpWidth=" + reloaded.getLpWidth()
+                            + ", lpHeight=" + reloaded.getLpHeight()
+                            + ", lpAlpha=" + reloaded.getLpAlpha());
                 } else {
                     log("ensureConfig: ext 为空，使用已保存配置");
                 }
@@ -286,19 +282,73 @@ public class Leodanmu extends Spider {
         if (context == null || TextUtils.isEmpty(fetchedExt)) return;
         try {
             DanmakuConfig config = DanmakuConfigManager.loadConfig(context);
+            if (config == null) config = new DanmakuConfig();
             if (fetchedExt.startsWith("{")) {
                 JSONObject jsonObject = new JSONObject(fetchedExt);
-                config.updateFromJson(jsonObject);
+                if (jsonObject.has("apiUrls")) {
+                    Object urlsObj = jsonObject.opt("apiUrls");
+                    java.util.Set<String> newUrls = new java.util.HashSet<>();
+                    if (urlsObj instanceof JSONArray) {
+                        JSONArray arr = (JSONArray) urlsObj;
+                        for (int i = 0; i < arr.length(); i++) {
+                            String url = arr.optString(i, "").replace("\/", "/").trim();
+                            if (!TextUtils.isEmpty(url)) newUrls.add(url);
+                        }
+                    } else {
+                        String url = jsonObject.optString("apiUrls", "").replace("\/", "/").trim();
+                        if (!TextUtils.isEmpty(url)) newUrls.add(url);
+                    }
+                    if (!newUrls.isEmpty()) {
+                        config.setApiUrls(newUrls);
+                        log(stage + ": save apiUrls=" + newUrls);
+                    } else {
+                        log(stage + ": save apiUrls skipped(empty)");
+                    }
+                }
+                if (jsonObject.has("autoPushEnabled")) {
+                    config.setAutoPushEnabled(jsonObject.optBoolean("autoPushEnabled"));
+                    log(stage + ": save autoPushEnabled=" + config.isAutoPushEnabled());
+                }
+                if (jsonObject.has("pushToastEnabled")) {
+                    config.setPushToastEnabled(jsonObject.optBoolean("pushToastEnabled"));
+                    log(stage + ": save pushToastEnabled=" + config.isPushToastEnabled());
+                }
+                if (jsonObject.has("theme")) {
+                    config.setTheme(jsonObject.optInt("theme"));
+                    log(stage + ": save theme=" + config.getTheme());
+                }
+                if (jsonObject.has("lpWidth")) {
+                    config.setLpWidth((float) jsonObject.optDouble("lpWidth", config.getLpWidth()));
+                    log(stage + ": save lpWidth=" + config.getLpWidth());
+                }
+                if (jsonObject.has("lpHeight")) {
+                    config.setLpHeight((float) jsonObject.optDouble("lpHeight", config.getLpHeight()));
+                    log(stage + ": save lpHeight=" + config.getLpHeight());
+                }
+                if (jsonObject.has("lpAlpha")) {
+                    config.setLpAlpha((float) jsonObject.optDouble("lpAlpha", config.getLpAlpha()));
+                    log(stage + ": save lpAlpha=" + config.getLpAlpha());
+                }
+                log(stage + ": ext json keys=" + jsonObject.toString().substring(0, Math.min(jsonObject.toString().length(), 320)));
             } else if (fetchedExt.startsWith("http")) {
+                java.util.Set<String> newUrls = new java.util.HashSet<>();
                 for (String url : fetchedExt.split(",")) {
                     String trimmed = url.trim();
-                    if (!TextUtils.isEmpty(trimmed)) config.getApiUrls().add(trimmed);
+                    if (!TextUtils.isEmpty(trimmed)) newUrls.add(trimmed);
+                }
+                if (!newUrls.isEmpty()) {
+                    config.setApiUrls(newUrls);
+                    log(stage + ": save apiUrls=" + newUrls);
                 }
             }
             DanmakuConfigManager.saveConfig(context, config);
-            log(stage + ": ext已自动保存到DanmakuConfig");
+            DanmakuConfig saved = DanmakuConfigManager.loadConfig(context);
+            log(stage + ": ext已自动保存到DanmakuConfig, final apiUrls=" + saved.getApiUrls()
+                    + ", autoPush=" + saved.isAutoPushEnabled()
+                    + ", pushToast=" + saved.isPushToastEnabled()
+                    + ", theme=" + saved.getTheme());
         } catch (Exception e) {
-            log(stage + ": ext自动保存失败: " + e.getMessage());
+            log(stage + ": ext自动保存失败: " + e.getClass().getName() + ": " + e.getMessage());
         }
     }
 
@@ -501,7 +551,7 @@ public class Leodanmu extends Spider {
         hookLastSource = source;
         hookLastClass = className;
         hookLastMethod = methodName;
-        hookLastExtPreview = TextUtils.isEmpty(ext) ? "" : ext.substring(0, Math.min(ext.length(), 120));
+        hookLastExtPreview = TextUtils.isEmpty(ext) ? "" : ext.substring(0, Math.min(ext.length(), 260));
         hookLastError = error == null ? "" : error;
         log("hook状态: stage=" + hookLastStage + ", source=" + hookLastSource + ", class=" + hookLastClass + ", method=" + hookLastMethod + (TextUtils.isEmpty(hookLastError) ? "" : ", error=" + hookLastError));
     }
