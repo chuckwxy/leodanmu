@@ -388,6 +388,7 @@ public class ExtFetcher {
                 return null;
             }
             trace(key + " url fetched ok");
+            trace(key + " response preview: " + preview(json));
             String ext = extractExtFromUnknown(json);
             if (!TextUtils.isEmpty(ext)) return ext;
             trace(key + " json has no ext");
@@ -478,9 +479,11 @@ public class ExtFetcher {
         if (!TextUtils.isEmpty(body)) {
             scanNotes = appendScanNote(scanNotes, "host-http=ok");
             trace("host http success");
+            trace("host http body preview: " + preview(body));
             return body;
         }
         scanNotes = appendScanNote(scanNotes, "host-http=fallback");
+        trace("host http provider miss");
         trace("host http miss, fallback httpGet");
         return httpGet(url, 5000);
     }
@@ -495,10 +498,12 @@ public class ExtFetcher {
         };
         String[] methods = new String[] {"string", "get", "request"};
         for (String className : classNames) {
+            trace("try host provider: " + className);
             try {
                 Class<?> clz = Class.forName(className);
                 for (String methodName : methods) {
                     try {
+                        trace("try host method: " + className + "#" + methodName);
                         java.lang.reflect.Method m = clz.getMethod(methodName, String.class);
                         Object result = m.invoke(null, url);
                         if (result instanceof String && !TextUtils.isEmpty((String) result)) {
@@ -513,6 +518,13 @@ public class ExtFetcher {
             }
         }
         return null;
+    }
+
+    private static String preview(String text) {
+        if (TextUtils.isEmpty(text)) return "<empty>";
+        String s = text.replace("
+", " ").replace("", " ").trim();
+        return s.substring(0, Math.min(s.length(), 200));
     }
 
     public static String getSubscriptionUrlPublic() {
@@ -544,19 +556,36 @@ public class ExtFetcher {
     private static String httpGet(String urlStr, int timeoutMs) throws Exception {
         HttpURLConnection conn = null;
         try {
+            trace("httpGet start: " + urlStr);
             URL url = new URL(urlStr);
             conn = (HttpURLConnection) url.openConnection();
             conn.setConnectTimeout(timeoutMs);
             conn.setReadTimeout(timeoutMs);
+            conn.setInstanceFollowRedirects(true);
             conn.setRequestMethod("GET");
+            conn.setRequestProperty("User-Agent", "Mozilla/5.0 LeoDanmu/1.0");
+            conn.setRequestProperty("Accept", "application/json,text/plain,*/*");
             int code = conn.getResponseCode();
-            if (code != 200) return null;
+            trace("httpGet status: " + code);
+            String contentType = conn.getContentType();
+            trace("httpGet content-type: " + (contentType == null ? "-" : contentType));
+            if (code != 200) {
+                String location = conn.getHeaderField("Location");
+                if (!TextUtils.isEmpty(location)) trace("httpGet location: " + location);
+                return null;
+            }
             BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
             StringBuilder sb = new StringBuilder();
             String line;
             while ((line = reader.readLine()) != null) sb.append(line);
             reader.close();
-            return sb.toString();
+            String body = sb.toString();
+            trace("httpGet body preview: " + preview(body));
+            return body;
+        } catch (Exception e) {
+            trace("httpGet exception type: " + e.getClass().getName());
+            trace("httpGet exception message: " + e.getMessage());
+            throw e;
         } finally {
             if (conn != null) conn.disconnect();
         }
