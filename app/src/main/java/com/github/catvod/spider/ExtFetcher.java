@@ -16,6 +16,8 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.FutureTask;
 
 /**
  * 在 init() 收到空 ext 时，优先从 Ok影视宿主运行时已加载的配置 JSON 里提取 ext；
@@ -484,8 +486,8 @@ public class ExtFetcher {
         }
         scanNotes = appendScanNote(scanNotes, "host-http=fallback");
         trace("host http provider miss");
-        trace("host http miss, fallback httpGet");
-        return httpGet(url, 5000);
+        trace("host http miss, fallback bg-httpGet");
+        return httpGetOnWorker(url, 5000);
     }
 
     private static String tryHostOkHttp(String url) {
@@ -550,6 +552,28 @@ public class ExtFetcher {
             }
         }
         return null;
+    }
+
+    private static String httpGetOnWorker(final String urlStr, final int timeoutMs) throws Exception {
+        trace("httpGetOnWorker dispatch");
+        FutureTask<String> task = new FutureTask<>(new Callable<String>() {
+            @Override
+            public String call() throws Exception {
+                trace("httpGetOnWorker running in background");
+                return httpGet(urlStr, timeoutMs);
+            }
+        });
+        Thread t = new Thread(task, "LeoDanmu-HttpWorker");
+        t.start();
+        try {
+            String body = task.get();
+            trace("httpGetOnWorker completed");
+            return body;
+        } catch (Exception e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof Exception) throw (Exception) cause;
+            throw e;
+        }
     }
 
     private static String httpGet(String urlStr, int timeoutMs) throws Exception {
