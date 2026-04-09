@@ -113,7 +113,28 @@ public class Leodanmu extends Spider {
             try {
                 if (context != null) {
                     DanmakuConfig config = DanmakuConfigManager.getConfig(context);
-                    if (config != null) {
+                    if (config == null) config = new DanmakuConfig();
+
+                    boolean hasLocalApiUrls = config.getApiUrls() != null && !config.getApiUrls().isEmpty();
+                    if (!hasLocalApiUrls) {
+                        log("ensureConfig: 本地 apiUrls 为空，尝试用 cachedExt/订阅 ext 补配置");
+
+                        String extToApply = cachedExt;
+                        if (TextUtils.isEmpty(extToApply)) {
+                            extToApply = ExtFetcher.fetchExtFromSubscription(context);
+                        }
+                        if (TextUtils.isEmpty(extToApply)) {
+                            extToApply = ExtFetcher.fetchExtFromOkJson(context);
+                        }
+
+                        if (!TextUtils.isEmpty(extToApply)) {
+                            applyExtIfNeeded(context, extToApply, "ensureConfig");
+                            DanmakuConfig reloaded = DanmakuConfigManager.loadConfig(context);
+                            log("ensureConfig: 补配置后重新读取, apiUrls=" + reloaded.getApiUrls());
+                        } else {
+                            log("ensureConfig: 未拿到可用于补配置的 ext");
+                        }
+                    } else {
                         log("ensureConfig: 使用已保存配置, apiUrls=" + config.getApiUrls()
                                 + ", autoPush=" + config.isAutoPushEnabled()
                                 + ", pushToast=" + config.isPushToastEnabled()
@@ -367,9 +388,11 @@ public class Leodanmu extends Spider {
 
             if (changed) {
                 DanmakuConfigManager.saveConfig(context, config);
-                log(stage + ": ext已自动保存到DanmakuConfig");
+                DanmakuConfig reloaded = DanmakuConfigManager.loadConfig(context);
+                log(stage + ": ext已自动保存到DanmakuConfig, reload apiUrls=" + reloaded.getApiUrls());
             } else {
-                log(stage + ": ext unchanged, skip save");
+                DanmakuConfig reloaded = DanmakuConfigManager.getConfig(context);
+                log(stage + ": ext unchanged, skip save, current apiUrls=" + (reloaded == null ? "null" : reloaded.getApiUrls()));
             }
             lastAppliedExt = ext;
             lastAppliedExtHash = extHash;

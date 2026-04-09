@@ -1496,13 +1496,31 @@ public class DanmakuScanner {
 
                             Leodanmu.log("[按钮点击] 打开搜索对话框");
                             try {
-                                String fetchedExt = ExtFetcher.fetchExtFromSubscription(activity);
-                                if (!android.text.TextUtils.isEmpty(fetchedExt)) {
-                                    Leodanmu.updateHookStatus("searchButton", ExtFetcher.getLastSource(), ExtFetcher.getLastClassName(), ExtFetcher.getLastMethodName(), fetchedExt, "");
-                                    Leodanmu.log("[按钮点击] 搜索前主动hook成功");
-                                } else {
-                                    Leodanmu.updateHookStatus("searchButton", ExtFetcher.getLastSource(), ExtFetcher.getLastClassName(), ExtFetcher.getLastMethodName(), "", ExtFetcher.getLastError());
-                                    Leodanmu.log("[按钮点击] 搜索前主动hook未命中");
+                                DanmakuConfig localConfig = DanmakuConfigManager.getConfig(activity);
+                                boolean hasLocalApiUrls = localConfig != null
+                                        && localConfig.getApiUrls() != null
+                                        && !localConfig.getApiUrls().isEmpty();
+
+                                if (!hasLocalApiUrls) {
+                                    String fetchedExt = ExtFetcher.fetchExtFromSubscription(activity);
+                                    if (android.text.TextUtils.isEmpty(fetchedExt)) {
+                                        fetchedExt = ExtFetcher.fetchExtFromOkJson(activity);
+                                    }
+                                    if (!android.text.TextUtils.isEmpty(fetchedExt)) {
+                                        Leodanmu.updateHookStatus("searchButton", ExtFetcher.getLastSource(), ExtFetcher.getLastClassName(), ExtFetcher.getLastMethodName(), fetchedExt, "");
+                                        Leodanmu.log("[按钮点击] 搜索前补配置成功");
+                                        Leodanmu.saveFetchedExtToConfig(activity, fetchedExt, "searchButton");
+                                    } else {
+                                        Leodanmu.updateHookStatus("searchButton", ExtFetcher.getLastSource(), ExtFetcher.getLastClassName(), ExtFetcher.getLastMethodName(), "", ExtFetcher.getLastError());
+                                        Leodanmu.log("[按钮点击] 搜索前补配置未命中");
+                                    }
+                                }
+
+                                DanmakuConfig verifyConfig = DanmakuConfigManager.loadConfig(activity);
+                                if (verifyConfig == null || verifyConfig.getApiUrls() == null || verifyConfig.getApiUrls().isEmpty()) {
+                                    Utils.safeShowToast(activity, "本地弹幕接口为空，请先保存配置");
+                                    Leodanmu.log("[按钮点击] 本地 apiUrls 仍为空，取消打开搜索框");
+                                    return;
                                 }
                             } catch (Exception e) {
                                 Leodanmu.updateHookStatus("searchButton", "exception", "", "", "", e.getMessage());
