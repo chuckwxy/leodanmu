@@ -36,6 +36,14 @@ public class Leodanmu extends Spider {
     private static boolean configLoaded = false;
     private static final Object CONFIG_LOCK = new Object();
 
+    // Hook 诊断状态
+    private static String hookLastStage = "idle";
+    private static String hookLastSource = "none";
+    private static String hookLastClass = "";
+    private static String hookLastMethod = "";
+    private static String hookLastExtPreview = "";
+    private static String hookLastError = "";
+
     // 日志
     private static final List<String> logBuffer = new CopyOnWriteArrayList<>();
     private static final int MAX_LOG_SIZE = 1000;
@@ -53,6 +61,7 @@ public class Leodanmu extends Spider {
     public void init(Context context, String extend) throws Exception {
         super.init(context, extend);
 
+        updateHookStatus("init", "enter", "", "", extend, "");
         if (TextUtils.isEmpty(extend)) {
             try {
                 String fetchedExt = ExtFetcher.fetchExtFromOkJson(context);
@@ -61,11 +70,14 @@ public class Leodanmu extends Spider {
                     cachedExt = fetchedExt;
                     configLoaded = false;
                     log("init: 从Ok影视配置JSON补到ext成功");
+                    updateHookStatus("init", ExtFetcher.getLastSource(), ExtFetcher.getLastClassName(), ExtFetcher.getLastMethodName(), fetchedExt, "");
                 } else {
                     log("init: ext为空，未从Ok影视配置JSON补到ext，回落到已保存配置");
+                    updateHookStatus("init", ExtFetcher.getLastSource(), ExtFetcher.getLastClassName(), ExtFetcher.getLastMethodName(), "", ExtFetcher.getLastError());
                 }
             } catch (Exception e) {
                 log("init: ExtFetcher异常: " + e.getMessage());
+                updateHookStatus("init", "exception", "", "", "", e.getMessage());
             }
         }
 
@@ -86,6 +98,23 @@ public class Leodanmu extends Spider {
         synchronized (CONFIG_LOCK) {
             if (configLoaded) return;
             try {
+                if (TextUtils.isEmpty(cachedExt) && context != null) {
+                    try {
+                        String fetchedExt = ExtFetcher.fetchExtFromOkJson(context);
+                        if (!TextUtils.isEmpty(fetchedExt)) {
+                            cachedExt = fetchedExt;
+                            configLoaded = false;
+                            log("ensureConfig: 从Ok影视运行时配置补到ext");
+                            updateHookStatus("ensureConfig", ExtFetcher.getLastSource(), ExtFetcher.getLastClassName(), ExtFetcher.getLastMethodName(), fetchedExt, "");
+                        } else {
+                            updateHookStatus("ensureConfig", ExtFetcher.getLastSource(), ExtFetcher.getLastClassName(), ExtFetcher.getLastMethodName(), "", ExtFetcher.getLastError());
+                        }
+                    } catch (Exception e) {
+                        log("ensureConfig: ExtFetcher异常: " + e.getMessage());
+                        updateHookStatus("ensureConfig", "exception", "", "", "", e.getMessage());
+                    }
+                }
+
                 if (!TextUtils.isEmpty(cachedExt)) {
                     DanmakuConfig config = DanmakuConfigManager.loadConfig(context);
                     JSONObject json = null;
@@ -271,8 +300,12 @@ public class Leodanmu extends Spider {
             list.put(autoPushVod);
 
             // 创建查看日志按钮
-            //JSONObject logVod = createVod("log", "查看日志", "", "调试信息");
-            //list.put(logVod);
+            JSONObject logVod = createVod("log", "查看日志", "", "调试信息");
+            list.put(logVod);
+
+            // 创建 Hook 诊断按钮
+            JSONObject hookDiagVod = createVod("hook_diag", "Hook诊断", "", getHookStatusSummary());
+            list.put(hookDiagVod);
 
             // 创建布局配置按钮
             JSONObject lpConfigVod = createVod("lp_config", "布局配置", "", "调整弹窗大小和透明度");
@@ -322,6 +355,10 @@ public class Leodanmu extends Spider {
                                     refreshCategoryContent(ctx);
                                 } else if (id.equals("lp_config")) {
                                     DanmakuUIHelper.showLpConfigDialog(ctx);
+                                } else if (id.equals("log")) {
+                                    DanmakuUIHelper.showLogDialog(ctx);
+                                } else if (id.equals("hook_diag")) {
+                                    Utils.safeShowToast(ctx, getHookStatusDetail());
                                 }
                             } catch (Exception e) {
                                 Leodanmu.log("显示对话框失败: " + e.getMessage());
@@ -340,11 +377,15 @@ public class Leodanmu extends Spider {
             JSONObject vod = new JSONObject();
             vod.put("vod_id", id);
             vod.put("vod_name", id.equals("auto_push") ? "自动推送弹幕" :
-                    id.equals("lp_config") ? "布局配置" : "Leo弹幕设置");
+                    id.equals("lp_config") ? "布局配置" :
+                    id.equals("log") ? "查看日志" :
+                    id.equals("hook_diag") ? "Hook诊断" : "Leo弹幕设置");
             vod.put("vod_pic", "");
             vod.put("vod_remarks", id.equals("auto_push") ?
                     (config.isAutoPushEnabled() ? "已开启" : "已关闭") :
-                    id.equals("lp_config") ? "调整弹窗大小和透明度" : "请稍候...");
+                    id.equals("lp_config") ? "调整弹窗大小和透明度" :
+                    id.equals("log") ? "查看运行日志" :
+                    id.equals("hook_diag") ? getHookStatusSummary() : "请稍候...");
             vod.put("vod_play_url", "");
             vod.put("vod_play_from", "");
             JSONObject result = new JSONObject();
@@ -399,6 +440,33 @@ public class Leodanmu extends Spider {
             log("liveContent: 配置已刷新，当前 apiUrls=" + freshConfig.getApiUrls());
         }
         return super.liveContent(url);
+    }
+
+    private static String getHookStatusSummary() {
+        String source = TextUtils.isEmpty(hookLastSource) ? "none" : hookLastSource;
+        String stage = TextUtils.isEmpty(hookLastStage) ? "idle" : hookLastStage;
+        return "阶段:" + stage + " 来源:" + source;
+    }
+
+    private static String getHookStatusDetail() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("阶段: ").append(TextUtils.isEmpty(hookLastStage) ? "idle" : hookLastStage);
+        sb.append("\n来源: ").append(TextUtils.isEmpty(hookLastSource) ? "none" : hookLastSource);
+        sb.append("\n类: ").append(TextUtils.isEmpty(hookLastClass) ? "-" : hookLastClass);
+        sb.append("\n方法: ").append(TextUtils.isEmpty(hookLastMethod) ? "-" : hookLastMethod);
+        sb.append("\next预览: ").append(TextUtils.isEmpty(hookLastExtPreview) ? "-" : hookLastExtPreview);
+        sb.append("\n错误: ").append(TextUtils.isEmpty(hookLastError) ? "-" : hookLastError);
+        return sb.toString();
+    }
+
+    public static void updateHookStatus(String stage, String source, String className, String methodName, String ext, String error) {
+        hookLastStage = stage;
+        hookLastSource = source;
+        hookLastClass = className;
+        hookLastMethod = methodName;
+        hookLastExtPreview = TextUtils.isEmpty(ext) ? "" : ext.substring(0, Math.min(ext.length(), 120));
+        hookLastError = error == null ? "" : error;
+        log("hook状态: stage=" + hookLastStage + ", source=" + hookLastSource + ", class=" + hookLastClass + ", method=" + hookLastMethod + (TextUtils.isEmpty(hookLastError) ? "" : ", error=" + hookLastError));
     }
 
     private JSONObject createClass(String id, String name) throws Exception {

@@ -20,6 +20,11 @@ import java.net.URL;
  */
 public class ExtFetcher {
 
+    private static String lastSource = "none";
+    private static String lastClassName = "";
+    private static String lastMethodName = "";
+    private static String lastError = "";
+
     private static final String[] CONFIG_CLASS_NAMES = {
             "com.fongmi.android.tv.api.config.LiveConfig",
             "com.fongmi.android.tv.api.config.VodConfig",
@@ -49,6 +54,7 @@ public class ExtFetcher {
     };
 
     public static String fetchExtFromOkJson(Context context) {
+        resetLastState();
         String ext = fetchExtFromRuntimeConfig();
         if (!TextUtils.isEmpty(ext)) return ext;
         return fetchExtFromSubscriptionUrlFallback();
@@ -62,24 +68,28 @@ public class ExtFetcher {
 
                 String ext = fetchExtFromJsonMethods(clz, instance);
                 if (!TextUtils.isEmpty(ext)) {
+                    markSuccess("runtime-json", className, "json-method");
                     Leodanmu.log("ExtFetcher: 从宿主运行时JSON拿到ext");
                     return ext;
                 }
 
                 ext = fetchExtFromSitesMethods(clz, instance);
                 if (!TextUtils.isEmpty(ext)) {
+                    markSuccess("runtime-sites", className, "sites-method");
                     Leodanmu.log("ExtFetcher: 从宿主运行时sites拿到ext");
                     return ext;
                 }
 
                 ext = fetchExtFromFields(clz, instance);
                 if (!TextUtils.isEmpty(ext)) {
+                    markSuccess("runtime-field", className, "field-scan");
                     Leodanmu.log("ExtFetcher: 从宿主运行时字段拿到ext");
                     return ext;
                 }
             } catch (Throwable ignored) {
             }
         }
+        lastError = "runtime-config-not-found";
         return null;
     }
 
@@ -274,15 +284,58 @@ public class ExtFetcher {
 
     private static String fetchExtFromSubscriptionUrlFallback() {
         String subscriptionUrl = getSubscriptionUrl();
-        if (TextUtils.isEmpty(subscriptionUrl)) return null;
+        if (TextUtils.isEmpty(subscriptionUrl)) {
+            lastError = "subscription-url-empty";
+            return null;
+        }
         try {
             String json = httpGet(subscriptionUrl, 5000);
-            if (TextUtils.isEmpty(json)) return null;
-            return extractExtFromUnknown(json);
+            if (TextUtils.isEmpty(json)) {
+                lastError = "subscription-json-empty";
+                return null;
+            }
+            String ext = extractExtFromUnknown(json);
+            if (!TextUtils.isEmpty(ext)) {
+                markSuccess("fallback-url", "subscription", subscriptionUrl);
+                return ext;
+            }
+            lastError = "ext-not-found-in-subscription-json";
+            return null;
         } catch (Exception e) {
+            lastError = e.getMessage();
             Leodanmu.log("ExtFetcher: fallback失败: " + e.getMessage());
             return null;
         }
+    }
+
+    public static String getLastSource() {
+        return lastSource;
+    }
+
+    public static String getLastClassName() {
+        return lastClassName;
+    }
+
+    public static String getLastMethodName() {
+        return lastMethodName;
+    }
+
+    public static String getLastError() {
+        return lastError;
+    }
+
+    private static void resetLastState() {
+        lastSource = "none";
+        lastClassName = "";
+        lastMethodName = "";
+        lastError = "";
+    }
+
+    private static void markSuccess(String source, String className, String methodName) {
+        lastSource = source;
+        lastClassName = className == null ? "" : className;
+        lastMethodName = methodName == null ? "" : methodName;
+        lastError = "";
     }
 
     public static String getSubscriptionUrlPublic() {
