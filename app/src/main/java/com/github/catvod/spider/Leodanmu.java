@@ -291,11 +291,11 @@ public class Leodanmu extends Spider {
                     if (urlsObj instanceof JSONArray) {
                         JSONArray arr = (JSONArray) urlsObj;
                         for (int i = 0; i < arr.length(); i++) {
-                            String url = arr.optString(i, "").replace("\/", "/").trim();
+                            String url = arr.optString(i, "").replace("/", "/").trim();
                             if (!TextUtils.isEmpty(url)) newUrls.add(url);
                         }
                     } else {
-                        String url = jsonObject.optString("apiUrls", "").replace("\/", "/").trim();
+                        String url = jsonObject.optString("apiUrls", "").replace("/", "/").trim();
                         if (!TextUtils.isEmpty(url)) newUrls.add(url);
                     }
                     if (!newUrls.isEmpty()) {
