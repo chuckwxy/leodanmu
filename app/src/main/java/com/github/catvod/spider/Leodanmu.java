@@ -270,7 +270,9 @@ public class Leodanmu extends Spider {
         sb.append("类: ").append(TextUtils.isEmpty(hookLastClass) ? "-" : hookLastClass).append("\n");
         sb.append("方法: ").append(TextUtils.isEmpty(hookLastMethod) ? "-" : hookLastMethod).append("\n");
         sb.append("ext预览: ").append(TextUtils.isEmpty(hookLastExtPreview) ? "-" : hookLastExtPreview).append("\n");
-        sb.append("错误: ").append(TextUtils.isEmpty(hookLastError) ? "-" : hookLastError).append("\n");
+        sb.append("错误: ").append(TextUtils.isEmpty(hookLastError) ? "-" : hookLastError).append("\n\n");
+        sb.append("=== Hook流程 ===\n");
+        sb.append(ExtFetcher.getTraceLog());
         return sb.toString();
     }
 

@@ -28,6 +28,8 @@ public class ExtFetcher {
     private static String lastClassName = "";
     private static String lastMethodName = "";
     private static String lastError = "";
+    private static final List<String> traceLogs = new ArrayList<>();
+    private static int traceStep = 0;
 
     private static final String[] CONFIG_CLASS_NAMES = {
             "com.fongmi.android.tv.api.config.LiveConfig",
@@ -80,16 +82,44 @@ public class ExtFetcher {
 
     private static String scanNotes = "";
 
+    private static void trace(String msg) {
+        traceStep += 1;
+        traceLogs.add("[" + traceStep + "] " + msg);
+        if (traceLogs.size() > 120) traceLogs.remove(0);
+    }
+
+    public static String getTraceLog() {
+        StringBuilder sb = new StringBuilder();
+        for (String s : traceLogs) sb.append(s).append("\n");
+        return sb.toString();
+    }
+
     public static String fetchExtFromOkJson(Context context) {
         resetLastState();
+        trace("enter fetchExtFromOkJson");
         String ext = fetchExtFromRuntimeConfig();
-        if (!TextUtils.isEmpty(ext)) return ext;
+        if (!TextUtils.isEmpty(ext)) {
+            trace("runtime-config hit");
+            return ext;
+        }
+        trace("runtime-config miss");
         ext = fetchExtFromLiveSubscription(context);
-        if (!TextUtils.isEmpty(ext)) return ext;
-        return fetchExtFromSubscriptionUrlFallback();
+        if (!TextUtils.isEmpty(ext)) {
+            trace("live-subscription hit");
+            return ext;
+        }
+        trace("live-subscription miss");
+        ext = fetchExtFromSubscriptionUrlFallback();
+        if (!TextUtils.isEmpty(ext)) {
+            trace("subscription fallback hit");
+            return ext;
+        }
+        trace("subscription fallback miss");
+        return null;
     }
 
     private static String fetchExtFromRuntimeConfig() {
+        trace("try runtime-config");
         for (String className : CONFIG_CLASS_NAMES) {
             try {
                 Class<?> clz = Class.forName(className);
@@ -119,6 +149,7 @@ public class ExtFetcher {
             }
         }
         lastError = "runtime-config-not-found";
+        trace("runtime-config no hit");
         return null;
     }
 
@@ -312,29 +343,40 @@ public class ExtFetcher {
     }
 
     private static String fetchExtFromLiveSubscription(Context context) {
+        trace("try live-subscription prefs");
         String liveUrl = fetchLiveSubscriptionUrlFromPrefs(context);
         if (TextUtils.isEmpty(liveUrl)) {
             lastError = "live-subscription-url-empty";
+            trace("no live subscription url found in prefs");
             return null;
         }
 
+        trace("live subscription url found: " + liveUrl);
+
         try {
+            trace("try host http for live subscription");
             String json = fetchJsonByHostHttp(liveUrl);
             if (TextUtils.isEmpty(json)) {
                 lastError = "live-subscription-json-empty";
+                trace("live subscription json empty");
                 return null;
             }
+
+            trace("live subscription json loaded");
 
             String ext = extractExtFromUnknown(json);
             if (!TextUtils.isEmpty(ext)) {
                 markSuccess("live-subscription", "shared_prefs", liveUrl);
+                trace("ext found in live subscription json");
                 return ext;
             }
 
             lastError = "ext-not-found-in-live-subscription-json";
+            trace("ext not found in live subscription json");
             return null;
         } catch (Throwable e) {
             lastError = e.getMessage();
+            trace("live subscription flow exception: " + e.getMessage());
             return null;
         }
     }
@@ -354,6 +396,7 @@ public class ExtFetcher {
             };
 
             for (String prefName : prefNames) {
+                trace("scan pref file: " + prefName);
                 try {
                     SharedPreferences sp = context.getSharedPreferences(prefName, Context.MODE_PRIVATE);
                     Map<String, ?> all = sp.getAll();
@@ -363,25 +406,32 @@ public class ExtFetcher {
                 }
             }
 
+            trace("scan fallback pref file: " + context.getPackageName() + "_preferences");
             SharedPreferences sp = context.getSharedPreferences(context.getPackageName() + "_preferences", Context.MODE_PRIVATE);
             String found = findUrlInMap(context.getPackageName() + "_preferences", sp.getAll());
             if (!TextUtils.isEmpty(found)) return found;
         } catch (Throwable e) {
             lastError = "pref-scan-ex:" + e.getMessage();
+            trace("pref scan exception: " + e.getMessage());
         }
         return null;
     }
 
     private static String findUrlInMap(String prefName, Map<String, ?> all) {
-        if (all == null || all.isEmpty()) return null;
+        if (all == null || all.isEmpty()) {
+            trace("pref file empty: " + prefName);
+            return null;
+        }
         for (Map.Entry<String, ?> entry : all.entrySet()) {
             String key = entry.getKey();
             Object value = entry.getValue();
             String text = value == null ? "" : String.valueOf(value).trim();
+            if (!TextUtils.isEmpty(key)) trace("check key: " + prefName + "/" + key);
             if (TextUtils.isEmpty(text)) continue;
             if (!looksLikeLiveSubscriptionKey(key)) continue;
             if (!looksLikeUrl(text)) continue;
             scanNotes = prefName + "/" + key + "=" + text;
+            trace("found live url by key match: " + prefName + "/" + key);
             return text;
         }
         for (Map.Entry<String, ?> entry : all.entrySet()) {
@@ -389,9 +439,11 @@ public class ExtFetcher {
             String text = value == null ? "" : String.valueOf(value).trim();
             if (looksLikeUrl(text) && looksLikeLiveSubscriptionValue(text)) {
                 scanNotes = prefName + "/" + entry.getKey() + "=" + text;
+                trace("found live url by value match: " + prefName + "/" + entry.getKey());
                 return text;
             }
         }
+        trace("no candidate url in pref file: " + prefName);
         return null;
     }
 
@@ -412,12 +464,15 @@ public class ExtFetcher {
     }
 
     private static String fetchJsonByHostHttp(String url) throws Exception {
+        trace("fetch json via host http: " + url);
         String body = tryHostOkHttp(url);
         if (!TextUtils.isEmpty(body)) {
             scanNotes = appendScanNote(scanNotes, "host-http=ok");
+            trace("host http success");
             return body;
         }
         scanNotes = appendScanNote(scanNotes, "host-http=fallback");
+        trace("host http miss, fallback httpGet");
         return httpGet(url, 5000);
     }
 
@@ -439,6 +494,7 @@ public class ExtFetcher {
                         Object result = m.invoke(null, url);
                         if (result instanceof String && !TextUtils.isEmpty((String) result)) {
                             markSuccess("host-http", className, methodName);
+                            trace("host http provider hit: " + className + "#" + methodName);
                             return (String) result;
                         }
                     } catch (Throwable ignored) {
@@ -457,26 +513,37 @@ public class ExtFetcher {
     }
 
     private static String fetchExtFromSubscriptionUrlFallback() {
+        trace("try subscription-url fallback");
         String subscriptionUrl = getSubscriptionUrl();
         if (TextUtils.isEmpty(subscriptionUrl)) {
             lastError = "subscription-url-empty";
+            trace("subscription fallback url empty");
             return null;
         }
+
+        trace("subscription fallback url found: " + subscriptionUrl);
         try {
+            trace("subscription fallback http get");
             String json = httpGet(subscriptionUrl, 5000);
             if (TextUtils.isEmpty(json)) {
                 lastError = "subscription-json-empty";
+                trace("subscription fallback json empty");
                 return null;
             }
+
+            trace("subscription fallback json loaded");
             String ext = extractExtFromUnknown(json);
             if (!TextUtils.isEmpty(ext)) {
                 markSuccess("fallback-url", "subscription", subscriptionUrl);
+                trace("ext found in subscription fallback json");
                 return ext;
             }
             lastError = "ext-not-found-in-subscription-json";
+            trace("ext not found in subscription fallback json");
             return null;
         } catch (Exception e) {
             lastError = e.getMessage();
+            trace("subscription fallback exception: " + e.getMessage());
             Leodanmu.log("ExtFetcher: fallback失败: " + e.getMessage());
             return null;
         }
@@ -507,6 +574,8 @@ public class ExtFetcher {
         lastMethodName = "";
         lastError = "";
         scanNotes = "";
+        traceLogs.clear();
+        traceStep = 0;
     }
 
     private static void markSuccess(String source, String className, String methodName) {
