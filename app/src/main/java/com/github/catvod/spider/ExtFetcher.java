@@ -103,18 +103,12 @@ public class ExtFetcher {
             return ext;
         }
         trace("runtime-config miss");
-        ext = fetchExtFromLiveSubscription(context);
+        ext = fetchExtFromHostConfigs(context);
         if (!TextUtils.isEmpty(ext)) {
-            trace("live-subscription hit");
+            trace("host-config hit");
             return ext;
         }
-        trace("live-subscription miss");
-        ext = fetchExtFromSubscriptionUrlFallback();
-        if (!TextUtils.isEmpty(ext)) {
-            trace("subscription fallback hit");
-            return ext;
-        }
-        trace("subscription fallback miss");
+        trace("host-config miss");
         return null;
     }
 
@@ -342,247 +336,96 @@ public class ExtFetcher {
         return null;
     }
 
-    private static String fetchExtFromLiveSubscription(Context context) {
-        trace("try live-subscription prefs");
-        String liveUrl = fetchLiveSubscriptionUrlFromPrefs(context);
-        if (TextUtils.isEmpty(liveUrl)) {
-            lastError = "live-subscription-url-empty";
-            trace("no live subscription url found in prefs");
+    private static String fetchExtFromHostConfigs(Context context) {
+        trace("try host config_x prefs");
+        if (context == null) {
+            lastError = "host-config-no-context";
+            trace("host config no context");
             return null;
         }
-
-        trace("live subscription url found: " + liveUrl);
-
         try {
-            trace("try host http for live subscription");
-            String json = fetchJsonByHostHttp(liveUrl);
+            String prefName = context.getPackageName() + "_preferences";
+            trace("read pref: " + prefName);
+            SharedPreferences sp = context.getSharedPreferences(prefName, Context.MODE_PRIVATE);
+            String[] keys = new String[] {"config_0", "config_1", "config_2"};
+            for (String key : keys) {
+                String raw = sp.getString(key, "");
+                trace("read key: " + key);
+                if (TextUtils.isEmpty(raw)) {
+                    trace(key + " empty");
+                    continue;
+                }
+                String preview = raw.substring(0, Math.min(raw.length(), 160)).replace("
+", " ");
+                scanNotes = appendScanNote(scanNotes, key + "=" + preview);
+                trace("preview " + key + ": " + preview);
+
+                String ext = tryExtractExtFromConfigValue(key, raw);
+                if (!TextUtils.isEmpty(ext)) {
+                    markSuccess("host-config", prefName, key);
+                    trace("ext found from " + key);
+                    return ext;
+                }
+                trace("no ext from " + key);
+            }
+            lastError = "config-keys-no-hit";
+            trace("config_0/1/2 all miss");
+            return null;
+        } catch (Throwable e) {
+            lastError = "host-config-ex:" + e.getMessage();
+            trace("host config exception: " + e.getMessage());
+            return null;
+        }
+    }
+
+    private static String tryExtractExtFromConfigValue(String key, String raw) throws Exception {
+        String value = raw == null ? "" : raw.trim();
+        if (TextUtils.isEmpty(value)) return null;
+
+        if (looksLikeUrl(value)) {
+            trace(key + " treated as url");
+            String json = fetchJsonByHostHttp(value);
             if (TextUtils.isEmpty(json)) {
-                lastError = "live-subscription-json-empty";
-                trace("live subscription json empty");
+                trace(key + " url fetched empty");
                 return null;
             }
-
-            trace("live subscription json loaded");
-
+            trace(key + " url fetched ok");
             String ext = extractExtFromUnknown(json);
-            if (!TextUtils.isEmpty(ext)) {
-                markSuccess("live-subscription", "shared_prefs", liveUrl);
-                trace("ext found in live subscription json");
-                return ext;
-            }
-
-            lastError = "ext-not-found-in-live-subscription-json";
-            trace("ext not found in live subscription json");
-            return null;
-        } catch (Throwable e) {
-            lastError = e.getMessage();
-            trace("live subscription flow exception: " + e.getMessage());
+            if (!TextUtils.isEmpty(ext)) return ext;
+            trace(key + " json has no ext");
             return null;
         }
-    }
 
-    private static String fetchLiveSubscriptionUrlFromPrefs(Context context) {
-        if (context == null) return null;
-        try {
-            String[] prefNames = new String[] {
-                    context.getPackageName() + "_preferences",
-                    "config",
-                    "setting",
-                    "settings",
-                    "live",
-                    "lives",
-                    "source",
-                    "sources"
-            };
-
-            for (String prefName : prefNames) {
-                trace("scan pref file: " + prefName);
-                try {
-                    SharedPreferences sp = context.getSharedPreferences(prefName, Context.MODE_PRIVATE);
-                    Map<String, ?> all = sp.getAll();
-                    String found = findUrlInMap(prefName, all);
-                    if (!TextUtils.isEmpty(found)) return found;
-                } catch (Throwable ignored) {
-                }
-            }
-
-            trace("scan fallback pref file: " + context.getPackageName() + "_preferences");
-            SharedPreferences sp = context.getSharedPreferences(context.getPackageName() + "_preferences", Context.MODE_PRIVATE);
-            String found = findUrlInMap(context.getPackageName() + "_preferences", sp.getAll());
-            if (!TextUtils.isEmpty(found)) return found;
-        } catch (Throwable e) {
-            lastError = "pref-scan-ex:" + e.getMessage();
-            trace("pref scan exception: " + e.getMessage());
-        }
-        return null;
-    }
-
-    private static String findUrlInMap(String prefName, Map<String, ?> all) {
-        if (all == null || all.isEmpty()) {
-            trace("pref file empty: " + prefName);
+        if (value.startsWith("{") || value.startsWith("[")) {
+            trace(key + " treated as json");
+            String ext = extractExtFromUnknown(value);
+            if (!TextUtils.isEmpty(ext)) return ext;
+            trace(key + " direct json has no ext");
             return null;
         }
-        for (Map.Entry<String, ?> entry : all.entrySet()) {
-            String key = entry.getKey();
-            Object value = entry.getValue();
-            String text = value == null ? "" : String.valueOf(value).trim();
-            if (!TextUtils.isEmpty(key)) trace("check key: " + prefName + "/" + key);
-            if (TextUtils.isEmpty(text)) continue;
-            if (!looksLikeLiveSubscriptionKey(key)) continue;
-            if (!looksLikeUrl(text)) continue;
-            scanNotes = prefName + "/" + key + "=" + text;
-            trace("found live url by key match: " + prefName + "/" + key);
-            return text;
-        }
-        for (Map.Entry<String, ?> entry : all.entrySet()) {
-            Object value = entry.getValue();
-            String text = value == null ? "" : String.valueOf(value).trim();
-            if (looksLikeUrl(text) && looksLikeLiveSubscriptionValue(text)) {
-                scanNotes = prefName + "/" + entry.getKey() + "=" + text;
-                trace("found live url by value match: " + prefName + "/" + entry.getKey());
-                return text;
-            }
-        }
-        trace("no candidate url in pref file: " + prefName);
-        return null;
-    }
 
-    private static boolean looksLikeLiveSubscriptionKey(String key) {
-        if (TextUtils.isEmpty(key)) return false;
-        String k = key.toLowerCase();
-        return (k.contains("live") || k.contains("直播") || k.contains("subscribe") || k.contains("source") || k.contains("config"))
-                && (k.contains("url") || k.contains("link") || k.contains("home") || k.contains("api") || k.contains("订阅"));
-    }
-
-    private static boolean looksLikeLiveSubscriptionValue(String value) {
-        String v = value.toLowerCase();
-        return v.contains("sub") || v.contains("txt") || v.contains("json") || v.contains("live");
-    }
-
-    private static boolean looksLikeUrl(String text) {
-        return !TextUtils.isEmpty(text) && (text.startsWith("http://") || text.startsWith("https://"));
-    }
-
-    private static String fetchJsonByHostHttp(String url) throws Exception {
-        trace("fetch json via host http: " + url);
-        String body = tryHostOkHttp(url);
-        if (!TextUtils.isEmpty(body)) {
-            scanNotes = appendScanNote(scanNotes, "host-http=ok");
-            trace("host http success");
-            return body;
-        }
-        scanNotes = appendScanNote(scanNotes, "host-http=fallback");
-        trace("host http miss, fallback httpGet");
-        return httpGet(url, 5000);
-    }
-
-    private static String tryHostOkHttp(String url) {
-        String[] classNames = new String[] {
-                "com.github.catvod.net.OkHttp",
-                "com.github.tvbox.osc.util.OkHttp",
-                "com.github.tvbox.osc.net.OkHttp",
-                "com.fongmi.android.tv.net.OkHttp",
-                "com.ok.video.net.OkHttp"
-        };
-        String[] methods = new String[] {"string", "get", "request"};
-        for (String className : classNames) {
+        if (looksLikeBase64Json(value)) {
+            trace(key + " treated as base64-json");
             try {
-                Class<?> clz = Class.forName(className);
-                for (String methodName : methods) {
-                    try {
-                        java.lang.reflect.Method m = clz.getMethod(methodName, String.class);
-                        Object result = m.invoke(null, url);
-                        if (result instanceof String && !TextUtils.isEmpty((String) result)) {
-                            markSuccess("host-http", className, methodName);
-                            trace("host http provider hit: " + className + "#" + methodName);
-                            return (String) result;
-                        }
-                    } catch (Throwable ignored) {
-                    }
-                }
-            } catch (Throwable ignored) {
+                String decoded = new String(java.util.Base64.getDecoder().decode(value), java.nio.charset.StandardCharsets.UTF_8);
+                trace(key + " base64 decoded");
+                String ext = extractExtFromUnknown(decoded);
+                if (!TextUtils.isEmpty(ext)) return ext;
+                trace(key + " decoded json has no ext");
+            } catch (Throwable e) {
+                trace(key + " base64 decode failed: " + e.getMessage());
             }
         }
+
+        trace(key + " unsupported raw format");
         return null;
     }
 
-    private static String appendScanNote(String base, String extra) {
-        if (TextUtils.isEmpty(base)) return extra;
-        if (TextUtils.isEmpty(extra)) return base;
-        return base + " | " + extra;
-    }
-
-    private static String fetchExtFromSubscriptionUrlFallback() {
-        trace("try subscription-url fallback");
-        String subscriptionUrl = getSubscriptionUrl();
-        if (TextUtils.isEmpty(subscriptionUrl)) {
-            lastError = "subscription-url-empty";
-            trace("subscription fallback url empty");
-            return null;
-        }
-
-        trace("subscription fallback url found: " + subscriptionUrl);
-        try {
-            trace("subscription fallback http get");
-            String json = httpGet(subscriptionUrl, 5000);
-            if (TextUtils.isEmpty(json)) {
-                lastError = "subscription-json-empty";
-                trace("subscription fallback json empty");
-                return null;
-            }
-
-            trace("subscription fallback json loaded");
-            String ext = extractExtFromUnknown(json);
-            if (!TextUtils.isEmpty(ext)) {
-                markSuccess("fallback-url", "subscription", subscriptionUrl);
-                trace("ext found in subscription fallback json");
-                return ext;
-            }
-            lastError = "ext-not-found-in-subscription-json";
-            trace("ext not found in subscription fallback json");
-            return null;
-        } catch (Exception e) {
-            lastError = e.getMessage();
-            trace("subscription fallback exception: " + e.getMessage());
-            Leodanmu.log("ExtFetcher: fallback失败: " + e.getMessage());
-            return null;
-        }
-    }
-
-    public static String getLastSource() {
-        return lastSource;
-    }
-
-    public static String getLastClassName() {
-        return lastClassName;
-    }
-
-    public static String getLastMethodName() {
-        return lastMethodName;
-    }
-
-    public static String getLastError() {
-        if (!TextUtils.isEmpty(scanNotes)) {
-            return TextUtils.isEmpty(lastError) ? scanNotes : (lastError + " | " + scanNotes);
-        }
-        return lastError;
-    }
-
-    private static void resetLastState() {
-        lastSource = "none";
-        lastClassName = "";
-        lastMethodName = "";
-        lastError = "";
-        scanNotes = "";
-        traceLogs.clear();
-        traceStep = 0;
-    }
-
-    private static void markSuccess(String source, String className, String methodName) {
-        lastSource = source;
-        lastClassName = className == null ? "" : className;
-        lastMethodName = methodName == null ? "" : methodName;
-        lastError = "";
+    private static boolean looksLikeBase64Json(String value) {
+        if (TextUtils.isEmpty(value) || value.length() < 16) return false;
+        String v = value.trim();
+        if (v.startsWith("eyJ") || v.startsWith("W3si)")) return true;
+        return v.matches("^[A-Za-z0-9+/=]+$");
     }
 
     public static String getSubscriptionUrlPublic() {
