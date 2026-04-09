@@ -522,8 +522,7 @@ public class ExtFetcher {
 
     private static String preview(String text) {
         if (TextUtils.isEmpty(text)) return "<empty>";
-        String s = text.replace("
-", " ").replace("", " ").trim();
+        String s = text.replace("\n", " ").replace("\r", " ").trim();
         return s.substring(0, Math.min(s.length(), 200));
     }
 
