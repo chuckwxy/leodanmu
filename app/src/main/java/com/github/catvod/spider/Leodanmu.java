@@ -68,24 +68,28 @@ public class Leodanmu extends Spider {
         //         + ", extendEmpty=" + TextUtils.isEmpty(extend)
         //         + ", extendHash=" + getExtHash(extend));
         updateHookStatus("init", "enter", "", "", extend, "");
-        if (TextUtils.isEmpty(extend)) {
+        if (TextUtils.isEmpty(extend) && TextUtils.isEmpty(cachedExt)) {
             try {
                 String fetchedExt = ExtFetcher.fetchExtFromOkJson(context);
                 if (!TextUtils.isEmpty(fetchedExt)) {
                     extend = fetchedExt;
                     cachedExt = fetchedExt;
                     configLoaded = false;
-                    saveFetchedExtToConfig(context, fetchedExt, "init");
+                    applyExtIfNeeded(context, fetchedExt, "init");
                     log("init: 从Ok影视配置JSON补到ext成功");
                     updateHookStatus("init", ExtFetcher.getLastSource(), ExtFetcher.getLastClassName(), ExtFetcher.getLastMethodName(), fetchedExt, "");
                 } else {
-                    log("init: ext为空，未从Ok影视配置JSON补到ext，回落到已保存配置");
+                    log("init: ext为空，未从Ok影视配置JSON补到ext，回落到缓存/已保存配置");
                     updateHookStatus("init", ExtFetcher.getLastSource(), ExtFetcher.getLastClassName(), ExtFetcher.getLastMethodName(), "", ExtFetcher.getLastError());
                 }
             } catch (Exception e) {
                 log("init: ExtFetcher异常: " + e.getMessage());
                 updateHookStatus("init", "exception", "", "", "", e.getMessage());
             }
+        }
+
+        if (TextUtils.isEmpty(extend)) {
+            extend = cachedExt;
         }
 
         // 缓存 ext，供不调用 init() 的客户端（直播等）后续使用
@@ -108,36 +112,19 @@ public class Leodanmu extends Spider {
             //         + ", cachedExtEmpty=" + TextUtils.isEmpty(cachedExt)
             //         + ", configLoaded=" + configLoaded);
             try {
-                if (TextUtils.isEmpty(cachedExt) && context != null) {
-                    try {
-                        String fetchedExt = ExtFetcher.fetchExtFromOkJson(context);
-                        if (!TextUtils.isEmpty(fetchedExt)) {
-                            cachedExt = fetchedExt;
-                            configLoaded = false;
-                            saveFetchedExtToConfig(context, fetchedExt, "ensureConfig");
-                            log("ensureConfig: 从Ok影视运行时配置补到ext");
-                            updateHookStatus("ensureConfig", ExtFetcher.getLastSource(), ExtFetcher.getLastClassName(), ExtFetcher.getLastMethodName(), fetchedExt, "");
-                        } else {
-                            updateHookStatus("ensureConfig", ExtFetcher.getLastSource(), ExtFetcher.getLastClassName(), ExtFetcher.getLastMethodName(), "", ExtFetcher.getLastError());
-                        }
-                    } catch (Exception e) {
-                        log("ensureConfig: ExtFetcher异常: " + e.getMessage());
-                        updateHookStatus("ensureConfig", "exception", "", "", "", e.getMessage());
-                    }
-                }
-
                 if (!TextUtils.isEmpty(cachedExt)) {
-                    saveFetchedExtToConfig(context, cachedExt, "ensureConfig");
-                    DanmakuConfig reloaded = DanmakuConfigManager.loadConfig(context);
-                    log("ensureConfig: 配置已从 ext 加载, apiUrls=" + reloaded.getApiUrls()
-                            + ", autoPush=" + reloaded.isAutoPushEnabled()
-                            + ", pushToast=" + reloaded.isPushToastEnabled()
-                            + ", theme=" + reloaded.getTheme()
-                            + ", lpWidth=" + reloaded.getLpWidth()
-                            + ", lpHeight=" + reloaded.getLpHeight()
-                            + ", lpAlpha=" + reloaded.getLpAlpha());
+                    applyExtIfNeeded(context, cachedExt, "ensureConfig");
+                } else if (context != null) {
+                    DanmakuConfig config = DanmakuConfigManager.getConfig(context);
+                    log("ensureConfig: 使用已保存配置, apiUrls=" + config.getApiUrls()
+                            + ", autoPush=" + config.isAutoPushEnabled()
+                            + ", pushToast=" + config.isPushToastEnabled()
+                            + ", theme=" + config.getTheme()
+                            + ", lpWidth=" + config.getLpWidth()
+                            + ", lpHeight=" + config.getLpHeight()
+                            + ", lpAlpha=" + config.getLpAlpha());
                 } else {
-                    log("ensureConfig: ext 为空，使用已保存配置");
+                    log("ensureConfig: context为空，跳过配置预热");
                 }
             } catch (Exception e) {
                 log("ensureConfig 异常: " + e.getMessage());
@@ -147,46 +134,8 @@ public class Leodanmu extends Spider {
     }
 
     public static void tryAutoPrefetchExt(Context context, String stage) {
-        if (context == null) return;
-        synchronized (CONFIG_LOCK) {
-            long now = System.currentTimeMillis();
-            if (autoPrefetchDone && now - lastAutoPrefetchTime < AUTO_PREFETCH_MIN_INTERVAL) {
-                log(stage + ": autoPrefetch skipped(done recently)");
-                return;
-            }
-            lastAutoPrefetchTime = now;
-            try {
-                DanmakuConfig config = DanmakuConfigManager.loadConfig(context);
-                if (config != null && config.getApiUrls() != null && !config.getApiUrls().isEmpty()) {
-                    log(stage + ": autoPrefetch skipped(existing apiUrls=" + config.getApiUrls() + ")");
-                    autoPrefetchDone = true;
-                    return;
-                }
-
-                if (!TextUtils.isEmpty(cachedExt)) {
-                    saveFetchedExtToConfig(context, cachedExt, stage + ":cachedExt");
-                    log(stage + ": autoPrefetch saved from cachedExt");
-                    autoPrefetchDone = true;
-                    configLoaded = false;
-                    return;
-                }
-
-                String fetchedExt = ExtFetcher.fetchExtFromOkJson(context);
-                if (!TextUtils.isEmpty(fetchedExt)) {
-                    cachedExt = fetchedExt;
-                    saveFetchedExtToConfig(context, fetchedExt, stage);
-                    updateHookStatus(stage, ExtFetcher.getLastSource(), ExtFetcher.getLastClassName(), ExtFetcher.getLastMethodName(), fetchedExt, "");
-                    log(stage + ": autoPrefetch fetched and saved");
-                    autoPrefetchDone = true;
-                    configLoaded = false;
-                } else {
-                    updateHookStatus(stage, ExtFetcher.getLastSource(), ExtFetcher.getLastClassName(), ExtFetcher.getLastMethodName(), "", ExtFetcher.getLastError());
-                    log(stage + ": autoPrefetch missed");
-                }
-            } catch (Exception e) {
-                log(stage + ": autoPrefetch exception: " + e.getMessage());
-            }
-        }
+        // TV 端性能优先：先停用自动预取，避免重复反射、JSON解析、SharedPreferences读写
+        // 如后续确认某些客户端确实不走 init()，再恢复为异步预取版本
     }
 
     public static void clearCache(Context context) {
@@ -219,24 +168,8 @@ public class Leodanmu extends Spider {
         // 初始化配置（每次都更新，不受 initialized 保护）
         DanmakuConfig config = DanmakuConfigManager.loadConfig(context);
         if (!TextUtils.isEmpty(extend)) {
-            if (extend.startsWith("http")) {
-                // 支持逗号分隔多个 URL
-                String[] urls = extend.split(",");
-                for (String url : urls) {
-                    String trimmed = url.trim();
-                    if (!TextUtils.isEmpty(trimmed)) {
-                        config.getApiUrls().add(trimmed);
-                    }
-                }
-            } else if (extend.startsWith("{") && extend.endsWith("}")) {
-                try {
-                    JSONObject jsonObject = new JSONObject(extend);
-                    config.updateFromJson(jsonObject);
-                } catch (Exception e) {
-                    log("解析JSON格式配置失败: " + e.getMessage());
-                }
-            }
-            DanmakuConfigManager.saveConfig(context, config);
+            applyExtIfNeeded(context, extend, "doInitWork");
+            config = DanmakuConfigManager.getConfig(context);
             log("doInitWork: ext已应用，apiUrls=" + config.getApiUrls());
         }
 
@@ -342,12 +275,18 @@ public class Leodanmu extends Spider {
     }
 
     public static void saveFetchedExtToConfig(Context context, String fetchedExt, String stage) {
-        if (context == null || TextUtils.isEmpty(fetchedExt)) return;
+        applyExtIfNeeded(context, fetchedExt, stage);
+    }
+
+    private static void applyExtIfNeeded(Context context, String ext, String stage) {
+        if (context == null || TextUtils.isEmpty(ext)) return;
         try {
             DanmakuConfig config = DanmakuConfigManager.loadConfig(context);
             if (config == null) config = new DanmakuConfig();
-            if (fetchedExt.startsWith("{")) {
-                JSONObject jsonObject = new JSONObject(fetchedExt);
+            boolean changed = false;
+            if (ext.startsWith("{")) {
+                JSONObject jsonObject = new JSONObject(ext);
+                String before = config.toString();
                 if (jsonObject.has("apiUrls")) {
                     Object urlsObj = jsonObject.opt("apiUrls");
                     java.util.Set<String> newUrls = new java.util.HashSet<>();
@@ -361,55 +300,88 @@ public class Leodanmu extends Spider {
                         String url = jsonObject.optString("apiUrls", "").replace("/", "/").trim();
                         if (!TextUtils.isEmpty(url)) newUrls.add(url);
                     }
-                    if (!newUrls.isEmpty()) {
+                    if (!newUrls.isEmpty() && !newUrls.equals(config.getApiUrls())) {
                         config.setApiUrls(newUrls);
+                        changed = true;
                         log(stage + ": save apiUrls=" + newUrls);
-                    } else {
-                        log(stage + ": save apiUrls skipped(empty)");
                     }
                 }
                 if (jsonObject.has("autoPushEnabled")) {
-                    config.setAutoPushEnabled(jsonObject.optBoolean("autoPushEnabled"));
-                    log(stage + ": save autoPushEnabled=" + config.isAutoPushEnabled());
+                    boolean autoPush = jsonObject.optBoolean("autoPushEnabled");
+                    if (config.isAutoPushEnabled() != autoPush) {
+                        config.setAutoPushEnabled(autoPush);
+                        changed = true;
+                        log(stage + ": save autoPushEnabled=" + config.isAutoPushEnabled());
+                    }
                 }
                 if (jsonObject.has("pushToastEnabled")) {
-                    config.setPushToastEnabled(jsonObject.optBoolean("pushToastEnabled"));
-                    log(stage + ": save pushToastEnabled=" + config.isPushToastEnabled());
+                    boolean pushToast = jsonObject.optBoolean("pushToastEnabled");
+                    if (config.isPushToastEnabled() != pushToast) {
+                        config.setPushToastEnabled(pushToast);
+                        changed = true;
+                        log(stage + ": save pushToastEnabled=" + config.isPushToastEnabled());
+                    }
                 }
                 if (jsonObject.has("theme")) {
-                    config.setTheme(jsonObject.optInt("theme"));
-                    log(stage + ": save theme=" + config.getTheme());
+                    int theme = jsonObject.optInt("theme");
+                    if (config.getTheme() != theme) {
+                        config.setTheme(theme);
+                        changed = true;
+                        log(stage + ": save theme=" + config.getTheme());
+                    }
                 }
                 if (jsonObject.has("lpWidth")) {
-                    config.setLpWidth((float) jsonObject.optDouble("lpWidth", config.getLpWidth()));
-                    log(stage + ": save lpWidth=" + config.getLpWidth());
+                    float lpWidth = (float) jsonObject.optDouble("lpWidth", config.getLpWidth());
+                    if (Float.compare(config.getLpWidth(), lpWidth) != 0) {
+                        config.setLpWidth(lpWidth);
+                        changed = true;
+                        log(stage + ": save lpWidth=" + config.getLpWidth());
+                    }
                 }
                 if (jsonObject.has("lpHeight")) {
-                    config.setLpHeight((float) jsonObject.optDouble("lpHeight", config.getLpHeight()));
-                    log(stage + ": save lpHeight=" + config.getLpHeight());
+                    float lpHeight = (float) jsonObject.optDouble("lpHeight", config.getLpHeight());
+                    if (Float.compare(config.getLpHeight(), lpHeight) != 0) {
+                        config.setLpHeight(lpHeight);
+                        changed = true;
+                        log(stage + ": save lpHeight=" + config.getLpHeight());
+                    }
                 }
                 if (jsonObject.has("lpAlpha")) {
-                    config.setLpAlpha((float) jsonObject.optDouble("lpAlpha", config.getLpAlpha()));
-                    log(stage + ": save lpAlpha=" + config.getLpAlpha());
+                    float lpAlpha = (float) jsonObject.optDouble("lpAlpha", config.getLpAlpha());
+                    if (Float.compare(config.getLpAlpha(), lpAlpha) != 0) {
+                        config.setLpAlpha(lpAlpha);
+                        changed = true;
+                        log(stage + ": save lpAlpha=" + config.getLpAlpha());
+                    }
                 }
                 log(stage + ": ext json keys=" + jsonObject.toString().substring(0, Math.min(jsonObject.toString().length(), 320)));
-            } else if (fetchedExt.startsWith("http")) {
-                java.util.Set<String> newUrls = new java.util.HashSet<>();
-                for (String url : fetchedExt.split(",")) {
-                    String trimmed = url.trim();
-                    if (!TextUtils.isEmpty(trimmed)) newUrls.add(trimmed);
+                if (!changed) {
+                    String after = config.toString();
+                    changed = !TextUtils.equals(before, after);
                 }
-                if (!newUrls.isEmpty()) {
-                    config.setApiUrls(newUrls);
-                    log(stage + ": save apiUrls=" + newUrls);
+            } else if (ext.startsWith("http")) {
+                java.util.Set<String> mergedUrls = new java.util.HashSet<>(config.getApiUrls());
+                for (String url : ext.split(",")) {
+                    String trimmed = url.trim();
+                    if (!TextUtils.isEmpty(trimmed)) mergedUrls.add(trimmed);
+                }
+                if (!mergedUrls.isEmpty() && !mergedUrls.equals(config.getApiUrls())) {
+                    config.setApiUrls(mergedUrls);
+                    changed = true;
+                    log(stage + ": save apiUrls=" + mergedUrls);
                 }
             }
-            DanmakuConfigManager.saveConfig(context, config);
-            DanmakuConfig saved = DanmakuConfigManager.loadConfig(context);
-            log(stage + ": ext已自动保存到DanmakuConfig, final apiUrls=" + saved.getApiUrls()
-                    + ", autoPush=" + saved.isAutoPushEnabled()
-                    + ", pushToast=" + saved.isPushToastEnabled()
-                    + ", theme=" + saved.getTheme());
+
+            if (changed) {
+                DanmakuConfigManager.saveConfig(context, config);
+                DanmakuConfig saved = DanmakuConfigManager.loadConfig(context);
+                log(stage + ": ext已自动保存到DanmakuConfig, final apiUrls=" + saved.getApiUrls()
+                        + ", autoPush=" + saved.isAutoPushEnabled()
+                        + ", pushToast=" + saved.isPushToastEnabled()
+                        + ", theme=" + saved.getTheme());
+            } else {
+                log(stage + ": ext unchanged, skip save");
+            }
         } catch (Exception e) {
             log(stage + ": ext自动保存失败: " + e.getClass().getName() + ": " + e.getMessage());
         }

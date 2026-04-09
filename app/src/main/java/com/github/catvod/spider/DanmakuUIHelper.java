@@ -187,6 +187,10 @@ public class DanmakuUIHelper {
     // ========== 边框按钮核心方法 ==========
     private static Button createBorderButton(Activity activity, String text) {
         ThemeColors colors = getThemeColors(activity);
+        return createBorderButton(activity, text, colors);
+    }
+
+    private static Button createBorderButton(Activity activity, String text, ThemeColors colors) {
         Button button = new Button(activity);
         button.setText(text);
         button.setTextColor(colors.textPrimary);
@@ -195,10 +199,10 @@ public class DanmakuUIHelper {
         button.setPadding(dpToPx(activity, 6), dpToPx(activity, 4),
                 dpToPx(activity, 6), dpToPx(activity, 4));
 
-        updateButtonBorder(button, false, activity);
+        updateButtonBorder(button, false, activity, colors);
 
         button.setOnFocusChangeListener((v, hasFocus) -> {
-            updateButtonBorder((Button) v, hasFocus, activity);
+            updateButtonBorder((Button) v, hasFocus, activity, colors);
             if (hasFocus) {
                 v.setScaleX(1.05f);
                 v.setScaleY(1.05f);
@@ -214,6 +218,10 @@ public class DanmakuUIHelper {
     // 创建无缩放效果的边框按钮（保留边框高亮，但无缩放动画）
     private static Button createStaticBorderButton(Activity activity, String text) {
         ThemeColors colors = getThemeColors(activity);
+        return createStaticBorderButton(activity, text, colors);
+    }
+
+    private static Button createStaticBorderButton(Activity activity, String text, ThemeColors colors) {
         Button button = new Button(activity);
         button.setText(text);
         button.setTextColor(colors.textPrimary);
@@ -221,10 +229,10 @@ public class DanmakuUIHelper {
         button.setTypeface(null, android.graphics.Typeface.BOLD);
         button.setPadding(dpToPx(activity, 6), dpToPx(activity, 4),
                 dpToPx(activity, 6), dpToPx(activity, 4));
-        updateButtonBorder(button, false, activity);
+        updateButtonBorder(button, false, activity, colors);
 
         button.setOnFocusChangeListener((v, hasFocus) -> {
-            updateButtonBorder((Button) v, hasFocus, activity);
+            updateButtonBorder((Button) v, hasFocus, activity, colors);
         });
 
         return button;
@@ -232,6 +240,10 @@ public class DanmakuUIHelper {
 
     private static void updateButtonBorder(Button button, boolean focused, Activity activity) {
         ThemeColors colors = getThemeColors(activity);
+        updateButtonBorder(button, focused, activity, colors);
+    }
+
+    private static void updateButtonBorder(Button button, boolean focused, Activity activity, ThemeColors colors) {
         GradientDrawable drawable = new GradientDrawable();
         drawable.setColor(Color.TRANSPARENT);
         drawable.setCornerRadius(dpToPx(activity, 6));
@@ -244,6 +256,10 @@ public class DanmakuUIHelper {
     // 为EditText添加焦点边框
     private static void setupEditTextBorder(EditText editText, Activity activity) {
         ThemeColors colors = getThemeColors(activity);
+        setupEditTextBorder(editText, activity, colors);
+    }
+
+    private static void setupEditTextBorder(EditText editText, Activity activity, ThemeColors colors) {
         editText.setOnFocusChangeListener((v, hasFocus) -> {
             GradientDrawable drawable = new GradientDrawable();
             if (colors == DARK_THEME) {
@@ -457,7 +473,7 @@ public class DanmakuUIHelper {
                 apiInput.setPadding(dpToPx(activity, 12), dpToPx(activity, 12),
                         dpToPx(activity, 12), dpToPx(activity, 12));
                 apiInput.setHintTextColor(colors.textTertiary);
-                setupEditTextBorder(apiInput, activity);
+                setupEditTextBorder(apiInput, activity, colors);
                 mainLayout.addView(apiInput);
 
                 // 水平布局：左侧自动推送，右侧二维码
@@ -627,7 +643,7 @@ public class DanmakuUIHelper {
         //        leftArea.addView(toolBtn);
 
                 // 第五行：清空缓存按钮
-                Button clearCacheBtn = createStaticBorderButton(activity, "清空缓存");
+                Button clearCacheBtn = createStaticBorderButton(activity, "清空缓存", colors);
                 clearCacheBtn.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
                 clearCacheBtn.setLayoutParams(new LinearLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(activity, 44)));
@@ -685,8 +701,8 @@ public class DanmakuUIHelper {
                 btnLayout.setOrientation(LinearLayout.HORIZONTAL);
                 btnLayout.setGravity(Gravity.CENTER);
 
-                Button resetBtn = createBorderButton(activity, "重置");
-                Button saveBtn = createBorderButton(activity, "保存生效");
+                Button resetBtn = createBorderButton(activity, "重置", colors);
+                Button saveBtn = createBorderButton(activity, "保存生效", colors);
 
                 LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(
                         0, dpToPx(activity, 44), 1);
@@ -879,8 +895,8 @@ public class DanmakuUIHelper {
                 btnLayout.setOrientation(LinearLayout.HORIZONTAL);
                 btnLayout.setGravity(Gravity.CENTER);
 
-                Button saveBtn = createBorderButton(activity, "保存");
-                Button cancelBtn = createBorderButton(activity, "取消");
+                Button saveBtn = createBorderButton(activity, "保存", colors);
+                Button cancelBtn = createBorderButton(activity, "取消", colors);
 
                 LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(
                         0, dpToPx(activity, 44), 1);
@@ -986,8 +1002,8 @@ public class DanmakuUIHelper {
                         dpToPx(activity, 16), dpToPx(activity, 12));
                 btnLayout.setBackgroundColor(colors.bgPrimary);
 
-                Button clearButton = createBorderButton(activity, "清空");
-                Button closeButton = createBorderButton(activity, "关闭");
+                Button clearButton = createBorderButton(activity, "清空", colors);
+                Button closeButton = createBorderButton(activity, "关闭", colors);
 
                 LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(
                         0, dpToPx(activity, 44), 1);
@@ -1095,9 +1111,9 @@ public class DanmakuUIHelper {
                         dpToPx(activity, 300), dpToPx(activity, 44));
                 inputParams.setMargins(0, 0, dpToPx(activity, 8), 0);
                 searchInput.setLayoutParams(inputParams);
-                setupEditTextBorder(searchInput, activity);
+                setupEditTextBorder(searchInput, activity, colors);
 
-                Button searchBtn = createBorderButton(activity, "搜索");
+                Button searchBtn = createBorderButton(activity, "搜索", colors);
                 searchBtn.setLayoutParams(new LinearLayout.LayoutParams(
                         dpToPx(activity, 70), dpToPx(activity, 44)));
 
