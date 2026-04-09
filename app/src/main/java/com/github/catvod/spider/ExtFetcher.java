@@ -337,7 +337,7 @@ public class ExtFetcher {
     }
 
     private static String fetchExtFromHostConfigs(Context context) {
-        trace("try host config_x prefs");
+        trace("try host config_1");
         if (context == null) {
             lastError = "host-config-no-context";
             trace("host config no context");
@@ -347,36 +347,27 @@ public class ExtFetcher {
         try {
             trace("read pref: " + prefName);
             SharedPreferences sp = context.getSharedPreferences(prefName, Context.MODE_PRIVATE);
-            String[] keys = new String[] {"config_0", "config_1", "config_2"};
-            StringBuilder errs = new StringBuilder();
-            for (String key : keys) {
-                try {
-                    String raw = sp.getString(key, "");
-                    trace("read key: " + key);
-                    if (TextUtils.isEmpty(raw)) {
-                        trace(key + " empty");
-                        continue;
-                    }
-                    String preview = raw.substring(0, Math.min(raw.length(), 160)).replace("\n", " ");
-                    scanNotes = appendScanNote(scanNotes, key + "=" + preview);
-                    trace("preview " + key + ": " + preview);
-
-                    String ext = tryExtractExtFromConfigValue(key, raw);
-                    if (!TextUtils.isEmpty(ext)) {
-                        markSuccess("host-config", prefName, key);
-                        trace("ext found from " + key);
-                        return ext;
-                    }
-                    trace("no ext from " + key);
-                } catch (Throwable e) {
-                    String msg = e.getMessage();
-                    if (errs.length() > 0) errs.append(" | ");
-                    errs.append(key).append(":").append(msg == null ? e.getClass().getSimpleName() : msg);
-                    trace(key + " exception: " + (msg == null ? e.getClass().getSimpleName() : msg));
-                }
+            String key = "config_1";
+            String raw = sp.getString(key, "");
+            trace("read key: " + key);
+            if (TextUtils.isEmpty(raw)) {
+                lastError = "config_1-empty";
+                trace("config_1 empty");
+                return null;
             }
-            lastError = errs.length() > 0 ? ("config-keys-no-hit | " + errs) : "config-keys-no-hit";
-            trace("config_0/1/2 all miss");
+            String preview = raw.substring(0, Math.min(raw.length(), 160)).replace("\n", " ");
+            scanNotes = appendScanNote(scanNotes, key + "=" + preview);
+            trace("preview " + key + ": " + preview);
+
+            String ext = tryExtractExtFromConfigValue(key, raw);
+            if (!TextUtils.isEmpty(ext)) {
+                markSuccess("host-config", prefName, key);
+                trace("ext found from " + key);
+                return ext;
+            }
+
+            lastError = TextUtils.isEmpty(lastError) ? "config_1-no-hit" : lastError;
+            trace("no ext from config_1");
             return null;
         } catch (Throwable e) {
             lastError = "host-config-ex:" + e.getMessage();
@@ -496,10 +487,10 @@ public class ExtFetcher {
 
     private static String tryHostOkHttp(String url) {
         String[] classNames = new String[] {
+                "com.fongmi.android.tv.net.OkHttp",
                 "com.github.catvod.net.OkHttp",
                 "com.github.tvbox.osc.util.OkHttp",
                 "com.github.tvbox.osc.net.OkHttp",
-                "com.fongmi.android.tv.net.OkHttp",
                 "com.ok.video.net.OkHttp"
         };
         String[] methods = new String[] {"string", "get", "request"};

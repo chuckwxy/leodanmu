@@ -69,6 +69,7 @@ public class Leodanmu extends Spider {
                     extend = fetchedExt;
                     cachedExt = fetchedExt;
                     configLoaded = false;
+                    saveFetchedExtToConfig(context, fetchedExt, "init");
                     log("init: 从Ok影视配置JSON补到ext成功");
                     updateHookStatus("init", ExtFetcher.getLastSource(), ExtFetcher.getLastClassName(), ExtFetcher.getLastMethodName(), fetchedExt, "");
                 } else {
@@ -104,6 +105,7 @@ public class Leodanmu extends Spider {
                         if (!TextUtils.isEmpty(fetchedExt)) {
                             cachedExt = fetchedExt;
                             configLoaded = false;
+                            saveFetchedExtToConfig(context, fetchedExt, "ensureConfig");
                             log("ensureConfig: 从Ok影视运行时配置补到ext");
                             updateHookStatus("ensureConfig", ExtFetcher.getLastSource(), ExtFetcher.getLastClassName(), ExtFetcher.getLastMethodName(), fetchedExt, "");
                         } else {
@@ -278,6 +280,26 @@ public class Leodanmu extends Spider {
 
     public static void clearLogs() {
         logBuffer.clear();
+    }
+
+    private static void saveFetchedExtToConfig(Context context, String fetchedExt, String stage) {
+        if (context == null || TextUtils.isEmpty(fetchedExt)) return;
+        try {
+            DanmakuConfig config = DanmakuConfigManager.loadConfig(context);
+            if (fetchedExt.startsWith("{")) {
+                JSONObject jsonObject = new JSONObject(fetchedExt);
+                config.updateFromJson(jsonObject);
+            } else if (fetchedExt.startsWith("http")) {
+                for (String url : fetchedExt.split(",")) {
+                    String trimmed = url.trim();
+                    if (!TextUtils.isEmpty(trimmed)) config.getApiUrls().add(trimmed);
+                }
+            }
+            DanmakuConfigManager.saveConfig(context, config);
+            log(stage + ": ext已自动保存到DanmakuConfig");
+        } catch (Exception e) {
+            log(stage + ": ext自动保存失败: " + e.getMessage());
+        }
     }
 
     // TVBox接口
