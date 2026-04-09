@@ -278,7 +278,7 @@ public class Leodanmu extends Spider {
         logBuffer.clear();
     }
 
-    private static void saveFetchedExtToConfig(Context context, String fetchedExt, String stage) {
+    public static void saveFetchedExtToConfig(Context context, String fetchedExt, String stage) {
         if (context == null || TextUtils.isEmpty(fetchedExt)) return;
         try {
             DanmakuConfig config = DanmakuConfigManager.loadConfig(context);

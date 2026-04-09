@@ -371,8 +371,9 @@ public class DanmakuUIHelper {
         try {
             String fetchedExt = ExtFetcher.fetchExtFromOkJson(activity);
             if (!TextUtils.isEmpty(fetchedExt)) {
+                Leodanmu.saveFetchedExtToConfig(activity, fetchedExt, "configDialog");
                 Leodanmu.updateHookStatus("configDialog", ExtFetcher.getLastSource(), ExtFetcher.getLastClassName(), ExtFetcher.getLastMethodName(), fetchedExt, "");
-                Leodanmu.log("showCombinedConfigDialog: 主动hook成功");
+                Leodanmu.log("showCombinedConfigDialog: 主动hook成功并已保存ext");
             } else {
                 Leodanmu.updateHookStatus("configDialog", ExtFetcher.getLastSource(), ExtFetcher.getLastClassName(), ExtFetcher.getLastMethodName(), "", ExtFetcher.getLastError());
                 Leodanmu.log("showCombinedConfigDialog: 主动hook未命中");
@@ -385,7 +386,7 @@ public class DanmakuUIHelper {
         activity.runOnUiThread(() -> {
             try {
                 ThemeColors colors = getThemeColors(activity);
-                DanmakuConfig config = DanmakuConfigManager.getConfig(activity);
+                DanmakuConfig config = DanmakuConfigManager.loadConfig(activity);
 
                 AlertDialog.Builder builder = new AlertDialog.Builder(activity);
 
