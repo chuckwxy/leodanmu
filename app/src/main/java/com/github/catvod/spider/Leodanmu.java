@@ -388,12 +388,13 @@ public class Leodanmu extends Spider {
             }
 
             if (changed) {
+                log(stage + ": save前 apiUrls=" + config.getApiUrls());
                 DanmakuConfigManager.saveConfig(context, config);
                 DanmakuConfig reloaded = DanmakuConfigManager.loadConfig(context);
-                log(stage + ": ext已自动保存到DanmakuConfig, reload apiUrls=" + reloaded.getApiUrls());
+                log(stage + ": save后 reload apiUrls=" + (reloaded == null ? "null" : reloaded.getApiUrls()));
             } else {
-                DanmakuConfig reloaded = DanmakuConfigManager.getConfig(context);
-                log(stage + ": ext unchanged, skip save, current apiUrls=" + (reloaded == null ? "null" : reloaded.getApiUrls()));
+                DanmakuConfig current = DanmakuConfigManager.getConfig(context);
+                log(stage + ": ext unchanged, current apiUrls=" + (current == null ? "null" : current.getApiUrls()));
             }
             lastAppliedExt = ext;
             lastAppliedExtHash = extHash;

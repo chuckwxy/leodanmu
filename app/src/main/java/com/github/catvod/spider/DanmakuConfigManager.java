@@ -38,20 +38,49 @@ public class DanmakuConfigManager {
     }
 
     public static DanmakuConfig loadConfig(Context context) {
+        if (context == null) {
+            context = Utils.getAppContext();
+            if (context == null) {
+                Leodanmu.log("DanmakuConfigManager.loadConfig: context为空");
+                return new DanmakuConfig();
+            }
+        }
+        Leodanmu.log("DanmakuConfigManager.loadConfig: prefsName=" + PREFS_NAME
+                + ", ctx=" + context.getClass().getName()
+                + ", pkg=" + context.getPackageName());
         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         String json = prefs.getString(KEY_CONFIG_JSON, null);
+        Leodanmu.log("DanmakuConfigManager.loadConfig: 读取 prefs json=" + json);
         if (json != null) {
-            return gson.fromJson(json, DanmakuConfig.class);
+            DanmakuConfig config = gson.fromJson(json, DanmakuConfig.class);
+            Leodanmu.log("DanmakuConfigManager.loadConfig: 解析后 apiUrls=" + (config == null ? "null" : config.getApiUrls()));
+            return config;
         } else {
+            Leodanmu.log("DanmakuConfigManager.loadConfig: prefs 无 json，走 migrateOldConfig");
+            // 迁移旧配置
             return migrateOldConfig(context);
         }
     }
 
     public static void saveConfig(Context context, DanmakuConfig config) {
+        if (context == null) {
+            context = Utils.getAppContext();
+            if (context == null) {
+                Leodanmu.log("DanmakuConfigManager.saveConfig: context为空，无法保存");
+                return;
+            }
+        }
         sDanmakuConfig = config;
+        Leodanmu.log("DanmakuConfigManager.saveConfig: prefsName=" + PREFS_NAME
+                + ", ctx=" + context.getClass().getName()
+                + ", pkg=" + context.getPackageName());
         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         String json = gson.toJson(config);
-        prefs.edit().putString(KEY_CONFIG_JSON, json).apply();
+        Leodanmu.log("DanmakuConfigManager.saveConfig: 即将保存 json=" + json);
+        boolean ok = prefs.edit().putString(KEY_CONFIG_JSON, json).commit();
+        Leodanmu.log("DanmakuConfigManager.saveConfig: commit=" + ok);
+        String savedJson = prefs.getString(KEY_CONFIG_JSON, null);
+        Leodanmu.log("DanmakuConfigManager.saveConfig: 保存后 prefs json=" + savedJson);
     }
 
     private static DanmakuConfig migrateOldConfig(Context context) {

@@ -1497,6 +1497,7 @@ public class DanmakuScanner {
                             Leodanmu.log("[按钮点击] 打开搜索对话框");
                             try {
                                 DanmakuConfig localConfig = DanmakuConfigManager.getConfig(activity);
+                                Leodanmu.log("[按钮点击] 本地配置快照 apiUrls=" + (localConfig == null ? "null" : localConfig.getApiUrls()));
                                 boolean hasLocalApiUrls = localConfig != null
                                         && localConfig.getApiUrls() != null
                                         && !localConfig.getApiUrls().isEmpty();
@@ -1517,6 +1518,7 @@ public class DanmakuScanner {
                                 }
 
                                 DanmakuConfig verifyConfig = DanmakuConfigManager.loadConfig(activity);
+                                Leodanmu.log("[按钮点击] 打开搜索框前 reload apiUrls=" + (verifyConfig == null ? "null" : verifyConfig.getApiUrls()));
                                 if (verifyConfig == null || verifyConfig.getApiUrls() == null || verifyConfig.getApiUrls().isEmpty()) {
                                     Utils.safeShowToast(activity, "本地弹幕接口为空，请先保存配置");
                                     Leodanmu.log("[按钮点击] 本地 apiUrls 仍为空，取消打开搜索框");
