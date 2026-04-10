@@ -2,6 +2,8 @@ package com.github.catvod.spider;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.graphics.Bitmap;
@@ -385,17 +387,26 @@ public class DanmakuUIHelper {
         if (activity.isFinishing() || activity.isDestroyed()) return;
 
         try {
-            String fetchedExt = ExtFetcher.fetchExtFromSubscription(activity);
-            if (TextUtils.isEmpty(fetchedExt)) {
-                fetchedExt = ExtFetcher.fetchExtFromOkJson(activity);
-            }
-            if (!TextUtils.isEmpty(fetchedExt)) {
-                Leodanmu.saveFetchedExtToConfig(activity, fetchedExt, "configDialog");
-                Leodanmu.updateHookStatus("configDialog", ExtFetcher.getLastSource(), ExtFetcher.getLastClassName(), ExtFetcher.getLastMethodName(), fetchedExt, "");
-                Leodanmu.log("showCombinedConfigDialog: 主动hook成功并已保存ext");
+            DanmakuConfig preloadConfig = DanmakuConfigManager.loadConfig(activity);
+            boolean hasLocalApiUrls = preloadConfig != null
+                    && preloadConfig.getApiUrls() != null
+                    && !preloadConfig.getApiUrls().isEmpty();
+
+            if (!hasLocalApiUrls) {
+                String fetchedExt = ExtFetcher.fetchExtFromSubscription(activity);
+                if (TextUtils.isEmpty(fetchedExt)) {
+                    fetchedExt = ExtFetcher.fetchExtFromOkJson(activity);
+                }
+                if (!TextUtils.isEmpty(fetchedExt)) {
+                    Leodanmu.saveFetchedExtToConfig(activity, fetchedExt, "configDialog");
+                    Leodanmu.updateHookStatus("configDialog", ExtFetcher.getLastSource(), ExtFetcher.getLastClassName(), ExtFetcher.getLastMethodName(), fetchedExt, "");
+                    Leodanmu.log("showCombinedConfigDialog: 本地为空，主动hook成功并已保存ext");
+                } else {
+                    Leodanmu.updateHookStatus("configDialog", ExtFetcher.getLastSource(), ExtFetcher.getLastClassName(), ExtFetcher.getLastMethodName(), "", ExtFetcher.getLastError());
+                    Leodanmu.log("showCombinedConfigDialog: 本地为空，主动hook未命中");
+                }
             } else {
-                Leodanmu.updateHookStatus("configDialog", ExtFetcher.getLastSource(), ExtFetcher.getLastClassName(), ExtFetcher.getLastMethodName(), "", ExtFetcher.getLastError());
-                Leodanmu.log("showCombinedConfigDialog: 主动hook未命中");
+                Leodanmu.log("showCombinedConfigDialog: 本地 apiUrls 已存在，跳过主动hook, apiUrls=" + preloadConfig.getApiUrls());
             }
         } catch (Exception e) {
             Leodanmu.updateHookStatus("configDialog", "exception", "", "", "", e.getMessage());
@@ -1006,15 +1017,18 @@ public class DanmakuUIHelper {
                 btnLayout.setBackgroundColor(colors.bgPrimary);
 
                 Button clearButton = createBorderButton(activity, "清空", colors);
+                Button copyButton = createBorderButton(activity, "复制日志", colors);
                 Button closeButton = createBorderButton(activity, "关闭", colors);
 
                 LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(
                         0, dpToPx(activity, 44), 1);
                 btnParams.setMargins(dpToPx(activity, 6), 0, dpToPx(activity, 6), 0);
                 clearButton.setLayoutParams(btnParams);
+                copyButton.setLayoutParams(btnParams);
                 closeButton.setLayoutParams(btnParams);
 
                 btnLayout.addView(clearButton);
+                btnLayout.addView(copyButton);
                 btnLayout.addView(closeButton);
                 mainLayout.addView(btnLayout);
 
@@ -1025,6 +1039,22 @@ public class DanmakuUIHelper {
                     Leodanmu.clearLogs();
                     dialog.dismiss();
                     showLogDialog(ctx);
+                });
+
+                copyButton.setOnClickListener(v -> {
+                    try {
+                        ClipboardManager cm = (ClipboardManager) activity.getSystemService(Context.CLIPBOARD_SERVICE);
+                        if (cm != null) {
+                            String currentLog = logView.getText() == null ? "" : logView.getText().toString();
+                            ClipData clip = ClipData.newPlainText("leo_danmaku_log", currentLog);
+                            cm.setPrimaryClip(clip);
+                            Utils.safeShowToast(activity, "已复制弹幕日志");
+                        } else {
+                            Utils.safeShowToast(activity, "复制日志失败：剪贴板不可用");
+                        }
+                    } catch (Exception e) {
+                        Utils.safeShowToast(activity, "复制日志失败: " + e.getMessage());
+                    }
                 });
 
                 closeButton.setOnClickListener(v -> dialog.dismiss());
