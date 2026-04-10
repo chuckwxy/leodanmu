@@ -81,13 +81,13 @@ public class LeoDanmakuService {
                 Leodanmu.log("[search#" + searchId + "] 已提交搜索任务 api=" + apiUrl);
             }
 
-            // 超时控制
-            long endTime = System.currentTimeMillis() + 30000;
+            // 超时控制：TV 端真实请求可能超过 30 秒，外层等待窗口放宽到 50 秒，避免先于 HTTP 返回误判为空
+            long endTime = System.currentTimeMillis() + 50000;
 
             while (pendingTasks > 0) {
                 long timeLeft = endTime - System.currentTimeMillis();
                 if (timeLeft <= 0) {
-                    Leodanmu.log("[search#" + searchId + "] 等待结果超时, globalResults=" + globalResults.size());
+                    Leodanmu.log("[search#" + searchId + "] 等待结果超时(50s), globalResults=" + globalResults.size());
                     break;
                 }
 
