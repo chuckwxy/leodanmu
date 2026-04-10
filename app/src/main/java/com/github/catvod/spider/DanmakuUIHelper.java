@@ -386,6 +386,7 @@ public class DanmakuUIHelper {
         Activity activity = (Activity) ctx;
         if (activity.isFinishing() || activity.isDestroyed()) return;
 
+        final DanmakuConfig[] configHolder = new DanmakuConfig[1];
         try {
             DanmakuConfig preloadConfig = DanmakuConfigManager.loadConfig(activity);
             boolean hasLocalApiUrls = preloadConfig != null
@@ -405,9 +406,11 @@ public class DanmakuUIHelper {
                     Leodanmu.updateHookStatus("configDialog", ExtFetcher.getLastSource(), ExtFetcher.getLastClassName(), ExtFetcher.getLastMethodName(), "", ExtFetcher.getLastError());
                     Leodanmu.log("showCombinedConfigDialog: 本地为空，主动hook未命中");
                 }
+                preloadConfig = DanmakuConfigManager.loadConfig(activity);
             } else {
                 Leodanmu.log("showCombinedConfigDialog: 本地 apiUrls 已存在，跳过主动hook, apiUrls=" + preloadConfig.getApiUrls());
             }
+            configHolder[0] = preloadConfig;
         } catch (Exception e) {
             Leodanmu.updateHookStatus("configDialog", "exception", "", "", "", e.getMessage());
             Leodanmu.log("showCombinedConfigDialog: 主动hook异常: " + e.getMessage());
@@ -416,7 +419,7 @@ public class DanmakuUIHelper {
         activity.runOnUiThread(() -> {
             try {
                 ThemeColors colors = getThemeColors(activity);
-                DanmakuConfig config = DanmakuConfigManager.loadConfig(activity);
+                DanmakuConfig config = configHolder[0] != null ? configHolder[0] : DanmakuConfigManager.loadConfig(activity);
 
                 AlertDialog.Builder builder = new AlertDialog.Builder(activity);
 
