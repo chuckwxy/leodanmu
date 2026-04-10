@@ -9,10 +9,13 @@ import javax.net.ssl.HttpsURLConnection;
 public class NetworkUtils {
 
     public static String robustHttpGet(String urlStr) {
+        long overallStart = System.currentTimeMillis();
         for (int retry = 0; retry < 2; retry++) {
+            long attemptStart = System.currentTimeMillis();
+            HttpURLConnection conn = null;
             try {
                 URL url = new URL(urlStr);
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn = (HttpURLConnection) url.openConnection();
 
                 // 处理HTTPS
                 if (conn instanceof HttpsURLConnection) {
@@ -43,24 +46,31 @@ public class NetworkUtils {
                         baos.write(buffer, 0, len);
                     }
                     is.close();
-                    return new String(baos.toByteArray(), "UTF-8");
+                    String body = new String(baos.toByteArray(), "UTF-8");
+                    String preview = body.replace('\n', ' ').replace('\r', ' ');
+                    if (preview.length() > 120) preview = preview.substring(0, 120);
+                    Leodanmu.log("HTTP 200(" + retry + ") cost=" + (System.currentTimeMillis() - attemptStart) + "ms len=" + body.length() + ": " + urlStr + " preview=" + preview);
+                    return body;
                 } else if (responseCode == 404 || responseCode == 403) {
-                    Leodanmu.log("HTTP " + responseCode + ": " + urlStr);
+                    Leodanmu.log("HTTP " + responseCode + "(" + retry + ") cost=" + (System.currentTimeMillis() - attemptStart) + "ms: " + urlStr);
                     break; // 不重试
                 } else {
                     // 其他错误码也记录一下
-                    Leodanmu.log("HTTP " + responseCode + ": " + urlStr);
+                    Leodanmu.log("HTTP " + responseCode + "(" + retry + ") cost=" + (System.currentTimeMillis() - attemptStart) + "ms: " + urlStr);
                 }
             } catch (Exception e) {
-                Leodanmu.log("网络请求失败(" + retry + "): " + urlStr + " - " +
+                Leodanmu.log("网络请求失败(" + retry + ") cost=" + (System.currentTimeMillis() - attemptStart) + "ms: " + urlStr + " - " + e.getClass().getSimpleName() + ": " +
                         (e.getMessage() != null ? e.getMessage() : e.getClass().getName()));
                 if (retry < 1) {
                     try {
                         Thread.sleep(500);
                     } catch (InterruptedException ie) {}
                 }
+            } finally {
+                if (conn != null) conn.disconnect();
             }
         }
+        Leodanmu.log("robustHttpGet 返回空字符串，总耗时=" + (System.currentTimeMillis() - overallStart) + "ms: " + urlStr);
         return "";
     }
 
