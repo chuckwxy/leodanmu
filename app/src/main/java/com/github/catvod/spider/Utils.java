@@ -14,6 +14,20 @@ import java.util.Map;
 public class Utils {
 
     private static WeakReference<Activity> cachedActivity;
+    private static Context appContext;  // 新增：全局 Application Context
+
+    // 新增：初始化全局 Context，在 Leodanmu.init() 中调用
+    public static void initAppContext(Context context) {
+        if (context != null) {
+            appContext = context.getApplicationContext();
+            Leodanmu.log("Utils: appContext initialized");
+        }
+    }
+
+    // 新增：获取全局 Application Context
+    public static Context getAppContext() {
+        return appContext;
+    }
 
     public static Activity getTopActivity() {
         try {
