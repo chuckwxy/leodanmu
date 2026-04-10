@@ -177,6 +177,7 @@ public class Leodanmu extends Spider {
 
 
     public static synchronized void doInitWork(Context context, String extend) {
+        Utils.initAppContext(context);
         // log("doInitWork enter: initialized=" + initialized
         //         + ", ctx=" + (context == null ? "null" : context.getClass().getName())
         //         + ", extendEmpty=" + TextUtils.isEmpty(extend)
