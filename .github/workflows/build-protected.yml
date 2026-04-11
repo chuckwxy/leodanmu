@@ -1,0 +1,63 @@
+name: Build protected leodm.jar
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ master, main ]
+
+jobs:
+  build-protected:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Grant execute permission
+        run: |
+          chmod +x gradlew
+          chmod +x scripts/protect/build_protected_jar.sh
+
+      - name: Build Protected Release APK
+        run: ./gradlew assembleProtectedRelease
+
+      - name: Generate protected leodm.jar
+        run: ./scripts/protect/build_protected_jar.sh leodm-protected.jar
+
+      - name: Upload protected artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: leodm-protected-jar
+          path: |
+            jar/leodm-protected.jar
+            jar/leodm-protected.jar.md5
+            jar/leodm-protected.jar.meta.txt
+            jar/leodm-protected.jar.mapping.txt
+          retention-days: 30
+
+      - name: Create protected release
+        uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
+        with:
+          tag_name: protected-build-${{ github.run_number }}
+          name: "Protected Build #${{ github.run_number }}"
+          body: |
+            自动保护构建
+            Commit: ${{ github.sha }}
+          files: |
+            jar/leodm-protected.jar
+            jar/leodm-protected.jar.md5
+            jar/leodm-protected.jar.meta.txt
+          draft: false
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
