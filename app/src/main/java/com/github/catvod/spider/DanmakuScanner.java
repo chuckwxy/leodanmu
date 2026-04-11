@@ -479,29 +479,12 @@ public class DanmakuScanner {
                 pendingPushes.remove(key);
                 continue;
             }
-            // 检查视频是否在播放
+            // 检查视频是否在播放：一旦检测到已播放，立即推送，不再额外等待最小时长
             if (media.isPlaying()) {
-                if (media.getState() != null) {
-                    // 检查是否播放了足够长时间
-                    long playDuration = currentTime - videoPlayStartTime;
-                    if (playDuration >= MIN_PLAY_DURATION_BEFORE_PUSH) {
-                        Leodanmu.log("✅ 视频已播放" + playDuration + "ms，执行推送: " + key);
-                        executePendingPush(push, false);
-                        pendingPushes.remove(key);
-                    } else {
-                        Leodanmu.log("⏳ 视频播放中(" + playDuration + "ms)，等待达到" + MIN_PLAY_DURATION_BEFORE_PUSH + "ms");
-                    }
-                } else {
-                    // 检查是否播放了足够长时间
-                    long playDuration = currentTime - videoPlayStartTime;
-                    if (playDuration >= YSC_MIN_PLAY_DURATION_BEFORE_PUSH) {
-                        Leodanmu.log("✅ 视频已播放" + playDuration + "ms，执行推送: " + key);
-                        executePendingPush(push, false);
-                        pendingPushes.remove(key);
-                    } else {
-                        Leodanmu.log("⏳ 视频播放中(" + playDuration + "ms)，等待达到" + YSC_MIN_PLAY_DURATION_BEFORE_PUSH + "ms");
-                    }
-                }
+                long playDuration = currentTime - videoPlayStartTime;
+                Leodanmu.log("✅ 检测到视频已播放，立即执行推送（已播放" + playDuration + "ms）: " + key);
+                executePendingPush(push, false);
+                pendingPushes.remove(key);
             } else {
                 Leodanmu.log("⏸️ 视频未播放，已等待" + waitTime + "ms，还剩" + (FORCE_PUSH_TIMEOUT - waitTime) + "ms将强制推送");
             }
