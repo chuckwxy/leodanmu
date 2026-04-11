@@ -748,10 +748,10 @@ public class LeoDanmakuService {
                                         danmakuItem.getTitle(),
                                         danmakuItem.getEpTitle(),
                                         finalDanmakuCount);
-                                // Utils.safeShowToast(activity, message);
+                                Utils.safeShowToast(activity, message);
                                 Leodanmu.log(message);
                             } else {
-                                // Utils.safeShowToast(activity, "推送失败: 无响应或响应异常");
+                                Utils.safeShowToast(activity, "推送失败: 无响应或响应异常");
                                 Leodanmu.log("❌ 推送失败，响应: " + finalPushResp);
                             }
                         } else {

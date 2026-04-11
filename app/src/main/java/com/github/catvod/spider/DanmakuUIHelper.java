@@ -651,13 +651,13 @@ public class DanmakuUIHelper {
                 leftArea.addView(themeRow);
 
                 // 第四行：布局按钮
-        //        Button toolBtn = createStaticBorderButton(activity, "布局");
-        //        toolBtn.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
-        //        toolBtn.setLayoutParams(new LinearLayout.LayoutParams(
-        //                ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(activity, 44)));
-        //        ((LinearLayout.LayoutParams) toolBtn.getLayoutParams()).topMargin = dpToPx(activity, 8);
-        //        toolBtn.setOnClickListener(v -> showLpConfigDialog(activity));
-        //        leftArea.addView(toolBtn);
+                Button toolBtn = createStaticBorderButton(activity, "布局");
+                toolBtn.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
+                toolBtn.setLayoutParams(new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(activity, 44)));
+                ((LinearLayout.LayoutParams) toolBtn.getLayoutParams()).topMargin = dpToPx(activity, 8);
+                toolBtn.setOnClickListener(v -> showLpConfigDialog(activity));
+                leftArea.addView(toolBtn);
 
                 // 第五行：清空缓存按钮
                 Button clearCacheBtn = createStaticBorderButton(activity, "清空缓存", colors);
@@ -673,19 +673,19 @@ public class DanmakuUIHelper {
                 leftArea.addView(clearCacheBtn);
 
                 // 第六行：弹幕日志（追加，不改前面5行布局）
-                 Button logBtn = createStaticBorderButton(activity, "弹幕日志");
-                 logBtn.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
-                 logBtn.setLayoutParams(new LinearLayout.LayoutParams(
-                         ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(activity, 44)));
-                 ((LinearLayout.LayoutParams) logBtn.getLayoutParams()).topMargin = dpToPx(activity, 8);
-                 logBtn.setOnClickListener(v -> {
-                     try {
-                         showLogDialog(activity);
-                     } catch (Exception e) {
-                         Leodanmu.log("打开弹幕日志失败: " + e.getMessage());
-                     }
-                 });
-                 leftArea.addView(logBtn);
+//                 Button logBtn = createStaticBorderButton(activity, "弹幕日志");
+//                 logBtn.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
+//                 logBtn.setLayoutParams(new LinearLayout.LayoutParams(
+//                         ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(activity, 44)));
+//                 ((LinearLayout.LayoutParams) logBtn.getLayoutParams()).topMargin = dpToPx(activity, 8);
+//                 logBtn.setOnClickListener(v -> {
+//                     try {
+//                         showLogDialog(activity);
+//                     } catch (Exception e) {
+//                         Leodanmu.log("打开弹幕日志失败: " + e.getMessage());
+//                     }
+//                 });
+//                 leftArea.addView(logBtn);
 
                 middleRow.addView(leftArea);
 

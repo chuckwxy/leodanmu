@@ -20,8 +20,8 @@ public class DanmakuConfig {
     public DanmakuConfig() {
         // 设置默认值
         apiUrls = new HashSet<>();
-        lpWidth = 0.8f;
-        lpHeight = 0.9f;
+        lpWidth = 1.0f;
+        lpHeight = 1.0f;
         lpAlpha = 1.0f;
         autoPushEnabled = false;
     }
