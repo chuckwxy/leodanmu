@@ -38,8 +38,6 @@ public class DanmakuScanner {
     // 视频播放状态
     private static boolean isVideoPlaying = false;
     private static long videoPlayStartTime = 0;
-    private static String lastActionProbeSignature = "";
-    private static long lastActionProbeLogTime = 0;
     private static final long MIN_PLAY_DURATION_BEFORE_PUSH = 0; // 至少播放0秒再推送
     private static final long YSC_MIN_PLAY_DURATION_BEFORE_PUSH = 3000; // 至少播放0秒再推送
     private static final long FORCE_PUSH_TIMEOUT = 10000; // 10秒后强制推送
@@ -243,7 +241,6 @@ public class DanmakuScanner {
                                     return;
                                 }
 
-                                logEpisodeActionProbe(act, media);
                                 processDetectedTitle(act);
                             } else {
                                 // 不在播放界面，重置播放状态
@@ -481,8 +478,7 @@ public class DanmakuScanner {
             }
             // 检查视频是否在播放：一旦检测到已播放，立即推送，不再额外等待最小时长
             if (media.isPlaying()) {
-                long playDuration = currentTime - videoPlayStartTime;
-                Leodanmu.log("✅ 检测到视频已播放，立即执行推送（已播放" + playDuration + "ms）: " + key);
+                Leodanmu.log("✅ 检测到视频已播放，立即执行推送: " + key);
                 executePendingPush(push, false);
                 pendingPushes.remove(key);
             } else {
@@ -1341,79 +1337,6 @@ public class DanmakuScanner {
         // 放宽阈值从0.7到0.5，更容易识别为同一系列
         Leodanmu.log("🔍 系列相似度检查: " + series1 + " vs " + series2 + " = " + similarity);
         return similarity > 0.5; // 相似度超过50%认为是同一系列
-    }
-
-    private static void logEpisodeActionProbe(Activity activity, Media media) {
-        try {
-            if (activity == null || media == null || activity.getWindow() == null) return;
-            View root = activity.getWindow().getDecorView();
-            if (root == null) return;
-
-            StringBuilder matchedNodes = new StringBuilder();
-            collectEpisodeActionNodes(root, matchedNodes, 0);
-            if (matchedNodes.length() == 0) return;
-
-            String mediaTitle = media.getTitle() == null ? "" : media.getTitle();
-            String mediaArtist = media.getArtist() == null ? "" : media.getArtist();
-            String signature = activity.getClass().getSimpleName() + "|" + mediaTitle + "|" + mediaArtist + "|" + currentEpisodeNum + "|" + matchedNodes;
-            long now = System.currentTimeMillis();
-            if (signature.equals(lastActionProbeSignature) && (now - lastActionProbeLogTime) < 3000) return;
-            lastActionProbeSignature = signature;
-            lastActionProbeLogTime = now;
-
-            String lastInfo = lastEpisodeInfo == null ? "null" :
-                    ("name=" + lastEpisodeInfo.getEpisodeName() + ", year=" + lastEpisodeInfo.getEpisodeYear() + ", season=" + lastEpisodeInfo.getEpisodeSeasonNum() + ", ep=" + lastEpisodeInfo.getEpisodeNum());
-
-            Leodanmu.log("[动作探针] activity=" + activity.getClass().getSimpleName()
-                    + ", mediaTitle=" + mediaTitle
-                    + ", mediaArtist=" + mediaArtist
-                    + ", currentEpisodeNum=" + currentEpisodeNum
-                    + ", lastEpisodeInfo={" + lastInfo + "}");
-            Leodanmu.log("[节点快照] " + matchedNodes);
-        } catch (Exception e) {
-            Leodanmu.log("[动作探针] 异常: " + e.getClass().getSimpleName() + ": " + e.getMessage());
-        }
-    }
-
-    private static void collectEpisodeActionNodes(View view, StringBuilder out, int depth) {
-        if (view == null || depth > 8) return;
-        String text = extractViewActionText(view);
-        if (isEpisodeActionKeyword(text)) {
-            if (out.length() > 0) out.append(" || ");
-            out.append("text=").append(text)
-                    .append(", class=").append(view.getClass().getSimpleName())
-                    .append(", clickable=").append(view.isClickable())
-                    .append(", selected=").append(view.isSelected())
-                    .append(", enabled=").append(view.isEnabled());
-        }
-        if (view instanceof ViewGroup) {
-            ViewGroup group = (ViewGroup) view;
-            for (int i = 0; i < group.getChildCount(); i++) {
-                collectEpisodeActionNodes(group.getChildAt(i), out, depth + 1);
-            }
-        }
-    }
-
-    private static String extractViewActionText(View view) {
-        String text = "";
-        if (view instanceof TextView) {
-            CharSequence cs = ((TextView) view).getText();
-            if (cs != null) text = cs.toString().trim();
-        }
-        if (TextUtils.isEmpty(text)) {
-            CharSequence desc = view.getContentDescription();
-            if (desc != null) text = desc.toString().trim();
-        }
-        return text;
-    }
-
-    private static boolean isEpisodeActionKeyword(String text) {
-        if (TextUtils.isEmpty(text)) return false;
-        return text.contains("上一集")
-                || text.contains("下一集")
-                || text.contains("选集")
-                || text.matches(".*第\\s*[0-9零一二三四五六七八九十百千万]+\\s*[集期话章回].*")
-                || text.matches(".*[0-9]{1,3}\\s*/\\s*[0-9]{1,3}.*");
     }
 
     // 安排延迟推送
