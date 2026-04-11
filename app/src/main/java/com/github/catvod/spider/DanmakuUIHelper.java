@@ -401,19 +401,19 @@ public class DanmakuUIHelper {
                 if (!TextUtils.isEmpty(fetchedExt)) {
                     Leodanmu.saveFetchedExtToConfig(activity, fetchedExt, "configDialog");
                     Leodanmu.updateHookStatus("configDialog", ExtFetcher.getLastSource(), ExtFetcher.getLastClassName(), ExtFetcher.getLastMethodName(), fetchedExt, "");
-                    Leodanmu.log("showCombinedConfigDialog: 本地为空，主动hook成功并已保存ext");
+                    // Leodanmu.log("showCombinedConfigDialog: 本地为空，主动hook成功并已保存ext");
                 } else {
                     Leodanmu.updateHookStatus("configDialog", ExtFetcher.getLastSource(), ExtFetcher.getLastClassName(), ExtFetcher.getLastMethodName(), "", ExtFetcher.getLastError());
-                    Leodanmu.log("showCombinedConfigDialog: 本地为空，主动hook未命中");
+                    // Leodanmu.log("showCombinedConfigDialog: 本地为空，主动hook未命中");
                 }
                 preloadConfig = DanmakuConfigManager.loadConfig(activity);
             } else {
-                Leodanmu.log("showCombinedConfigDialog: 本地 apiUrls 已存在，跳过主动hook, apiUrls=" + preloadConfig.getApiUrls());
+                // Leodanmu.log("showCombinedConfigDialog: 本地 apiUrls 已存在，跳过主动hook, apiUrls=" + preloadConfig.getApiUrls());
             }
             configHolder[0] = preloadConfig;
         } catch (Exception e) {
             Leodanmu.updateHookStatus("configDialog", "exception", "", "", "", e.getMessage());
-            Leodanmu.log("showCombinedConfigDialog: 主动hook异常: " + e.getMessage());
+            // Leodanmu.log("showCombinedConfigDialog: 主动hook异常: " + e.getMessage());
         }
 
         activity.runOnUiThread(() -> {

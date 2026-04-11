@@ -20,12 +20,12 @@ public class NetworkUtils {
             if (body != null && !body.isEmpty()) {
                 String preview = body.replace('\n', ' ').replace('\r', ' ');
                 if (preview.length() > 120) preview = preview.substring(0, 120);
-                Leodanmu.log("OkHttp成功 cost=" + (System.currentTimeMillis() - okStart) + "ms len=" + body.length() + ": " + urlStr + " preview=" + preview);
+                // Leodanmu.log("OkHttp成功 cost=" + (System.currentTimeMillis() - okStart) + "ms len=" + body.length() + ": " + urlStr + " preview=" + preview);
                 return body;
             }
-            Leodanmu.log("OkHttp返回空字符串，准备回退旧网络链: " + urlStr);
+            // Leodanmu.log("OkHttp返回空字符串，准备回退旧网络链: " + urlStr);
         } catch (Throwable t) {
-            Leodanmu.log("OkHttp请求异常，准备回退旧网络链: " + urlStr + " - " + t.getClass().getSimpleName() + ": " + (t.getMessage() != null ? t.getMessage() : t.getClass().getName()));
+            // Leodanmu.log("OkHttp请求异常，准备回退旧网络链: " + urlStr + " - " + t.getClass().getSimpleName() + ": " + (t.getMessage() != null ? t.getMessage() : t.getClass().getName()));
         }
 
         for (int retry = 0; retry < 2; retry++) {
@@ -38,7 +38,7 @@ public class NetworkUtils {
 
                 // 处理HTTPS：优先走设备默认 TLS，失败后再回退到自定义兼容 TLS
                 if (conn instanceof HttpsURLConnection) {
-                    Leodanmu.log("HTTPS请求优先使用设备默认TLS: " + urlStr);
+                    // Leodanmu.log("HTTPS请求优先使用设备默认TLS: " + urlStr);
                 }
 
                 conn.setRequestMethod("GET");
@@ -65,18 +65,18 @@ public class NetworkUtils {
                     String body = new String(baos.toByteArray(), "UTF-8");
                     String preview = body.replace('\n', ' ').replace('\r', ' ');
                     if (preview.length() > 120) preview = preview.substring(0, 120);
-                    Leodanmu.log("旧网络链HTTP 200(" + retry + ") cost=" + (System.currentTimeMillis() - attemptStart) + "ms len=" + body.length() + ": " + urlStr + " preview=" + preview);
+                    // Leodanmu.log("旧网络链HTTP 200(" + retry + ") cost=" + (System.currentTimeMillis() - attemptStart) + "ms len=" + body.length() + ": " + urlStr + " preview=" + preview);
                     return body;
                 } else if (responseCode == 404 || responseCode == 403) {
-                    Leodanmu.log("旧网络链HTTP " + responseCode + "(" + retry + ") cost=" + (System.currentTimeMillis() - attemptStart) + "ms: " + urlStr);
+                    // Leodanmu.log("旧网络链HTTP " + responseCode + "(" + retry + ") cost=" + (System.currentTimeMillis() - attemptStart) + "ms: " + urlStr);
                     break; // 不重试
                 } else {
                     // 其他错误码也记录一下
-                    Leodanmu.log("旧网络链HTTP " + responseCode + "(" + retry + ") cost=" + (System.currentTimeMillis() - attemptStart) + "ms: " + urlStr);
+                    // Leodanmu.log("旧网络链HTTP " + responseCode + "(" + retry + ") cost=" + (System.currentTimeMillis() - attemptStart) + "ms: " + urlStr);
                 }
             } catch (Exception e) {
-                Leodanmu.log("旧网络链请求失败(" + retry + ") cost=" + (System.currentTimeMillis() - attemptStart) + "ms: " + urlStr + " - " + e.getClass().getSimpleName() + ": " +
-                        (e.getMessage() != null ? e.getMessage() : e.getClass().getName()));
+                // Leodanmu.log("旧网络链请求失败(" + retry + ") cost=" + (System.currentTimeMillis() - attemptStart) + "ms: " + urlStr + " - " + e.getClass().getSimpleName() + ": " +
+                //         (e.getMessage() != null ? e.getMessage() : e.getClass().getName()));
 
                 if (!httpsFallbackWithCompatTls && urlStr.startsWith("https://")) {
                     try {
@@ -85,9 +85,9 @@ public class NetworkUtils {
                         HttpsURLConnection httpsConn = (HttpsURLConnection) url.openConnection();
                         try {
                             httpsConn.setSSLSocketFactory(new TLSSocketFactory());
-                            Leodanmu.log("旧网络链默认TLS失败后，回退到兼容TLS: " + urlStr);
+                            // Leodanmu.log("旧网络链默认TLS失败后，回退到兼容TLS: " + urlStr);
                         } catch (Exception initEx) {
-                            Leodanmu.log("旧网络链兼容TLS工厂初始化失败: " + initEx.getClass().getSimpleName() + ": " + initEx.getMessage());
+                            // Leodanmu.log("旧网络链兼容TLS工厂初始化失败: " + initEx.getClass().getSimpleName() + ": " + initEx.getMessage());
                         }
                         httpsConn.setRequestMethod("GET");
                         httpsConn.setConnectTimeout(30000);
@@ -111,15 +111,15 @@ public class NetworkUtils {
                             String body = new String(baos.toByteArray(), "UTF-8");
                             String preview = body.replace('\n', ' ').replace('\r', ' ');
                             if (preview.length() > 120) preview = preview.substring(0, 120);
-                            Leodanmu.log("旧网络链兼容TLS回退成功 cost=" + (System.currentTimeMillis() - fallbackStart) + "ms len=" + body.length() + ": " + urlStr + " preview=" + preview);
+                            // Leodanmu.log("旧网络链兼容TLS回退成功 cost=" + (System.currentTimeMillis() - fallbackStart) + "ms len=" + body.length() + ": " + urlStr + " preview=" + preview);
                             httpsConn.disconnect();
                             return body;
                         } else {
-                            Leodanmu.log("旧网络链兼容TLS回退HTTP " + responseCode + " cost=" + (System.currentTimeMillis() - fallbackStart) + "ms: " + urlStr);
+                            // Leodanmu.log("旧网络链兼容TLS回退HTTP " + responseCode + " cost=" + (System.currentTimeMillis() - fallbackStart) + "ms: " + urlStr);
                         }
                         httpsConn.disconnect();
                     } catch (Exception fallbackEx) {
-                        Leodanmu.log("旧网络链兼容TLS回退失败: " + fallbackEx.getClass().getSimpleName() + ": " + (fallbackEx.getMessage() != null ? fallbackEx.getMessage() : fallbackEx.getClass().getName()));
+                        // Leodanmu.log("旧网络链兼容TLS回退失败: " + fallbackEx.getClass().getSimpleName() + ": " + (fallbackEx.getMessage() != null ? fallbackEx.getMessage() : fallbackEx.getClass().getName()));
                     }
                     httpsFallbackWithCompatTls = true;
                 }
@@ -133,7 +133,7 @@ public class NetworkUtils {
                 if (conn != null) conn.disconnect();
             }
         }
-        Leodanmu.log("robustHttpGet 返回空字符串，总耗时=" + (System.currentTimeMillis() - overallStart) + "ms: " + urlStr);
+        // Leodanmu.log("robustHttpGet 返回空字符串，总耗时=" + (System.currentTimeMillis() - overallStart) + "ms: " + urlStr);
         return "";
     }
 

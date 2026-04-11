@@ -73,12 +73,12 @@ public class TLSSocketFactory extends SSLSocketFactory {
                 }
                 if (!enabled.isEmpty()) {
                     sslSocket.setEnabledProtocols(enabled.toArray(new String[0]));
-                    Leodanmu.log("TLS启用协议=" + enabled);
+                    // Leodanmu.log("TLS启用协议=" + enabled);
                 } else {
-                    Leodanmu.log("TLS未找到首选协议，沿用系统默认协议=" + Arrays.asList(sslSocket.getEnabledProtocols()));
+                    // Leodanmu.log("TLS未找到首选协议，沿用系统默认协议=" + Arrays.asList(sslSocket.getEnabledProtocols()));
                 }
             } catch (Exception e) {
-                Leodanmu.log("TLS协议设置失败，沿用系统默认: " + e.getClass().getSimpleName() + ": " + e.getMessage());
+                // Leodanmu.log("TLS协议设置失败，沿用系统默认: " + e.getClass().getSimpleName() + ": " + e.getMessage());
             }
         }
         return socket;

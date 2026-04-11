@@ -58,7 +58,7 @@ public class LeoDanmakuService {
         try {
             DanmakuConfig config = DanmakuConfigManager.getConfig(activity);
             List<String> targets = new ArrayList<>(config.getApiUrls());
-            Leodanmu.log("[search#" + searchId + "] searchDanmaku start keyword=" + keyword + ", apiCount=" + targets.size());
+            // Leodanmu.log("[search#" + searchId + "] searchDanmaku start keyword=" + keyword + ", apiCount=" + targets.size());
             if (targets.isEmpty()) {
                 Leodanmu.log("[search#" + searchId + "] 没有配置API地址");
                 Utils.safeShowToast(activity, "没有配置API地址");
@@ -78,7 +78,7 @@ public class LeoDanmakuService {
                     }
                 });
                 pendingTasks++;
-                Leodanmu.log("[search#" + searchId + "] 已提交搜索任务 api=" + apiUrl);
+                // Leodanmu.log("[search#" + searchId + "] 已提交搜索任务 api=" + apiUrl);
             }
 
             // 超时控制：TV 端真实请求可能超过 30 秒，外层等待窗口放宽到 50 秒，避免先于 HTTP 返回误判为空
@@ -87,7 +87,7 @@ public class LeoDanmakuService {
             while (pendingTasks > 0) {
                 long timeLeft = endTime - System.currentTimeMillis();
                 if (timeLeft <= 0) {
-                    Leodanmu.log("[search#" + searchId + "] 等待结果超时(50s), globalResults=" + globalResults.size());
+                    // Leodanmu.log("[search#" + searchId + "] 等待结果超时(50s), globalResults=" + globalResults.size());
                     break;
                 }
 
@@ -101,7 +101,7 @@ public class LeoDanmakuService {
                         List<DanmakuItem> res = future.get();
                         pendingTasks--;
                         int rawCount = res != null ? res.size() : 0;
-                        Leodanmu.log("[search#" + searchId + "] 收到任务结果 rawCount=" + rawCount + ", pending=" + pendingTasks);
+                        // Leodanmu.log("[search#" + searchId + "] 收到任务结果 rawCount=" + rawCount + ", pending=" + pendingTasks);
 
                         if (res != null && !res.isEmpty()) {
                             // 过滤结果
@@ -119,19 +119,19 @@ public class LeoDanmakuService {
                                 }
                             }
 
-                            Leodanmu.log("[search#" + searchId + "] 过滤完成 kept=" + res.size() + ", removed=" + removed);
+                            // Leodanmu.log("[search#" + searchId + "] 过滤完成 kept=" + res.size() + ", removed=" + removed);
                             if (!res.isEmpty()) {
                                 Leodanmu.log("找到弹幕结果: " + res.size() + " 个");
                                 globalResults.addAll(res);
                             }
                         }
                     } else {
-                        Leodanmu.log("[search#" + searchId + "] poll超时 wait=" + wait + "ms, currentResults=" + globalResults.size() + ", pending=" + pendingTasks);
+                        // Leodanmu.log("[search#" + searchId + "] poll超时 wait=" + wait + "ms, currentResults=" + globalResults.size() + ", pending=" + pendingTasks);
                         if (!globalResults.isEmpty()) break;
                     }
                 } catch (Exception e) {
                     pendingTasks--;
-                    Leodanmu.log("[search#" + searchId + "] 汇总任务异常: " + e.getClass().getSimpleName() + ": " + e.getMessage());
+                    // Leodanmu.log("[search#" + searchId + "] 汇总任务异常: " + e.getClass().getSimpleName() + ": " + e.getMessage());
                 }
             }
         } catch (Exception e) {
@@ -144,7 +144,7 @@ public class LeoDanmakuService {
             resultMap.put(item.getEpId(), item);
         }
         DanmakuManager.lastDanmakuItemMap = resultMap;
-        Leodanmu.log("[search#" + searchId + "] searchDanmaku end totalResults=" + globalResults.size() + ", cost=" + (System.currentTimeMillis() - searchStart) + "ms");
+        // Leodanmu.log("[search#" + searchId + "] searchDanmaku end totalResults=" + globalResults.size() + ", cost=" + (System.currentTimeMillis() - searchStart) + "ms");
 
         return globalResults;
     }
@@ -157,19 +157,19 @@ public class LeoDanmakuService {
             // 尝试多种API路径
             String searchUrl = apiBase + "/api/v2/search/episodes?anime=" +
                     URLEncoder.encode(keyword, "UTF-8");
-            Leodanmu.log("[search#" + searchId + "] 搜索URL: " + searchUrl);
+            // Leodanmu.log("[search#" + searchId + "] 搜索URL: " + searchUrl);
 
             String json = NetworkUtils.robustHttpGet(searchUrl);
-            Leodanmu.log("[search#" + searchId + "] v2返回长度=" + (TextUtils.isEmpty(json) ? 0 : json.length()) + ", cost=" + (System.currentTimeMillis() - start) + "ms");
+            // Leodanmu.log("[search#" + searchId + "] v2返回长度=" + (TextUtils.isEmpty(json) ? 0 : json.length()) + ", cost=" + (System.currentTimeMillis() - start) + "ms");
 
             // 回退到旧API
             if (TextUtils.isEmpty(json)) {
                 searchUrl = apiBase + "/search/episodes?anime=" +
                         URLEncoder.encode(keyword, "UTF-8");
-                Leodanmu.log("[search#" + searchId + "] 回退搜索URL: " + searchUrl);
+                // Leodanmu.log("[search#" + searchId + "] 回退搜索URL: " + searchUrl);
                 long fallbackStart = System.currentTimeMillis();
                 json = NetworkUtils.robustHttpGet(searchUrl);
-                Leodanmu.log("[search#" + searchId + "] fallback返回长度=" + (TextUtils.isEmpty(json) ? 0 : json.length()) + ", cost=" + (System.currentTimeMillis() - fallbackStart) + "ms");
+                // Leodanmu.log("[search#" + searchId + "] fallback返回长度=" + (TextUtils.isEmpty(json) ? 0 : json.length()) + ", cost=" + (System.currentTimeMillis() - fallbackStart) + "ms");
             }
 
             if (TextUtils.isEmpty(json)) {
@@ -179,7 +179,7 @@ public class LeoDanmakuService {
 
             String preview = json.replace('\n', ' ').replace('\r', ' ');
             if (preview.length() > 160) preview = preview.substring(0, 160);
-            Leodanmu.log("[search#" + searchId + "] 搜索响应预览=" + preview);
+            // Leodanmu.log("[search#" + searchId + "] 搜索响应预览=" + preview);
 
             // 解析JSON
             JSONArray array = null;
@@ -198,7 +198,7 @@ public class LeoDanmakuService {
                 return list;
             }
 
-            Leodanmu.log("[search#" + searchId + "] JSON数组长度=" + array.length());
+            // Leodanmu.log("[search#" + searchId + "] JSON数组长度=" + array.length());
 
             // 判断数据结构
             boolean isAnimeList = false;
@@ -239,7 +239,7 @@ public class LeoDanmakuService {
             e.printStackTrace();
         }
 
-        Leodanmu.log("[search#" + searchId + "] doSearch end resultCount=" + list.size() + ", cost=" + (System.currentTimeMillis() - start) + "ms");
+        // Leodanmu.log("[search#" + searchId + "] doSearch end resultCount=" + list.size() + ", cost=" + (System.currentTimeMillis() - start) + "ms");
         return list;
     }
 
@@ -513,7 +513,7 @@ public class LeoDanmakuService {
                 try {
                     long autoSearchStart = System.currentTimeMillis();
                     SearchResult result = autoSearchForResult(episodeInfo, activity);
-                    Leodanmu.log("autoSearchForResult完成 found=" + result.found + ", similarity=" + result.similarity + ", cost=" + (System.currentTimeMillis() - autoSearchStart) + "ms");
+                    // Leodanmu.log("autoSearchForResult完成 found=" + result.found + ", similarity=" + result.similarity + ", cost=" + (System.currentTimeMillis() - autoSearchStart) + "ms");
                     if (result.found) {
                         Leodanmu.log("🎯 自动搜索找到结果: " + result.item);
 
