@@ -1,7 +1,9 @@
 package com.github.catvod.spider;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.DialogInterface;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Handler;
@@ -80,6 +82,11 @@ public class DanmakuScanner {
     private static Runnable delayedPushTask = null;
 
     private static boolean isLeoButtonInjected = false;
+
+    // 跨实例运行令牌：用于新实例接管后让旧实例优雅退出
+    private static final String RUNTIME_PREFS = "leo_danmaku_runtime";
+    private static final String KEY_ACTIVE_INSTANCE_TOKEN = "active_instance_token";
+    private static String currentInstanceToken = "";
 
     // 正则表达式
     private static final Pattern EPISODE_PATTERN = Pattern.compile(
@@ -164,8 +171,45 @@ public class DanmakuScanner {
         return title.replaceAll("\\s*\\(\\d{4}\\)\\s*", "").trim();
     }
 
+    private static SharedPreferences getRuntimePrefs() {
+        Context context = Utils.getAppContext();
+        if (context == null) {
+            return null;
+        }
+        return context.getSharedPreferences(RUNTIME_PREFS, Context.MODE_PRIVATE);
+    }
+
+    private static String createInstanceToken() {
+        return System.currentTimeMillis() + "_" + UUID.randomUUID().toString();
+    }
+
+    private static void claimActiveInstance() {
+        currentInstanceToken = createInstanceToken();
+        SharedPreferences prefs = getRuntimePrefs();
+        if (prefs != null) {
+            prefs.edit().putString(KEY_ACTIVE_INSTANCE_TOKEN, currentInstanceToken).apply();
+        }
+        Leodanmu.log("🆕 新实例接管Hook监控");
+    }
+
+    private static boolean isCurrentInstanceActive() {
+        SharedPreferences prefs = getRuntimePrefs();
+        if (prefs == null) {
+            return true;
+        }
+        String activeToken = prefs.getString(KEY_ACTIVE_INSTANCE_TOKEN, "");
+        return !TextUtils.isEmpty(currentInstanceToken) && TextUtils.equals(currentInstanceToken, activeToken);
+    }
+
+    private static void stopHookMonitorForTakeover() {
+        Leodanmu.log("♻️ 检测到新实例接管，当前实例优雅退出");
+        stopHookMonitor();
+    }
+
     // 启动Hook监控
     public static void startHookMonitor() {
+
+        claimActiveInstance();
 
         if (hookTimer != null || isMonitoring) {
             Leodanmu.log("⚠️ Hook监控已在运行中");
@@ -238,6 +282,12 @@ public class DanmakuScanner {
                                 // 检测是否开启自动查询或者已经手动查询过
                                 DanmakuConfig config = DanmakuConfigManager.getConfig(act);
                                 if (!config.isAutoPushEnabled() && TextUtils.isEmpty(DanmakuManager.lastManualDanmakuUrl)) {
+                                    return;
+                                }
+
+                                // 主工作流入口：若检测到新实例已接管，则旧实例在此优雅退出
+                                if (!isCurrentInstanceActive()) {
+                                    stopHookMonitorForTakeover();
                                     return;
                                 }
 
@@ -535,6 +585,7 @@ public class DanmakuScanner {
         pendingPushes.clear();
         lastPushTime.clear();
         isLeoButtonInjected = false;
+        currentInstanceToken = "";
 
         // 【新增】清理UIHelper的资源
         DanmakuUIHelper.cleanupAllResources();
