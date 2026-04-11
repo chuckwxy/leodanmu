@@ -5,8 +5,11 @@ ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT_DIR"
 
 OUT_NAME="${1:-leodm-protected.jar}"
-APK_PATH="app/build/outputs/apk/protectedRelease/app-protectedRelease-unsigned.apk"
 APKTOOL_PATH="jar/3rd/apktool_2.11.0.jar"
+APK_CANDIDATES=(
+  "app/build/outputs/apk/protectedRelease/app-protectedRelease-unsigned.apk"
+  "app/build/outputs/apk/protectedRelease/app-protectedRelease.apk"
+)
 WORK_DIR="jar/protected_work"
 TEMPLATE_DIR="$WORK_DIR/spider.jar"
 SMALI_DIR="$WORK_DIR/Smali_classes"
@@ -14,12 +17,26 @@ META_OUT="jar/${OUT_NAME}.meta.txt"
 MAP_SRC="app/build/outputs/mapping/protectedRelease/mapping.txt"
 MAP_DST="jar/${OUT_NAME}.mapping.txt"
 
+APK_PATH=""
+for candidate in "${APK_CANDIDATES[@]}"; do
+  if [ -f "$candidate" ]; then
+    APK_PATH="$candidate"
+    break
+  fi
+done
+
+if [ -z "$APK_PATH" ]; then
+  echo "[protect] protected APK not found. looked for: ${APK_CANDIDATES[*]}" >&2
+  exit 1
+fi
+
 rm -f "jar/${OUT_NAME}" "jar/${OUT_NAME}.md5" "$META_OUT" "$MAP_DST"
 rm -rf "$WORK_DIR"
 mkdir -p "$WORK_DIR"
 
 cp -R jar/spider.jar "$TEMPLATE_DIR"
 
+echo "[protect] using apk: $APK_PATH"
 echo "[protect] decompile protected APK main classes"
 java -jar "$APKTOOL_PATH" d -f --only-main-classes "$APK_PATH" -o "$SMALI_DIR"
 
