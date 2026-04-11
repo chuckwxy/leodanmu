@@ -1,9 +1,8 @@
 # Protected release rules for leodanmu dex.jar
 # Goal: keep plugin entry classes stable, aggressively obfuscate internal implementation.
 
-# Repackage / flatten aggressively
--flattenpackagehierarchy x
--repackageclasses x
+# Keep package paths stable for current dex.jar collection pipeline.
+# We still obfuscate class/member names aggressively, but do not repackage/flatten yet.
 -overloadaggressively
 -allowaccessmodification
 -useuniqueclassmembernames
