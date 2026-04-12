@@ -15,7 +15,9 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -50,6 +52,9 @@ public class Leodanmu extends Spider {
     // 日志
     private static final List<String> logBuffer = new CopyOnWriteArrayList<>();
     private static final int MAX_LOG_SIZE = 1000;
+    private static final int MAX_SHARED_LOG_LINES = 1200;
+    private static final String SHARED_LOG_FILE_NAME = "leo_danmaku_runtime.log";
+    private static final Object SHARED_LOG_LOCK = new Object();
 
     /**
      * 添加一个时间戳变量来防止 Leo弹幕 按钮快速连续点击：
@@ -258,7 +263,104 @@ public class Leodanmu extends Spider {
         if (logBuffer.size() > MAX_LOG_SIZE) {
             logBuffer.remove(0);
         }
+        appendSharedLog(newLogEntry);
     }
+@@
+-    public static String getLogContent() {
+-        StringBuilder sb = new StringBuilder();
+-        sb.append(getHookDebugContent()).append("\n");
+-        for (String s : logBuffer) sb.append(s).append("\n");
+-        return sb.toString();
+-    }
++    public static String getLogContent() {
++        StringBuilder sb = new StringBuilder();
++        sb.append(getHookDebugContent()).append("\n");
++        String sharedLog = readSharedLogContent();
++        if (!TextUtils.isEmpty(sharedLog)) {
++            sb.append(sharedLog);
++            if (!sharedLog.endsWith("\n")) sb.append("\n");
++        } else {
++            for (String s : logBuffer) sb.append(s).append("\n");
++        }
++        return sb.toString();
++    }
+@@
+-    public static void clearLogs() {
+-        logBuffer.clear();
+-    }
++    public static void clearLogs() {
++        logBuffer.clear();
++        clearSharedLog();
++    }
++
++    private static File getSharedLogFile() {
++        Context context = Utils.getAppContext();
++        if (context == null) return null;
++        File dir = context.getCacheDir();
++        if (dir == null) return null;
++        return new File(dir, SHARED_LOG_FILE_NAME);
++    }
++
++    private static void appendSharedLog(String newLogEntry) {
++        synchronized (SHARED_LOG_LOCK) {
++            try {
++                File file = getSharedLogFile();
++                if (file == null) return;
++                File parent = file.getParentFile();
++                if (parent != null && !parent.exists()) parent.mkdirs();
++
++                String existing = file.exists()
++                        ? new String(java.nio.file.Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8)
++                        : "";
++                StringBuilder combined = new StringBuilder();
++                if (!TextUtils.isEmpty(existing)) combined.append(existing);
++                if (combined.length() > 0 && combined.charAt(combined.length() - 1) != '\n') combined.append('\n');
++                combined.append(newLogEntry).append('\n');
++
++                String[] lines = combined.toString().split("\\n");
++                int start = Math.max(0, lines.length - MAX_SHARED_LOG_LINES);
++                StringBuilder trimmed = new StringBuilder();
++                for (int i = start; i < lines.length; i++) {
++                    String line = lines[i];
++                    if (TextUtils.isEmpty(line)) continue;
++                    trimmed.append(line).append('\n');
++                }
++
++                try (FileOutputStream fos = new FileOutputStream(file, false)) {
++                    fos.write(trimmed.toString().getBytes(StandardCharsets.UTF_8));
++                }
++            } catch (Throwable ignored) {
++                // 共享日志失败不影响主流程
++            }
++        }
++    }
++
++    private static String readSharedLogContent() {
++        synchronized (SHARED_LOG_LOCK) {
++            try {
++                File file = getSharedLogFile();
++                if (file == null || !file.exists()) return "";
++                return new String(java.nio.file.Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
++            } catch (Throwable ignored) {
++                return "";
++            }
++        }
++    }
++
++    private static void clearSharedLog() {
++        synchronized (SHARED_LOG_LOCK) {
++            try {
++                File file = getSharedLogFile();
++                if (file != null && file.exists()) {
++                    try (FileOutputStream fos = new FileOutputStream(file, false)) {
++                        fos.write(new byte[0]);
++                    }
++                }
++            } catch (Throwable ignored) {
++                // ignore
++            }
++        }
++    }
 
     private static String getExtHash(String extend) {
         if (TextUtils.isEmpty(extend)) return "null";
