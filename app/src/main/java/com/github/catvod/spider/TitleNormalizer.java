@@ -14,6 +14,7 @@ public class TitleNormalizer {
     private static final Pattern PERIOD_PATTERN = Pattern.compile("(?:第\\s*([一二三四五六七八九十两0-9]+)\\s*期|([0-9]{8})\\s*期)", Pattern.CASE_INSENSITIVE);
     private static final Pattern SPECIAL_PATTERN = Pattern.compile("(纯享|加更|花絮|彩蛋|预告|特别篇|先导片|番外|SP|OVA|OAD)", Pattern.CASE_INSENSITIVE);
     private static final Pattern NOISE_PATTERN = Pattern.compile("(?i)(from\\s+[a-z0-9_-]+|4k|hdr|杜比|蓝光|超清|国语|中字|双语)");
+    private static final Pattern TAIL_SEASON_PATTERN = Pattern.compile("^(.*?)(?:\\s+)?([0-9]{1,2})$");
 
     public static TitleMatchInfo parse(String raw) {
         TitleMatchInfo info = new TitleMatchInfo();
@@ -61,6 +62,23 @@ public class TitleNormalizer {
         core = NOISE_PATTERN.matcher(core).replaceAll(" ");
         core = core.replaceAll("[\\[【(（][^\\]】)）]{0,40}[\\]】)）]", " ");
         core = core.replaceAll("\\s+", " ").trim();
+
+        if (TextUtils.isEmpty(info.seasonNum) && TextUtils.isEmpty(info.periodNum) && !TextUtils.isEmpty(core)) {
+            Matcher tailSeason = TAIL_SEASON_PATTERN.matcher(core);
+            if (tailSeason.matches()) {
+                String prefix = tailSeason.group(1) == null ? "" : tailSeason.group(1).trim();
+                String tail = normalizeNumber(tailSeason.group(2));
+                if (!TextUtils.isEmpty(prefix)
+                        && prefix.length() >= 2
+                        && !prefix.matches(".*第$")
+                        && !prefix.matches(".*[0-9]$")
+                        && !TextUtils.equals(tail, "0")) {
+                    info.seasonNum = tail;
+                    core = prefix;
+                }
+            }
+        }
+
         info.coreTitle = core;
         return info;
     }
