@@ -35,6 +35,13 @@
 -keep class * extends com.github.catvod.crawler.Spider { public <init>(...); public <methods>; }
 -keep class com.github.catvod.js.Function { *; }
 
+# Gson-reflected model layer: keep these stable first, otherwise config/media/entity parsing breaks.
+-keep class com.github.catvod.spider.DanmakuConfig { *; }
+-keep class com.github.catvod.spider.DanmakuConfigManager { *; }
+-keep class com.github.catvod.spider.EpisodeInfo { *; }
+-keep class com.github.catvod.spider.entity.** { *; }
+-keep class com.github.catvod.bean.** { *; }
+
 # Known public plugin entry points / compatibility anchors
 -keep class com.github.catvod.spider.Leodanmu { public <init>(...); public <methods>; }
 -keep class com.github.catvod.spider.Init { public <init>(...); public <methods>; }
