@@ -173,8 +173,8 @@ public class ExtFetcher {
         JSONArray sites = root.optJSONArray("sites");
         if (sites != null) return extractExtFromSitesArray(sites);
         JSONObject site = root.optJSONObject("site");
-        if (site != null) return extractExtFromSiteObject(site);
-        return extractExtFromSiteObject(root);
+        if (site != null) return extractExtFromSiteObject(site, -1, true);
+        return extractExtFromSiteObject(root, -1, true);
     }
 
     private static String extractExtFromSitesArray(JSONArray sites) {
