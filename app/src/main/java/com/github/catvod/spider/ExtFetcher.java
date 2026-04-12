@@ -179,25 +179,46 @@ public class ExtFetcher {
 
     private static String extractExtFromSitesArray(JSONArray sites) {
         if (sites == null) return null;
+        scanNotes = appendScanNote(scanNotes, "sites=" + sites.length());
+        int sampled = 0;
         for (int i = 0; i < sites.length(); i++) {
             JSONObject site = sites.optJSONObject(i);
             if (site == null) continue;
-            String ext = extractExtFromSiteObject(site);
+            String ext = extractExtFromSiteObject(site, i, sampled < 5);
+            if (sampled < 5) sampled++;
             if (!TextUtils.isEmpty(ext)) return ext;
         }
         return null;
     }
 
-    private static String extractExtFromSiteObject(JSONObject site) {
+    private static String extractExtFromSiteObject(JSONObject site, int index, boolean recordSample) {
         if (site == null) return null;
         String api = site.optString("api", "");
         String key = site.optString("key", "");
         String name = site.optString("name", "");
-        if (!isTargetSite(api, key, name)) return null;
-
+        boolean target = isTargetSite(api, key, name);
         Object ext = site.opt("ext");
+
+        if (recordSample) {
+            String extType = ext == null ? "null" : ext.getClass().getSimpleName();
+            String extPreview = ext == null ? "" : String.valueOf(ext);
+            if (extPreview.length() > 60) extPreview = extPreview.substring(0, 60) + "...";
+            scanNotes = appendScanNote(scanNotes,
+                    "site[" + index + "]"
+                            + " name=" + name
+                            + " key=" + key
+                            + " api=" + api
+                            + " target=" + target
+                            + " extType=" + extType
+                            + (TextUtils.isEmpty(extPreview) ? "" : " extPreview=" + extPreview));
+        }
+
+        if (!target) return null;
+        trace("matched subscription site: idx=" + index + ", name=" + name + ", key=" + key + ", api=" + api);
+
         if (ext instanceof JSONObject || ext instanceof JSONArray) return ext.toString();
         if (ext instanceof String && !TextUtils.isEmpty((String) ext)) return (String) ext;
+        scanNotes = appendScanNote(scanNotes, "matched-site-without-ext=" + index);
         return null;
     }
 
