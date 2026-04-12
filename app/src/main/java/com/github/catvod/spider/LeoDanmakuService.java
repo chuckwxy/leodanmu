@@ -450,7 +450,8 @@ public class LeoDanmakuService {
                 searchKeyword = searchKeyword + "(" + episodeInfo.getEpisodeYear() + ")";
             }
 
-            TitleMatchInfo targetInfo = TitleNormalizer.parse(searchKeyword + " " + episodeInfo.getEpisodeTitle());
+            String episodeTag = !TextUtils.isEmpty(episodeInfo.getEpisodeName()) ? episodeInfo.getEpisodeName() : episodeInfo.getEpisodeNum();
+            TitleMatchInfo targetInfo = TitleNormalizer.parse(searchKeyword + " " + episodeTag);
             TitleMatchInfo candidateInfo = TitleNormalizer.parse((item.getAnimeTitle() == null ? "" : item.getAnimeTitle()) + " " + (item.getEpTitle() == null ? "" : item.getEpTitle()));
             int structuredScore = TitleNormalizer.score(targetInfo, candidateInfo);
             double legacySimilarity = calculateSimilarity(titleToCompare, searchKeyword);
