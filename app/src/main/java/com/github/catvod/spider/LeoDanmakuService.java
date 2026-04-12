@@ -446,10 +446,10 @@ public class LeoDanmakuService {
                 }
             }
 
-            Leodanmu.log("📦 标题组候选: " + groupKey + " (结构分: " + structuredScore + ", 特殊分: " + specialScore + ", 相似度: " + legacySimilarity + ", 组分: " + groupScore + ", 最佳组内分: " + bestItemScore + ")");
+            // Leodanmu.log("📦 标题组候选: " + groupKey + " (结构分: " + structuredScore + ", 特殊分: " + specialScore + ", 相似度: " + legacySimilarity + ", 组分: " + groupScore + ", 最佳组内分: " + bestItemScore + ")");
 
             if (!isGroupItemMatchAcceptable(episodeInfo, bestItemScore, bestItem)) {
-                Leodanmu.log("⚠️ 标题组淘汰：组内无有效分集匹配 - " + groupKey + (bestItem == null ? "" : "，候选=" + bestItem.getEpTitle()));
+                // Leodanmu.log("⚠️ 标题组淘汰：组内无有效分集匹配 - " + groupKey + (bestItem == null ? "" : "，候选=" + bestItem.getEpTitle()));
                 continue;
             }
 
@@ -470,8 +470,8 @@ public class LeoDanmakuService {
         int specialScore = calculateSpecialScore(episodeInfo, item.getTitle(), item.getEpTitle());
         double legacySimilarity = calculateSimilarity(titleToCompare, searchKeyword);
         double finalScore = structuredScore + episodeScore + specialScore + legacySimilarity;
-        Leodanmu.log("🤔 组内比较: " + item.getTitle() + " - " + item.getEpTitle()
-                + " (结构分: " + structuredScore + ", 集分: " + episodeScore + ", 特殊分: " + specialScore + ", 相似度: " + legacySimilarity + ", 最终分: " + finalScore + ")");
+        // Leodanmu.log("🤔 组内比较: " + item.getTitle() + " - " + item.getEpTitle()
+        //         + " (结构分: " + structuredScore + ", 集分: " + episodeScore + ", 特殊分: " + specialScore + ", 相似度: " + legacySimilarity + ", 最终分: " + finalScore + ")");
         return finalScore;
     }
 
