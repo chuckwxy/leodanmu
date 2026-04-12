@@ -319,15 +319,19 @@ public class DanmakuUIHelper {
 
         button.setTag(item);
 
+        boolean isCurrentDanmaku = !TextUtils.isEmpty(DanmakuManager.lastDanmakuUrl)
+                && TextUtils.equals(DanmakuManager.lastDanmakuUrl, item.getDanmakuUrl());
+        int currentDanmakuColor = colors == LIGHT_THEME ? 0xFF8A6500 : 0xFFC2A14A;
+
         // 创建统一的背景 Drawable（包含背景色和圆角，初始无边框）
         GradientDrawable background = new GradientDrawable();
         background.setCornerRadius(dpToPx(activity, 8));
         if (colors == LIGHT_THEME) {
             background.setColor(0xFFFFFFFF); // 纯白背景
-            button.setTextColor(0xFF000000); // 黑色文字
+            button.setTextColor(isCurrentDanmaku ? currentDanmakuColor : 0xFF000000); // 黑色文字 / 当前推送色
         } else {
             background.setColor(0x80000000); // 半透明黑背景
-            button.setTextColor(colors.textPrimary); // 白色文字
+            button.setTextColor(isCurrentDanmaku ? currentDanmakuColor : colors.textPrimary); // 常规白字 / 当前推送色
         }
         background.setStroke(0, Color.TRANSPARENT); // 初始无边框
         button.setBackground(background);
@@ -346,6 +350,9 @@ public class DanmakuUIHelper {
             } else {
                 v.setElevation(0);
             }
+            button.setTextColor(isCurrentDanmaku
+                    ? currentDanmakuColor
+                    : (colors == LIGHT_THEME ? 0xFF000000 : colors.textPrimary));
             // 修改边框
             GradientDrawable drawable = (GradientDrawable) v.getBackground();
             if (hasFocus) {
