@@ -372,31 +372,6 @@ public class Leodanmu extends Spider {
         return String.valueOf(extend.hashCode());
     }
 
-    public static String getLogContent() {
-        StringBuilder sb = new StringBuilder();
-        sb.append(getHookDebugContent()).append("\n");
-        for (String s : logBuffer) sb.append(s).append("\n");
-        return sb.toString();
-    }
-
-    public static String getHookDebugContent() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("=== Hook诊断 ===\n");
-        sb.append("阶段: ").append(TextUtils.isEmpty(hookLastStage) ? "idle" : hookLastStage).append("\n");
-        sb.append("来源: ").append(TextUtils.isEmpty(hookLastSource) ? "none" : hookLastSource).append("\n");
-        sb.append("类: ").append(TextUtils.isEmpty(hookLastClass) ? "-" : hookLastClass).append("\n");
-        sb.append("方法: ").append(TextUtils.isEmpty(hookLastMethod) ? "-" : hookLastMethod).append("\n");
-        sb.append("ext预览: ").append(TextUtils.isEmpty(hookLastExtPreview) ? "-" : hookLastExtPreview).append("\n");
-        sb.append("错误: ").append(TextUtils.isEmpty(hookLastError) ? "-" : hookLastError).append("\n\n");
-        sb.append("=== Hook流程 ===\n");
-        sb.append(ExtFetcher.getTraceLog());
-        return sb.toString();
-    }
-
-    public static void clearLogs() {
-        logBuffer.clear();
-    }
-
     public static void saveFetchedExtToConfig(Context context, String fetchedExt, String stage) {
         applyExtIfNeeded(context, fetchedExt, stage);
     }
