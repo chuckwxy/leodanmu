@@ -56,7 +56,7 @@ public class LeoDanmakuService {
         final List<DanmakuItem> globalResults = Collections.synchronizedList(new ArrayList<DanmakuItem>());
 
         try {
-            DanmakuConfig config = DanmakuConfigManager.getConfig(activity);
+            DanmakuConfig config = DanmakuConfigManager.loadConfig(activity);
             List<String> targets = new ArrayList<>(config.getApiUrls());
             // Leodanmu.log("[search#" + searchId + "] searchDanmaku start keyword=" + keyword + ", apiCount=" + targets.size());
             if (targets.isEmpty()) {

@@ -280,7 +280,7 @@ public class DanmakuScanner {
                                 }
 
                                 // 检测是否开启自动查询或者已经手动查询过
-                                DanmakuConfig config = DanmakuConfigManager.getConfig(act);
+                                DanmakuConfig config = DanmakuConfigManager.loadConfig(act);
                                 if (!config.isAutoPushEnabled() && TextUtils.isEmpty(DanmakuManager.lastManualDanmakuUrl)) {
                                     return;
                                 }
@@ -541,6 +541,13 @@ public class DanmakuScanner {
     private static void executePendingPush(PendingPush push, boolean isForced) {
         if (push.activity == null || push.activity.isFinishing()) {
             Leodanmu.log("⚠️ Activity无效，取消推送");
+            return;
+        }
+
+        DanmakuConfig latestConfig = DanmakuConfigManager.loadConfig(push.activity);
+        if (latestConfig == null || !latestConfig.isAutoPushEnabled()) {
+            Leodanmu.log("⏭️ 自动推送已关闭，跳过待推送任务: " + push.danmakuItem.getEpTitle());
+            pendingPushes.remove(push.danmakuItem.getEpTitle());
             return;
         }
 
@@ -1536,18 +1543,9 @@ public class DanmakuScanner {
                                         && !localConfig.getApiUrls().isEmpty();
 
                                 if (!hasLocalApiUrls) {
-                                    String fetchedExt = ExtFetcher.fetchExtFromSubscription(activity);
-                                    if (android.text.TextUtils.isEmpty(fetchedExt)) {
-                                        fetchedExt = ExtFetcher.fetchExtFromOkJson(activity);
-                                    }
-                                    if (!android.text.TextUtils.isEmpty(fetchedExt)) {
-                                        Leodanmu.updateHookStatus("searchButton", ExtFetcher.getLastSource(), ExtFetcher.getLastClassName(), ExtFetcher.getLastMethodName(), fetchedExt, "");
-                                        // Leodanmu.log("[按钮点击] 搜索前补配置成功");
-                                        Leodanmu.saveFetchedExtToConfig(activity, fetchedExt, "searchButton");
-                                    } else {
-                                        Leodanmu.updateHookStatus("searchButton", ExtFetcher.getLastSource(), ExtFetcher.getLastClassName(), ExtFetcher.getLastMethodName(), "", ExtFetcher.getLastError());
-                                        // Leodanmu.log("[按钮点击] 搜索前补配置未命中");
-                                    }
+                                    Leodanmu.updateHookStatus("searchButton", "local-config", "DanmakuConfigManager", "loadConfig", "", "请先在前台保存API地址");
+                                } else {
+                                    Leodanmu.updateHookStatus("searchButton", "local-config", "DanmakuConfigManager", "loadConfig", "", "");
                                 }
 
                                 DanmakuConfig verifyConfig = DanmakuConfigManager.loadConfig(activity);

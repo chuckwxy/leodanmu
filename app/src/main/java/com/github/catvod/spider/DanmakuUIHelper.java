@@ -389,31 +389,12 @@ public class DanmakuUIHelper {
         final DanmakuConfig[] configHolder = new DanmakuConfig[1];
         try {
             DanmakuConfig preloadConfig = DanmakuConfigManager.loadConfig(activity);
-            boolean hasLocalApiUrls = preloadConfig != null
-                    && preloadConfig.getApiUrls() != null
-                    && !preloadConfig.getApiUrls().isEmpty();
-
-            if (!hasLocalApiUrls) {
-                String fetchedExt = ExtFetcher.fetchExtFromSubscription(activity);
-                if (TextUtils.isEmpty(fetchedExt)) {
-                    fetchedExt = ExtFetcher.fetchExtFromOkJson(activity);
-                }
-                if (!TextUtils.isEmpty(fetchedExt)) {
-                    Leodanmu.saveFetchedExtToConfig(activity, fetchedExt, "configDialog");
-                    Leodanmu.updateHookStatus("configDialog", ExtFetcher.getLastSource(), ExtFetcher.getLastClassName(), ExtFetcher.getLastMethodName(), fetchedExt, "");
-                    // Leodanmu.log("showCombinedConfigDialog: 本地为空，主动hook成功并已保存ext");
-                } else {
-                    Leodanmu.updateHookStatus("configDialog", ExtFetcher.getLastSource(), ExtFetcher.getLastClassName(), ExtFetcher.getLastMethodName(), "", ExtFetcher.getLastError());
-                    // Leodanmu.log("showCombinedConfigDialog: 本地为空，主动hook未命中");
-                }
-                preloadConfig = DanmakuConfigManager.loadConfig(activity);
-            } else {
-                // Leodanmu.log("showCombinedConfigDialog: 本地 apiUrls 已存在，跳过主动hook, apiUrls=" + preloadConfig.getApiUrls());
-            }
-            configHolder[0] = preloadConfig;
+            configHolder[0] = preloadConfig == null ? new DanmakuConfig() : preloadConfig;
+            Leodanmu.updateHookStatus("idle", "local-config", "DanmakuConfigManager", "loadConfig", "", "");
         } catch (Exception e) {
             Leodanmu.updateHookStatus("configDialog", "exception", "", "", "", e.getMessage());
-            // Leodanmu.log("showCombinedConfigDialog: 主动hook异常: " + e.getMessage());
+            configHolder[0] = DanmakuConfigManager.loadConfig(activity);
+            if (configHolder[0] == null) configHolder[0] = new DanmakuConfig();
         }
 
         activity.runOnUiThread(() -> {
@@ -794,13 +775,13 @@ public class DanmakuUIHelper {
                             newUrls.add(trimmed);
                         }
                     }
-                    if (!newUrls.isEmpty()) {
-                        config.setApiUrls(newUrls);
-                    }
-
-                    config.setAutoPushEnabled(autoSwitch.isChecked());
-                    config.setPushToastEnabled(toastSwitch.isChecked());
-                    DanmakuConfigManager.saveConfig(activity, config);
+                    DanmakuConfig latestConfig = DanmakuConfigManager.loadConfig(activity);
+                    if (latestConfig == null) latestConfig = new DanmakuConfig();
+                    latestConfig.setApiUrls(newUrls);
+                    latestConfig.setAutoPushEnabled(autoSwitch.isChecked());
+                    latestConfig.setPushToastEnabled(toastSwitch.isChecked());
+                    latestConfig.setTheme(config.getTheme());
+                    DanmakuConfigManager.saveConfig(activity, latestConfig);
                     Utils.safeShowToast(activity, "配置已保存");
                     Leodanmu.log("已保存新配置");
                     dialog.dismiss();
