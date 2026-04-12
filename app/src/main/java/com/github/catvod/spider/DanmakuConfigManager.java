@@ -77,6 +77,13 @@ public class DanmakuConfigManager {
         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         String json = gson.toJson(config);
         Leodanmu.log("DanmakuConfigManager.saveConfig: 即将保存 json=" + json);
+        Leodanmu.log("DanmakuConfigManager.saveConfig: 保存摘要 apiUrls=" + config.getApiUrls()
+                + ", autoPush=" + config.isAutoPushEnabled()
+                + ", pushToast=" + config.isPushToastEnabled()
+                + ", theme=" + config.getTheme()
+                + ", lpWidth=" + config.getLpWidth()
+                + ", lpHeight=" + config.getLpHeight()
+                + ", lpAlpha=" + config.getLpAlpha());
         boolean ok = prefs.edit().putString(KEY_CONFIG_JSON, json).commit();
         Leodanmu.log("DanmakuConfigManager.saveConfig: commit=" + ok);
         String savedJson = prefs.getString(KEY_CONFIG_JSON, null);

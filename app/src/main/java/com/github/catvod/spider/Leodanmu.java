@@ -74,24 +74,8 @@ public class Leodanmu extends Spider {
         //         + ", extendHash=" + getExtHash(extend));
         updateHookStatus("init", "enter", "", "", extend, "");
         if (TextUtils.isEmpty(extend) && TextUtils.isEmpty(cachedExt)) {
-            try {
-                String fetchedExt = ExtFetcher.fetchExtFromSubscription(context);
-                if (!TextUtils.isEmpty(fetchedExt)) {
-                    extend = fetchedExt;
-                    cachedExt = fetchedExt;
-                    cachedExtHash = fetchedExt.hashCode();
-                    configLoaded = false;
-                    applyExtIfNeeded(context, fetchedExt, "init");
-                    log("init: 从订阅配置补到ext成功");
-                    updateHookStatus("init", ExtFetcher.getLastSource(), ExtFetcher.getLastClassName(), ExtFetcher.getLastMethodName(), fetchedExt, "");
-                } else {
-                    log("init: ext为空，未从订阅配置补到ext，回落到缓存/已保存配置");
-                    updateHookStatus("init", ExtFetcher.getLastSource(), ExtFetcher.getLastClassName(), ExtFetcher.getLastMethodName(), "", ExtFetcher.getLastError());
-                }
-            } catch (Exception e) {
-                log("init: ExtFetcher异常: " + e.getMessage());
-                updateHookStatus("init", "exception", "", "", "", e.getMessage());
-            }
+            log("init: 未提供 ext，已禁用自动补配置，等待前台手动保存");
+            updateHookStatus("init", "manual-only", "", "", "", "自动补ext已禁用");
         }
 
         if (TextUtils.isEmpty(extend)) {
@@ -122,23 +106,7 @@ public class Leodanmu extends Spider {
 
                     boolean hasLocalApiUrls = config.getApiUrls() != null && !config.getApiUrls().isEmpty();
                     if (!hasLocalApiUrls) {
-                        log("ensureConfig: 本地 apiUrls 为空，尝试用 cachedExt/订阅 ext 补配置");
-
-                        String extToApply = cachedExt;
-                        if (TextUtils.isEmpty(extToApply)) {
-                            extToApply = ExtFetcher.fetchExtFromSubscription(context);
-                        }
-                        if (TextUtils.isEmpty(extToApply)) {
-                            extToApply = ExtFetcher.fetchExtFromOkJson(context);
-                        }
-
-                        if (!TextUtils.isEmpty(extToApply)) {
-                            applyExtIfNeeded(context, extToApply, "ensureConfig");
-                            DanmakuConfig reloaded = DanmakuConfigManager.loadConfig(context);
-                            log("ensureConfig: 补配置后重新读取, apiUrls=" + reloaded.getApiUrls());
-                        } else {
-                            log("ensureConfig: 未拿到可用于补配置的 ext");
-                        }
+                        log("ensureConfig: 本地 apiUrls 为空，已禁用自动补 ext，请在前台手动保存");
                     } else {
                         log("ensureConfig: 使用已保存配置, apiUrls=" + config.getApiUrls()
                                 + ", autoPush=" + config.isAutoPushEnabled()
