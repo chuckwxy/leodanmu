@@ -583,58 +583,43 @@ public class LeoDanmakuService {
 
     // ========== 修改：直接推送弹幕URL，使用动态端口和防重复推送 ==========
     public static void pushDanmakuDirect(DanmakuItem danmakuItem, Activity activity, boolean isAuto) {
+        pushDanmakuDirect(danmakuItem, activity, isAuto, false);
+    }
+
+    public static void pushDanmakuDirect(DanmakuItem danmakuItem, Activity activity, boolean isAuto, boolean fastPushThenVerify) {
         String danmakuUrl = danmakuItem.getDanmakuUrl();
-        // Leodanmu.log("pushDanmakuDirect enter: title=" + danmakuItem.getTitle()
-        //         + ", ep=" + danmakuItem.getEpTitle()
-        //         + ", isAuto=" + isAuto
-        //         + ", url=" + danmakuUrl
-        //         + ", thread=" + Thread.currentThread().getName());
-        // Leodanmu.log("pushDanmakuDirect stack: " + buildShortStack());
         if (TextUtils.isEmpty(danmakuUrl)) {
             Leodanmu.log("⚠️ 推送弹幕URL为空，跳过");
             return;
         }
 
         long currentTime = System.currentTimeMillis();
-
-        // 检查此URL的上次推送时间
         Long lastPush = lastPushTimes.get(danmakuUrl);
-        // if (lastPush != null) {
-        //     Leodanmu.log("push duplicate probe hit: url=" + danmakuUrl + ", delta=" + (currentTime - lastPush) + "ms");
-        // }
         if (lastPush != null && (currentTime - lastPush < PUSH_MIN_INTERVAL)) {
             Leodanmu.log("⚠️ 推送过于频繁 (同一URL)，跳过: " + danmakuUrl);
             return;
         }
 
-        // 更新推送时间并清理旧记录
         lastPushTimes.put(danmakuUrl, currentTime);
         cleanupOldPushTimes(currentTime);
-
-        // 记录弹幕URL（这个可以在主线程执行）
         Leodanmu.recordDanmakuUrl(danmakuItem, isAuto);
 
-        // 在网络请求前检查是否在主线程
         boolean isMainThread = Looper.myLooper() == Looper.getMainLooper();
         if (isMainThread) {
             Leodanmu.log("警告：推送弹幕在主线程调用，切换到子线程");
-            // 切换到子线程执行
             new Thread(new Runnable() {
                 @Override
                 public void run() {
-                    pushDanmakuInThread(danmakuItem, activity);
+                    pushDanmakuInThread(danmakuItem, activity, fastPushThenVerify);
                 }
             }).start();
         } else {
-            // 已经在子线程，直接执行
             Leodanmu.log("已经在子线程，直接执行弹幕推送");
-            pushDanmakuInThread(danmakuItem, activity);
+            pushDanmakuInThread(danmakuItem, activity, fastPushThenVerify);
         }
     }
 
-    // 清理旧的推送记录，防止Map无限增大
     private static void cleanupOldPushTimes(long currentTime) {
-        // 清理超过5分钟的记录
         long cleanupThreshold = 5 * 60 * 1000;
         Iterator<Map.Entry<String, Long>> iterator = lastPushTimes.entrySet().iterator();
         while (iterator.hasNext()) {
@@ -645,142 +630,148 @@ public class LeoDanmakuService {
         }
     }
 
-    // 单独的网络推送方法，确保在子线程中执行
-    private static void pushDanmakuInThread(DanmakuItem danmakuItem, Activity activity) {
+    private static void pushDanmakuInThread(DanmakuItem danmakuItem, Activity activity, boolean fastPushThenVerify) {
         try {
             if (TextUtils.isEmpty(danmakuItem.getDanmakuUrl())) {
                 Leodanmu.log("推送弹幕URL为空");
                 return;
             }
 
-            Leodanmu.apiUrl = danmakuItem.getApiBase();
-
-            // 步骤1: 先获取弹幕数据，验证是否有效
-            String danmakuData = null;
-            int danmakuCount = 0;
-            final int maxRetries = 3;
-
-            for (int attempt = 0; attempt < maxRetries; attempt++) {
-                try {
-                    danmakuData = NetworkUtils.robustHttpGet(danmakuItem.getDanmakuUrl());
-                    Leodanmu.log("获取弹幕数据 (尝试 " + (attempt + 1) + "/" + maxRetries + ") - URL: " + danmakuItem.getDanmakuUrl());
-
-                    // 使用 DOM 解析
-                    danmakuCount = countDanmakuItems(danmakuData);
-                    if (danmakuCount > 0) {
-                        Leodanmu.log("✅ 获取到有效弹幕数据，总数: " + danmakuCount + " 条");
-                        break; // 成功获取，跳出重试
-                    } else if (danmakuCount == 0) {
-                        Leodanmu.log("⚠️ 弹幕数据为空或无内容，尝试次数: " + (attempt + 1) + "/" + maxRetries);
-                    } else {
-                        Leodanmu.log("⚠️ 弹幕数据格式错误或解析失败，尝试次数: " + (attempt + 1) + "/" + maxRetries);
-                    }
-
-                    // 重试等待
-                    if (attempt < maxRetries - 1) {
-                        try {
-                            Thread.sleep(1000);
-                        } catch (InterruptedException ie) {
-                            Thread.currentThread().interrupt();
-                        }
-                    }
-                } catch (Exception e) {
-                    Leodanmu.log("获取弹幕数据异常 (尝试 " + (attempt + 1) + "/" + maxRetries + "): " + e.getMessage());
-                    if (attempt < maxRetries - 1) {
-                        try {
-                            Thread.sleep(1000);
-                        } catch (InterruptedException ie) {
-                            Thread.currentThread().interrupt();
-                        }
-                    }
-                }
-            }
-
-            // 如果数据验证失败，直接返回
-            if (danmakuCount <= 0) {
-                Leodanmu.log("❌ 无法获取有效的弹幕数据（或弹幕为空），取消推送");
-                if (activity != null && !activity.isFinishing()) {
-                    activity.runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            // Utils.safeShowToast(activity, "弹幕数据验证失败，请稍后重试");
-                        }
-                    });
+            if (fastPushThenVerify) {
+                Leodanmu.log("⚡ 命中已验证链路，先推送后异步校验: " + danmakuItem.getEpTitle());
+                String fastPushResp = pushDanmakuToPlayer(danmakuItem);
+                if (!TextUtils.isEmpty(fastPushResp) && fastPushResp.toLowerCase().contains("ok")) {
+                    Leodanmu.log("✅ 快速推送已发送，等待异步校验: " + danmakuItem.getDanmakuUrl());
+                    verifyDanmakuAfterPushAsync(danmakuItem, activity);
+                } else {
+                    Leodanmu.log("❌ 快速推送失败，响应: " + fastPushResp);
                 }
                 return;
             }
 
-            // 步骤2: 数据验证成功，开始推送
-            String localIp = NetworkUtils.getLocalIpAddress();
-            String pushUrl = "http://" + localIp + ":" + Utils.getPort() + "/action?do=refresh&type=danmaku&path=" +
-                    URLEncoder.encode(danmakuItem.getDanmakuUrl(), "UTF-8");
-            Leodanmu.log("推送地址: " + pushUrl);
-
-            String pushResp = "";
-            // Leodanmu.log("push request start: " + pushUrl);
-            for (int i = 0; i < 3; i++) {
-                pushResp = NetworkUtils.robustHttpGet(pushUrl);
-                Leodanmu.log("推送尝试 " + (i + 1) + "/3: " + (!TextUtils.isEmpty(pushResp) ? "成功" : "失败"));
-                if (!TextUtils.isEmpty(pushResp) && pushResp.toLowerCase().contains("ok")) {
-                    Leodanmu.log("✅ 推送成功");
-                    // Leodanmu.log("push request success: " + pushUrl);
-                    break;
-                }
-                if (i < 2) {
-                    try {
-                        Thread.sleep(1000);
-                    } catch (InterruptedException ie) {
-                        Thread.currentThread().interrupt();
-                    }
-                }
+            int danmakuCount = fetchValidDanmakuCount(danmakuItem, 3);
+            if (danmakuCount <= 0) {
+                Leodanmu.log("❌ 无法获取有效的弹幕数据（或弹幕为空），取消推送");
+                return;
             }
 
-            final int finalDanmakuCount = danmakuCount;
-            final String finalPushResp = pushResp;
-
-            // 步骤3: 在主线程显示结果（根据配置决定是否显示 Toast）
-            if (activity != null && !activity.isFinishing()) {
-                // 在子线程获取配置，然后传递到 UI 线程
-                DanmakuConfig config = DanmakuConfigManager.getConfig(activity);
-                final boolean showToast = config.isPushToastEnabled();
-
-                activity.runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        if (activity == null || activity.isFinishing()) return;
-
-                        if (showToast) {
-                            if (!TextUtils.isEmpty(finalPushResp) && finalPushResp.toLowerCase().contains("ok")) {
-                                String message = String.format("弹幕已推送: %s - %s (共%d条)",
-                                        danmakuItem.getTitle(),
-                                        danmakuItem.getEpTitle(),
-                                        finalDanmakuCount);
-                                Utils.safeShowToast(activity, message);
-                                Leodanmu.log(message);
-                            } else {
-                                Utils.safeShowToast(activity, "推送失败: 无响应或响应异常");
-                                Leodanmu.log("❌ 推送失败，响应: " + finalPushResp);
-                            }
-                        } else {
-                            // 不显示 Toast，只记录日志
-                            if (!TextUtils.isEmpty(finalPushResp) && finalPushResp.toLowerCase().contains("ok")) {
-                                Leodanmu.log(String.format("弹幕已推送: %s - %s (共%d条)",
-                                        danmakuItem.getTitle(),
-                                        danmakuItem.getEpTitle(),
-                                        finalDanmakuCount));
-                            } else {
-                                Leodanmu.log("❌ 推送失败，响应: " + finalPushResp);
-                            }
-                        }
-                    }
-                });
-            }
+            String pushResp = pushDanmakuToPlayer(danmakuItem);
+            notifyPushResult(activity, danmakuItem, danmakuCount, pushResp);
         } catch (Exception e) {
             Leodanmu.log("推送异常: " + e.getMessage());
-            // e.printStackTrace();
-            if (activity != null && !activity.isFinishing()) {
-                // Utils.safeShowToast(activity, "推送异常: " + e.getMessage());
+        }
+    }
+
+    private static int fetchValidDanmakuCount(DanmakuItem danmakuItem, int maxRetries) {
+        Leodanmu.apiUrl = danmakuItem.getApiBase();
+        String danmakuData;
+        int danmakuCount;
+
+        for (int attempt = 0; attempt < maxRetries; attempt++) {
+            try {
+                Leodanmu.log("开始获取弹幕数据 (尝试 " + (attempt + 1) + "/" + maxRetries + ") - URL: " + danmakuItem.getDanmakuUrl());
+                danmakuData = NetworkUtils.robustHttpGet(danmakuItem.getDanmakuUrl());
+                danmakuCount = countDanmakuItems(danmakuData);
+                if (danmakuCount > 0) {
+                    Leodanmu.log("✅ 获取到有效弹幕数据，总数: " + danmakuCount + " 条");
+                    return danmakuCount;
+                } else if (danmakuCount == 0) {
+                    Leodanmu.log("⚠️ 弹幕数据为空或无内容，尝试次数: " + (attempt + 1) + "/" + maxRetries);
+                } else {
+                    Leodanmu.log("⚠️ 弹幕数据格式错误或解析失败，尝试次数: " + (attempt + 1) + "/" + maxRetries);
+                }
+            } catch (Exception e) {
+                Leodanmu.log("获取弹幕数据异常 (尝试 " + (attempt + 1) + "/" + maxRetries + "): " + e.getMessage());
             }
+
+            if (attempt < maxRetries - 1) {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        }
+        return 0;
+    }
+
+    private static String pushDanmakuToPlayer(DanmakuItem danmakuItem) throws Exception {
+        String localIp = NetworkUtils.getLocalIpAddress();
+        String pushUrl = "http://" + localIp + ":" + Utils.getPort() + "/action?do=refresh&type=danmaku&path=" +
+                URLEncoder.encode(danmakuItem.getDanmakuUrl(), "UTF-8");
+        Leodanmu.log("推送地址: " + pushUrl);
+
+        String pushResp = "";
+        for (int i = 0; i < 3; i++) {
+            pushResp = NetworkUtils.robustHttpGet(pushUrl);
+            Leodanmu.log("推送尝试 " + (i + 1) + "/3: " + (!TextUtils.isEmpty(pushResp) ? "成功" : "失败"));
+            if (!TextUtils.isEmpty(pushResp) && pushResp.toLowerCase().contains("ok")) {
+                Leodanmu.log("✅ 推送成功");
+                break;
+            }
+            if (i < 2) {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        }
+        return pushResp;
+    }
+
+    private static void verifyDanmakuAfterPushAsync(final DanmakuItem danmakuItem, final Activity activity) {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                int danmakuCount = fetchValidDanmakuCount(danmakuItem, 3);
+                if (danmakuCount <= 0) {
+                    Leodanmu.log("⚠️ 异步校验失败：弹幕为空或无效 - " + danmakuItem.getDanmakuUrl());
+                    return;
+                }
+                if (!TextUtils.equals(DanmakuManager.lastDanmakuUrl, danmakuItem.getDanmakuUrl())) {
+                    Leodanmu.log("ℹ️ 异步校验完成，但当前弹幕已切换，跳过旧提示: " + danmakuItem.getEpTitle());
+                    return;
+                }
+                notifyPushResult(activity, danmakuItem, danmakuCount, "ok-async");
+            }
+        }).start();
+    }
+
+    private static void notifyPushResult(Activity activity, DanmakuItem danmakuItem, int danmakuCount, String pushResp) {
+        final int finalDanmakuCount = danmakuCount;
+        final String finalPushResp = pushResp;
+        if (activity != null && !activity.isFinishing()) {
+            DanmakuConfig config = DanmakuConfigManager.getConfig(activity);
+            final boolean showToast = config.isPushToastEnabled();
+            activity.runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    if (activity == null || activity.isFinishing()) return;
+                    if (showToast) {
+                        if (!TextUtils.isEmpty(finalPushResp) && finalPushResp.toLowerCase().contains("ok")) {
+                            String message = String.format("弹幕已推送: %s - %s (共%d条)",
+                                    danmakuItem.getTitle(),
+                                    danmakuItem.getEpTitle(),
+                                    finalDanmakuCount);
+                            Utils.safeShowToast(activity, message);
+                            Leodanmu.log(message);
+                        } else {
+                            Utils.safeShowToast(activity, "推送失败: 无响应或响应异常");
+                            Leodanmu.log("❌ 推送失败，响应: " + finalPushResp);
+                        }
+                    } else {
+                        if (!TextUtils.isEmpty(finalPushResp) && finalPushResp.toLowerCase().contains("ok")) {
+                            Leodanmu.log(String.format("弹幕已推送: %s - %s (共%d条)",
+                                    danmakuItem.getTitle(),
+                                    danmakuItem.getEpTitle(),
+                                    finalDanmakuCount));
+                        } else {
+                            Leodanmu.log("❌ 推送失败，响应: " + finalPushResp);
+                        }
+                    }
+                }
+            });
         }
     }
 

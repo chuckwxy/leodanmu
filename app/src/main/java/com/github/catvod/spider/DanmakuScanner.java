@@ -55,12 +55,16 @@ public class DanmakuScanner {
         String title;
         long scheduleTime;
         boolean isForcedPush = false; // 标记是否为强制推送
+        boolean fastPushEligible = false;
+        String debugKey = "";
 
-        PendingPush(DanmakuItem danmakuItem, Activity activity, String title, long scheduleTime) {
+        PendingPush(DanmakuItem danmakuItem, Activity activity, String title, long scheduleTime, boolean fastPushEligible, String debugKey) {
             this.danmakuItem = danmakuItem;
             this.activity = activity;
             this.title = title;
             this.scheduleTime = scheduleTime;
+            this.fastPushEligible = fastPushEligible;
+            this.debugKey = debugKey;
         }
     }
 
@@ -512,7 +516,7 @@ public class DanmakuScanner {
             boolean shouldForcePush = waitTime >= FORCE_PUSH_TIMEOUT && !push.isForcedPush;
 
             if (shouldForcePush) {
-                Leodanmu.log("🚨 等待" + waitTime + "ms未检测到播放状态，强制推送: " + key);
+                Leodanmu.log("🚨 等待" + waitTime + "ms未检测到播放状态，强制推送: " + push.debugKey);
                 push.isForcedPush = true;
                 executePendingPush(push, true);
                 pendingPushes.remove(key);
@@ -521,17 +525,17 @@ public class DanmakuScanner {
 
             Media media = getMedia();
             if (media == null) {
-                Leodanmu.log("❌ 无法获取当前播放媒体信息，取消推送: " + key);
+                Leodanmu.log("❌ 无法获取当前播放媒体信息，取消推送: " + push.debugKey);
                 pendingPushes.remove(key);
                 continue;
             }
             // 检查视频是否在播放：一旦检测到已播放，立即推送，不再额外等待最小时长
             if (media.isPlaying()) {
-                Leodanmu.log("✅ 检测到视频已播放，立即执行推送: " + key);
+                Leodanmu.log("✅ 检测到视频已播放，立即执行推送: " + push.debugKey);
                 executePendingPush(push, false);
                 pendingPushes.remove(key);
             } else {
-                Leodanmu.log("⏸️ 视频未播放，已等待" + waitTime + "ms，还剩" + (FORCE_PUSH_TIMEOUT - waitTime) + "ms将强制推送");
+                Leodanmu.log("⏸️ 视频未播放，已等待" + waitTime + "ms，还剩" + (FORCE_PUSH_TIMEOUT - waitTime) + "ms将强制推送: " + push.debugKey);
             }
         }
     }
@@ -549,13 +553,13 @@ public class DanmakuScanner {
             return;
         }
 
-        Leodanmu.log("🚀 开始执行" + (isForced ? "强制" : "") + "推送: " + push.danmakuItem.getDanmakuUrl());
+        Leodanmu.log("🚀 开始执行" + (isForced ? "强制" : "") + "推送: " + push.debugKey + "，模式=" + (push.fastPushEligible ? "快推后校验" : "严格校验"));
 
         new Thread(new Runnable() {
             @Override
             public void run() {
                 try {
-                    LeoDanmakuService.pushDanmakuDirect(push.danmakuItem, push.activity, true);
+                    LeoDanmakuService.pushDanmakuDirect(push.danmakuItem, push.activity, true, push.fastPushEligible);
 
                     // 记录推送时间，防止重复推送
                     lastPushTime.put(push.danmakuItem.getDanmakuUrl(), System.currentTimeMillis());
@@ -1300,7 +1304,7 @@ public class DanmakuScanner {
                 // 延迟推送，等待视频播放
                 String title = lastEpisodeInfo.getEpisodeNames() != null && !lastEpisodeInfo.getEpisodeNames().isEmpty() ?
                         lastEpisodeInfo.getEpisodeNames().get(0) : lastEpisodeInfo.getEpisodeName();
-                scheduleDelayedPush(nextDanmakuItem, activity, title, pushKey);
+                scheduleDelayedPush(nextDanmakuItem, activity, title, pushKey, true);
                 return; // 成功使用ID递增，直接返回
             } else {
                 Leodanmu.log("⚠️ ID递增方式未找到弹幕，将尝试重新搜索或使用原有逻辑");
@@ -1333,7 +1337,7 @@ public class DanmakuScanner {
                 // 延迟推送，等待视频播放
                 String title = lastEpisodeInfo.getEpisodeNames() != null && !lastEpisodeInfo.getEpisodeNames().isEmpty() ?
                         lastEpisodeInfo.getEpisodeNames().get(0) : lastEpisodeInfo.getEpisodeName();
-                scheduleDelayedPush(nextDanmakuItem, activity, title, pushKey);
+                scheduleDelayedPush(nextDanmakuItem, activity, title, pushKey, true);
             } else {
                 Leodanmu.log("⚠️ 无法直接获取下一个弹幕URL，重新查询");
                 LeoDanmakuService.autoSearch(lastEpisodeInfo, activity);
@@ -1396,14 +1400,36 @@ public class DanmakuScanner {
     }
 
     // 安排延迟推送
-    private static void scheduleDelayedPush(DanmakuItem item, Activity activity, String title, String pushKey) {
-        Leodanmu.log("⏰ 安排延迟推送: " + pushKey);
+    private static void scheduleDelayedPush(DanmakuItem item, Activity activity, String title, String pushKey, boolean fastPushEligible) {
+        String debugKey = buildPendingPushDebugKey(item, pushKey);
+        Leodanmu.log("⏰ 安排延迟推送: " + debugKey);
         Leodanmu.log("   item: " + item.toString());
+        Leodanmu.log("   模式: " + (fastPushEligible ? "换集快推(先推送后校验)" : "严格校验(先校验后推送)"));
         Leodanmu.log("   等待视频播放后再推送（最多等待" + FORCE_PUSH_TIMEOUT/1000 + "秒）...");
 
         // 添加到待推送队列
-        PendingPush pendingPush = new PendingPush(item, activity, title, System.currentTimeMillis());
+        PendingPush pendingPush = new PendingPush(item, activity, title, System.currentTimeMillis(), fastPushEligible, debugKey);
         pendingPushes.put(pushKey, pendingPush);
+    }
+
+    private static String buildPendingPushDebugKey(DanmakuItem item, String pushKey) {
+        String ep = item == null ? "" : item.getEpTitle();
+        int epId = item == null ? -1 : item.getEpId();
+        String source = item == null ? "" : item.getFrom();
+        String tail = "";
+        if (!TextUtils.isEmpty(pushKey)) {
+            int idx = pushKey.indexOf("filename=");
+            if (idx >= 0) {
+                tail = pushKey.substring(idx + 9);
+                int amp = tail.indexOf('&');
+                if (amp >= 0) tail = tail.substring(0, amp);
+            } else if (pushKey.length() > 48) {
+                tail = pushKey.substring(0, 48) + "...";
+            } else {
+                tail = pushKey;
+            }
+        }
+        return "epId=" + epId + ", from=" + source + ", ep=" + ep + (TextUtils.isEmpty(tail) ? "" : ", media=" + tail);
     }
 
     // === 修改后的按钮注入逻辑 ===
