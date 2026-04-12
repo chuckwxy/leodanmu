@@ -316,13 +316,18 @@ public class DanmakuScanner {
     // ========== 修改：getEpisodeInfo 使用智能提取和多个候选名 ==========
     private static EpisodeInfo getEpisodeInfo(Media media, Activity act) {
         // 提取剧集信息
+        String rawFileName = media.getArtist().replace("正在播放：", "");
         String seriesName = extractSeriesName(media.getTitle());
-        String episodeNum = extractEpisodeNum(media.getArtist().replace("正在播放：", ""));
+        String episodeNum = extractEpisodeNum(rawFileName);
         String year = extractYear(media.getArtist());
         if (TextUtils.isEmpty(year)) {
             year = extractYear2(media.getTitle());
         }
         String seasonNum = extractSeasonNum(media.getArtist());
+        String specialTag = extractSpecialTag(rawFileName);
+        String specialType = extractSpecialType(specialTag);
+        String specialSuffix = extractSpecialSuffix(specialTag);
+        String episodeDateCode = extractDateCode(rawFileName);
 
         // 构建剧集名称列表
         List<String> episodeNames = new ArrayList<>();
@@ -349,8 +354,13 @@ public class DanmakuScanner {
         episodeInfo.setEpisodeYear(year);
         episodeInfo.setEpisodeSeasonNum(seasonNum);
         episodeInfo.setSeriesName(seriesName);
-        episodeInfo.setFileName(media.getArtist().replace("正在播放：", ""));
+        episodeInfo.setFileName(rawFileName);
         episodeInfo.setEpisodeUrl(media.getUrl());
+        episodeInfo.setSearchKeyword(!episodeNames.isEmpty() ? episodeNames.get(0) : seriesName);
+        episodeInfo.setSpecialTag(specialTag);
+        episodeInfo.setSpecialType(specialType);
+        episodeInfo.setSpecialSuffix(specialSuffix);
+        episodeInfo.setEpisodeDateCode(episodeDateCode);
 
         // 兼容旧字段，保持原有episodeName为第一个候选名
         if (!episodeNames.isEmpty()) {
@@ -358,6 +368,51 @@ public class DanmakuScanner {
         }
 
         return episodeInfo;
+    }
+
+    private static String extractSpecialTag(String text) {
+        if (TextUtils.isEmpty(text)) return "";
+        Pattern[] patterns = {
+                Pattern.compile("(先导片[上下])"),
+                Pattern.compile("(先导片)"),
+                Pattern.compile("(空降直播)"),
+                Pattern.compile("(纯享(?:版)?)"),
+                Pattern.compile("(加更(?:版)?)"),
+                Pattern.compile("(特别篇|特别企划|番外|花絮)")
+        };
+        for (Pattern p : patterns) {
+            Matcher m = p.matcher(text);
+            if (m.find()) return m.group(1);
+        }
+        return "";
+    }
+
+    private static String extractSpecialType(String tag) {
+        if (TextUtils.isEmpty(tag)) return "";
+        if (tag.startsWith("先导片")) return "先导片";
+        if (tag.contains("空降直播")) return "空降直播";
+        if (tag.contains("纯享")) return "纯享";
+        if (tag.contains("加更")) return "加更";
+        if (tag.contains("特别篇") || tag.contains("特别企划")) return "特别篇";
+        if (tag.contains("番外")) return "番外";
+        if (tag.contains("花絮")) return "花絮";
+        return tag;
+    }
+
+    private static String extractSpecialSuffix(String tag) {
+        if (TextUtils.isEmpty(tag)) return "";
+        if (tag.endsWith("上")) return "上";
+        if (tag.endsWith("下")) return "下";
+        return "";
+    }
+
+    private static String extractDateCode(String text) {
+        if (TextUtils.isEmpty(text)) return "";
+        Matcher matcher = Pattern.compile("(20\\d{2})[.\\-/](\\d{2})[.\\-/](\\d{2})").matcher(text);
+        if (matcher.find()) {
+            return matcher.group(1) + matcher.group(2) + matcher.group(3);
+        }
+        return "";
     }
 
     // ========== 修改：getMedia 使用动态端口 ==========
@@ -1251,8 +1306,16 @@ public class DanmakuScanner {
 
         // 【关键修改2】如果有手动选择的弹幕URL，也视为有效缓存
         boolean hasManualDanmaku = !TextUtils.isEmpty(DanmakuManager.lastManualDanmakuUrl);
+        boolean hasNormalEpisodeNum = !TextUtils.isEmpty(lastEpisodeInfo.getEpisodeNum());
+        boolean hasSpecialTag = !TextUtils.isEmpty(lastEpisodeInfo.getSpecialTag());
 
-        if (hasValidDanmakuCache || hasManualDanmaku) {
+        if (!hasNormalEpisodeNum && hasSpecialTag) {
+            Leodanmu.log("⚠️ 当前内容无标准集数，跳过ID递增逻辑，转特殊内容搜索: " + lastEpisodeInfo.getSpecialTag());
+        } else if (!hasNormalEpisodeNum) {
+            Leodanmu.log("⚠️ 当前内容无标准集数，跳过ID递增逻辑");
+        }
+
+        if ((hasValidDanmakuCache || hasManualDanmaku) && hasNormalEpisodeNum) {
             Leodanmu.log("🔍 检测到有效弹幕缓存，尝试使用ID递增方式");
 
             // 获取当前集数（从EpisodeInfo或currentEpisodeNum）
@@ -1315,7 +1378,7 @@ public class DanmakuScanner {
         // 【关键修改4】放宽系列相似度判断
         boolean isSameSeries = isSameSeries(currentSeriesName, lastEpisodeInfo.getSeriesName());
 
-        if (isSameSeries) {
+        if (isSameSeries && hasNormalEpisodeNum && !TextUtils.isEmpty(currentEpisodeNum)) {
             long timeSinceLastChange = currentTime - lastEpisodeChangeTime;
 
             Leodanmu.log("🔄 检测到同系列换集: " + currentEpisodeNum + " -> " + lastEpisodeInfo.getEpisodeNum());

@@ -12,6 +12,11 @@ public class EpisodeInfo {
     private String fileName;
     private String episodeUrl;
     private List<String> episodeNames;   // 新增：多候选名称列表
+    private String searchKeyword;
+    private String specialTag;
+    private String specialType;
+    private String specialSuffix;
+    private String episodeDateCode;
 
     public EpisodeInfo() {
         episodeNames = new ArrayList<>(); // 初始化
@@ -81,6 +86,46 @@ public class EpisodeInfo {
     public void setEpisodeNames(List<String> episodeNames) {
         this.episodeNames = episodeNames;
     }
+
+    public String getSearchKeyword() {
+        return searchKeyword;
+    }
+
+    public void setSearchKeyword(String searchKeyword) {
+        this.searchKeyword = searchKeyword;
+    }
+
+    public String getSpecialTag() {
+        return specialTag;
+    }
+
+    public void setSpecialTag(String specialTag) {
+        this.specialTag = specialTag;
+    }
+
+    public String getSpecialType() {
+        return specialType;
+    }
+
+    public void setSpecialType(String specialType) {
+        this.specialType = specialType;
+    }
+
+    public String getSpecialSuffix() {
+        return specialSuffix;
+    }
+
+    public void setSpecialSuffix(String specialSuffix) {
+        this.specialSuffix = specialSuffix;
+    }
+
+    public String getEpisodeDateCode() {
+        return episodeDateCode;
+    }
+
+    public void setEpisodeDateCode(String episodeDateCode) {
+        this.episodeDateCode = episodeDateCode;
+    }
     // =========================
 
     @Override
@@ -94,6 +139,11 @@ public class EpisodeInfo {
                 ", fileName='" + fileName + '\'' +
                 ", episodeUrl='" + episodeUrl + '\'' +
                 ", episodeNames=" + episodeNames + '\'' +
+                ", searchKeyword='" + searchKeyword + '\'' +
+                ", specialTag='" + specialTag + '\'' +
+                ", specialType='" + specialType + '\'' +
+                ", specialSuffix='" + specialSuffix + '\'' +
+                ", episodeDateCode='" + episodeDateCode + '\'' +
                 '}';
     }
 }
