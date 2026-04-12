@@ -43,11 +43,12 @@ public class DanmakuConfigManager {
             if (context == null) {
                 Leodanmu.log("DanmakuConfigManager.loadConfig: context为空");
                 return new DanmakuConfig();
-        SharedPreferences prefs = context.getSharedPreferences(prefsName, Context.MODE_PRIVATE);
+            }
+        }
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         String json = prefs.getString(KEY_CONFIG_JSON, null);
         if (json != null && !json.isEmpty()) {
             try {
-                Gson gson = new Gson();
                 DanmakuConfig config = gson.fromJson(json, DanmakuConfig.class);
                 if (config != null) {
                     sDanmakuConfig = config;
@@ -57,10 +58,9 @@ public class DanmakuConfigManager {
                 Leodanmu.log("解析配置失败，尝试迁移旧配置: " + e.getMessage());
             }
         } else {
-            // 迁移旧配置
             return migrateOldConfig(context);
         }
-        }
+        return migrateOldConfig(context);
     }
 
     public static void saveConfig(Context context, DanmakuConfig config) {

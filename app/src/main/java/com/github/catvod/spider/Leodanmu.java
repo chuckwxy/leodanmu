@@ -708,7 +708,6 @@ public class Leodanmu extends Spider {
             log("hook状态: stage=" + hookLastStage + ", source=" + hookLastSource + ", class=" + hookLastClass + ", method=" + hookLastMethod + (TextUtils.isEmpty(hookLastError) ? "" : ", error=" + hookLastError));
         }
     }
-    }
 
     private JSONObject createClass(String id, String name) throws Exception {
         JSONObject cls = new JSONObject();
