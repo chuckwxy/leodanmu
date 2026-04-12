@@ -449,16 +449,22 @@ public class LeoDanmakuService {
             if (!TextUtils.isEmpty(episodeInfo.getEpisodeYear())) {
                 searchKeyword = searchKeyword + "(" + episodeInfo.getEpisodeYear() + ")";
             }
-            double similarity = calculateSimilarity(titleToCompare, searchKeyword);
-            Leodanmu.log("🤔 比较: " + titleToCompare + " vs " + searchKeyword + " (相似度: " + similarity + ")");
-            if (similarity > bestSimilarity) {
-                bestSimilarity = similarity;
+
+            TitleMatchInfo targetInfo = TitleNormalizer.parse(searchKeyword + " " + episodeInfo.getEpisodeTitle());
+            TitleMatchInfo candidateInfo = TitleNormalizer.parse((item.getAnimeTitle() == null ? "" : item.getAnimeTitle()) + " " + (item.getEpTitle() == null ? "" : item.getEpTitle()));
+            int structuredScore = TitleNormalizer.score(targetInfo, candidateInfo);
+            double legacySimilarity = calculateSimilarity(titleToCompare, searchKeyword);
+            double finalScore = structuredScore >= 35 ? (structuredScore + legacySimilarity) : legacySimilarity;
+            Leodanmu.log("🤔 比较: " + titleToCompare + " vs " + searchKeyword
+                    + " (结构分: " + structuredScore + ", 相似度: " + legacySimilarity + ", 最终分: " + finalScore + ")");
+            if (finalScore > bestSimilarity) {
+                bestSimilarity = finalScore;
                 selectedItem = item;
             }
         }
 
         if (selectedItem != null) {
-            Leodanmu.log("🎯 自动搜索选择: " + selectedItem.title + " - " + selectedItem.epTitle + " (相似度: " + bestSimilarity + ")");
+            Leodanmu.log("🎯 自动搜索选择: " + selectedItem.title + " - " + selectedItem.epTitle + " (最终分: " + bestSimilarity + ")");
             return new SearchResult(true, bestSimilarity, selectedItem);
         }
         return new SearchResult(false, 0, null);
