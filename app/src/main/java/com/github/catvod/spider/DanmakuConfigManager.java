@@ -85,6 +85,9 @@ public class DanmakuConfigManager {
                 + ", lpHeight=" + config.getLpHeight()
                 + ", lpAlpha=" + config.getLpAlpha());
         boolean ok = prefs.edit().putString(KEY_CONFIG_JSON, json).commit();
+        if (ok) {
+            Leodanmu.refreshRuntimeConfig(context, config);
+        }
         Leodanmu.log("DanmakuConfigManager.saveConfig: commit=" + ok);
         String savedJson = prefs.getString(KEY_CONFIG_JSON, null);
         Leodanmu.log("DanmakuConfigManager.saveConfig: 保存后 prefs json=" + savedJson);

@@ -805,7 +805,7 @@ public class DanmakuUIHelper {
                 ThemeColors colors = getThemeColors(activity);
                 // 重新获取最新配置
                 DanmakuConfig config = DanmakuConfigManager.getConfig(activity);
-                Leodanmu.log("布局配置加载: width=" + config.getLpWidth() + ", height=" + config.getLpHeight() + ", alpha=" + config.getLpAlpha());
+                Leodanmu.log("布局配置加载: width=" + Leodanmu.getRuntimeLpWidth() + ", height=" + Leodanmu.getRuntimeLpHeight() + ", alpha=" + Leodanmu.getRuntimeLpAlpha());
 
                 AlertDialog.Builder builder = new AlertDialog.Builder(activity);
 

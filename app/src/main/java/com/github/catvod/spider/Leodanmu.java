@@ -41,6 +41,13 @@ public class Leodanmu extends Spider {
     private static String lastAppliedExt = null;
     private static int lastAppliedExtHash = 0;
 
+    // 运行时配置快照：保存时刷新，平时直接读，避免高频轮询 prefs
+    private static volatile boolean runtimeAutoPushEnabled = false;
+    private static volatile boolean runtimePushToastEnabled = true;
+    private static volatile float runtimeLpWidth = 1.0f;
+    private static volatile float runtimeLpHeight = 1.0f;
+    private static volatile float runtimeLpAlpha = 1.0f;
+
     // Hook 诊断状态
     private static String hookLastStage = "idle";
     private static String hookLastSource = "none";
@@ -161,6 +168,7 @@ public class Leodanmu extends Spider {
 
         // 初始化配置缓存，不再在这里重复应用 ext，避免 TV 端重复解析/落盘
         DanmakuConfig config = DanmakuConfigManager.getConfig(context);
+        refreshRuntimeConfig(context, config);
 
         if (initialized) return;
 
@@ -264,6 +272,47 @@ public class Leodanmu extends Spider {
     public static void clearLogs() {
         logBuffer.clear();
         clearSharedLog();
+    }
+
+    public static void refreshRuntimeConfig(Context context) {
+        refreshRuntimeConfig(context, DanmakuConfigManager.loadConfig(context));
+    }
+
+    public static void refreshRuntimeConfig(Context context, DanmakuConfig config) {
+        if (config == null && context != null) {
+            config = DanmakuConfigManager.loadConfig(context);
+        }
+        if (config == null) return;
+        runtimeAutoPushEnabled = config.isAutoPushEnabled();
+        runtimePushToastEnabled = config.isPushToastEnabled();
+        runtimeLpWidth = config.getLpWidth();
+        runtimeLpHeight = config.getLpHeight();
+        runtimeLpAlpha = config.getLpAlpha();
+        log("运行时配置已刷新: autoPush=" + runtimeAutoPushEnabled
+                + ", pushToast=" + runtimePushToastEnabled
+                + ", lpWidth=" + runtimeLpWidth
+                + ", lpHeight=" + runtimeLpHeight
+                + ", lpAlpha=" + runtimeLpAlpha);
+    }
+
+    public static boolean isRuntimeAutoPushEnabled() {
+        return runtimeAutoPushEnabled;
+    }
+
+    public static boolean isRuntimePushToastEnabled() {
+        return runtimePushToastEnabled;
+    }
+
+    public static float getRuntimeLpWidth() {
+        return runtimeLpWidth;
+    }
+
+    public static float getRuntimeLpHeight() {
+        return runtimeLpHeight;
+    }
+
+    public static float getRuntimeLpAlpha() {
+        return runtimeLpAlpha;
     }
 
     private static File getSharedLogFile() {

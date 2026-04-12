@@ -280,8 +280,7 @@ public class DanmakuScanner {
                                 }
 
                                 // 检测是否开启自动查询或者已经手动查询过
-                                DanmakuConfig config = DanmakuConfigManager.loadConfig(act);
-                                if (!config.isAutoPushEnabled() && TextUtils.isEmpty(DanmakuManager.lastManualDanmakuUrl)) {
+                                if (!Leodanmu.isRuntimeAutoPushEnabled() && TextUtils.isEmpty(DanmakuManager.lastManualDanmakuUrl)) {
                                     return;
                                 }
 
@@ -544,8 +543,7 @@ public class DanmakuScanner {
             return;
         }
 
-        DanmakuConfig latestConfig = DanmakuConfigManager.loadConfig(push.activity);
-        if (latestConfig == null || !latestConfig.isAutoPushEnabled()) {
+        if (!Leodanmu.isRuntimeAutoPushEnabled()) {
             Leodanmu.log("⏭️ 自动推送已关闭，跳过待推送任务: " + push.danmakuItem.getEpTitle());
             pendingPushes.remove(push.danmakuItem.getEpTitle());
             return;
