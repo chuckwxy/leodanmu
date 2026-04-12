@@ -43,22 +43,23 @@ public class DanmakuConfigManager {
             if (context == null) {
                 Leodanmu.log("DanmakuConfigManager.loadConfig: context为空");
                 return new DanmakuConfig();
-            }
-        }
-        Leodanmu.log("DanmakuConfigManager.loadConfig: prefsName=" + PREFS_NAME
-                + ", ctx=" + context.getClass().getName()
-                + ", pkg=" + context.getPackageName());
-        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        SharedPreferences prefs = context.getSharedPreferences(prefsName, Context.MODE_PRIVATE);
         String json = prefs.getString(KEY_CONFIG_JSON, null);
-        Leodanmu.log("DanmakuConfigManager.loadConfig: 读取 prefs json=" + json);
-        if (json != null) {
-            DanmakuConfig config = gson.fromJson(json, DanmakuConfig.class);
-            Leodanmu.log("DanmakuConfigManager.loadConfig: 解析后 apiUrls=" + (config == null ? "null" : config.getApiUrls()));
-            return config;
+        if (json != null && !json.isEmpty()) {
+            try {
+                Gson gson = new Gson();
+                DanmakuConfig config = gson.fromJson(json, DanmakuConfig.class);
+                if (config != null) {
+                    sDanmakuConfig = config;
+                    return config;
+                }
+            } catch (Exception e) {
+                Leodanmu.log("解析配置失败，尝试迁移旧配置: " + e.getMessage());
+            }
         } else {
-            Leodanmu.log("DanmakuConfigManager.loadConfig: prefs 无 json，走 migrateOldConfig");
             // 迁移旧配置
             return migrateOldConfig(context);
+        }
         }
     }
 

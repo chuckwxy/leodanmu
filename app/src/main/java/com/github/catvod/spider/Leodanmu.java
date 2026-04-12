@@ -703,7 +703,11 @@ public class Leodanmu extends Spider {
         hookLastMethod = methodName;
         hookLastExtPreview = TextUtils.isEmpty(ext) ? "" : ext.substring(0, Math.min(ext.length(), 260));
         hookLastError = error == null ? "" : error;
-        log("hook状态: stage=" + hookLastStage + ", source=" + hookLastSource + ", class=" + hookLastClass + ", method=" + hookLastMethod + (TextUtils.isEmpty(hookLastError) ? "" : ", error=" + hookLastError));
+        boolean noisyIdle = "idle".equals(hookLastStage) && "local-config".equals(hookLastSource) && TextUtils.isEmpty(hookLastError);
+        if (!noisyIdle) {
+            log("hook状态: stage=" + hookLastStage + ", source=" + hookLastSource + ", class=" + hookLastClass + ", method=" + hookLastMethod + (TextUtils.isEmpty(hookLastError) ? "" : ", error=" + hookLastError));
+        }
+    }
     }
 
     private JSONObject createClass(String id, String name) throws Exception {
