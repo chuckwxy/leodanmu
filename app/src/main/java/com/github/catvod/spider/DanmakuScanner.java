@@ -329,23 +329,17 @@ public class DanmakuScanner {
         String specialSuffix = extractSpecialSuffix(specialTag);
         String episodeDateCode = extractDateCode(rawFileName);
 
-        // 构建剧集名称列表
+        // 构建剧集名称列表：搜索阶段只保留清理后的主关键词，不把季数/集数/特殊标签带进主搜索词
         List<String> episodeNames = new ArrayList<>();
         String extractTitle1 = extractTitle(media.getTitle());
         String extractTitle2 = extractTitle2(extractTitle1); // 进一步简化
         String cachedName = SharedPreferencesService.getSearchKeywordCache(act, extractTitle2);
 
-        if (!TextUtils.isEmpty(cachedName) && !cachedName.equals(media.getTitle())) {
-            episodeNames.add(cachedName);
-        }
-        if (!TextUtils.isEmpty(extractTitle2) && !episodeNames.contains(extractTitle2)) {
-            episodeNames.add(extractTitle2);
-        }
-        if (!TextUtils.isEmpty(extractTitle1) && !episodeNames.contains(extractTitle1)) {
-            episodeNames.add(extractTitle1);
-        }
-        if (!TextUtils.isEmpty(media.getTitle()) && !episodeNames.contains(media.getTitle())) {
-            episodeNames.add(media.getTitle());
+        String searchKeyword = !TextUtils.isEmpty(cachedName) && !cachedName.equals(media.getTitle()) ? cachedName : extractTitle2;
+        if (TextUtils.isEmpty(searchKeyword)) searchKeyword = extractTitle1;
+        if (TextUtils.isEmpty(searchKeyword)) searchKeyword = seriesName;
+        if (!TextUtils.isEmpty(searchKeyword)) {
+            episodeNames.add(searchKeyword);
         }
 
         EpisodeInfo episodeInfo = new EpisodeInfo();
