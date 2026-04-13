@@ -90,6 +90,8 @@ public class DanmakuScanner {
 
     private static boolean isLeoButtonInjected = false;
 
+    private static String lastMonitorStateSignature = "";
+
     // 跨实例运行令牌：用于新实例接管后让旧实例优雅退出
     private static final String RUNTIME_PREFS = "leo_danmaku_runtime";
     private static final String KEY_ACTIVE_INSTANCE_TOKEN = "active_instance_token";
@@ -267,6 +269,17 @@ public class DanmakuScanner {
                                 }
 
                                 isVideoPlaying = media.isPlaying();
+
+                                String stateSignature = className + "|"
+                                        + media.getUrl() + "|"
+                                        + media.getTitle() + "|"
+                                        + media.getArtist() + "|"
+                                        + media.isPlaying();
+
+                                if (TextUtils.equals(stateSignature, lastMonitorStateSignature)) {
+                                    return;
+                                }
+                                lastMonitorStateSignature = stateSignature;
 
                                 if (isVideoPlaying) {
                                     // 获取媒体信息
@@ -549,6 +562,7 @@ public class DanmakuScanner {
                 currentEpisodePart = "";
                 currentEpisodeYear = "";
                 currentEpisodeSeason = "";
+                lastMonitorStateSignature = "";
                 lastEpisodeChangeTime = 0;
                 videoPlayStartTime = 0;
 
@@ -604,6 +618,7 @@ public class DanmakuScanner {
         currentEpisodePart = "";
         currentEpisodeYear = "";
         currentEpisodeSeason = "";
+        lastMonitorStateSignature = "";
         lastEpisodeChangeTime = 0;
         isVideoPlaying = false;
         videoPlayStartTime = 0;
