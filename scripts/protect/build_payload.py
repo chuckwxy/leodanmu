@@ -9,6 +9,18 @@ PAYLOAD_SOURCES = [
     "app/src/main/java/com/github/catvod/spider/protect/RealLeodanmu.java",
     "app/src/main/java/com/github/catvod/spider/protect/PayloadBridge.java",
     "app/src/main/java/com/github/catvod/spider/protect/ProtectedLoader.java",
+    "app/src/main/java/com/github/catvod/spider/LeoDanmakuService.java",
+    "app/src/main/java/com/github/catvod/spider/DanmakuScanner.java",
+    "app/src/main/java/com/github/catvod/spider/DanmakuUIHelper.java",
+    "app/src/main/java/com/github/catvod/spider/NetworkUtils.java",
+    "app/src/main/java/com/github/catvod/spider/TLSSocketFactory.java",
+    "app/src/main/java/com/github/catvod/spider/TitleNormalizer.java",
+    "app/src/main/java/com/github/catvod/spider/TitleMatchInfo.java",
+    "app/src/main/java/com/github/catvod/spider/ExtFetcher.java",
+    "app/src/main/java/com/github/catvod/spider/DanmakuManager.java",
+    "app/src/main/java/com/github/catvod/spider/DanmakuUtils.java",
+    "app/src/main/java/com/github/catvod/spider/TVFocusHelper.java",
+    "app/src/main/java/com/github/catvod/spider/danmu/SharedPreferencesService.java",
 ]
 
 
@@ -40,7 +52,7 @@ def main() -> int:
         "payloadJar": str(payload_jar),
         "sourcesRequested": PAYLOAD_SOURCES,
         "sourcesPacked": found,
-        "note": "V1 minimal shell payload skeleton; runtime still allows fallback if payload cannot be classloaded.",
+        "note": "V1 phase-2 payload target manifest expanded; runtime still allows fallback if payload cannot be classloaded.",
     }
     meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"[payload] built {payload_jar}")
