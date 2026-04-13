@@ -35,6 +35,8 @@ public class DanmakuScanner {
     static String currentSeriesName = "";
     static String currentEpisodeNum = "";
     static String currentEpisodePart = "";
+    static String currentEpisodeYear = "";
+    static String currentEpisodeSeason = "";
     static long lastEpisodeChangeTime = 0;
     private static final long MIN_EPISODE_CHANGE_INTERVAL = 1000;
 
@@ -438,6 +440,27 @@ public class DanmakuScanner {
         return TextUtils.isEmpty(part) ? String.valueOf(episodeNum) : (episodeNum + part);
     }
 
+    private static String safeValue(String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    private static boolean shouldUseIdStepping(EpisodeInfo targetEpisodeInfo) {
+        if (targetEpisodeInfo == null) return false;
+
+        String targetYear = safeValue(targetEpisodeInfo.getEpisodeYear());
+        String targetSeason = safeValue(targetEpisodeInfo.getEpisodeSeasonNum());
+
+        if (!TextUtils.isEmpty(currentEpisodeYear) && !TextUtils.isEmpty(targetYear) && !currentEpisodeYear.equals(targetYear)) {
+            return false;
+        }
+
+        if (!TextUtils.isEmpty(currentEpisodeSeason) && !TextUtils.isEmpty(targetSeason) && !currentEpisodeSeason.equals(targetSeason)) {
+            return false;
+        }
+
+        return true;
+    }
+
     private static String extractDateCode(String text) {
         if (TextUtils.isEmpty(text)) return "";
         Matcher matcher = Pattern.compile("(20\\d{2})[.\\-/](\\d{2})[.\\-/](\\d{2})").matcher(text);
@@ -524,6 +547,8 @@ public class DanmakuScanner {
                 currentSeriesName = "";
                 currentEpisodeNum = "";
                 currentEpisodePart = "";
+                currentEpisodeYear = "";
+                currentEpisodeSeason = "";
                 lastEpisodeChangeTime = 0;
                 videoPlayStartTime = 0;
 
@@ -577,6 +602,8 @@ public class DanmakuScanner {
         currentSeriesName = "";
         currentEpisodeNum = "";
         currentEpisodePart = "";
+        currentEpisodeYear = "";
+        currentEpisodeSeason = "";
         lastEpisodeChangeTime = 0;
         isVideoPlaying = false;
         videoPlayStartTime = 0;
@@ -1350,7 +1377,10 @@ public class DanmakuScanner {
         }
 
         if ((hasValidDanmakuCache || hasManualDanmaku) && hasNormalEpisodeNum) {
-            Leodanmu.log("🔍 检测到有效弹幕缓存，尝试使用ID递增方式");
+            if (!shouldUseIdStepping(lastEpisodeInfo)) {
+                Leodanmu.log("⚠️ 年份或季数变化，跳过ID递增逻辑，转自动搜索");
+            } else {
+                Leodanmu.log("🔍 检测到有效弹幕缓存，尝试使用ID递增方式");
 
             // 获取当前集数（从EpisodeInfo或currentEpisodeNum）
             int currentEpisodeNumValue = 0;
@@ -1395,6 +1425,8 @@ public class DanmakuScanner {
                 currentSeriesName = lastEpisodeInfo.getSeriesName();
                 currentEpisodeNum = String.valueOf(targetEpisodeNumValue);
                 currentEpisodePart = targetEpisodePart;
+                currentEpisodeYear = safeValue(lastEpisodeInfo.getEpisodeYear());
+                currentEpisodeSeason = safeValue(lastEpisodeInfo.getEpisodeSeasonNum());
                 lastEpisodeChangeTime = currentTime;
                 videoPlayStartTime = System.currentTimeMillis();
 
@@ -1412,12 +1444,19 @@ public class DanmakuScanner {
                 Leodanmu.log("⚠️ ID递增方式未找到弹幕，将尝试重新搜索或使用原有逻辑");
                 // 继续执行原有逻辑
             }
+            }
         }
 
         // 【关键修改4】放宽系列相似度判断
         boolean isSameSeries = isSameSeries(currentSeriesName, lastEpisodeInfo.getSeriesName());
 
         if (isSameSeries && hasNormalEpisodeNum && !TextUtils.isEmpty(currentEpisodeNum)) {
+            if (!shouldUseIdStepping(lastEpisodeInfo)) {
+                Leodanmu.log("⚠️ 同系列但年份或季数变化，跳过ID递增逻辑，转自动搜索");
+                LeoDanmakuService.autoSearch(lastEpisodeInfo, activity);
+                return;
+            }
+
             long timeSinceLastChange = currentTime - lastEpisodeChangeTime;
             String targetEpisodePart = normalizeEpisodePart(lastEpisodeInfo.getSpecialSuffix());
             int currentEpisodeNumValue = Integer.parseInt(currentEpisodeNum);
@@ -1437,6 +1476,8 @@ public class DanmakuScanner {
                 // 更新记录
                 currentEpisodeNum = lastEpisodeInfo.getEpisodeNum();
                 currentEpisodePart = targetEpisodePart;
+                currentEpisodeYear = safeValue(lastEpisodeInfo.getEpisodeYear());
+                currentEpisodeSeason = safeValue(lastEpisodeInfo.getEpisodeSeasonNum());
                 lastEpisodeChangeTime = currentTime;
 
                 // 生成推送key
@@ -1462,6 +1503,8 @@ public class DanmakuScanner {
             currentSeriesName = lastEpisodeInfo.getSeriesName();
             currentEpisodeNum = lastEpisodeInfo.getEpisodeNum();
             currentEpisodePart = normalizeEpisodePart(lastEpisodeInfo.getSpecialSuffix());
+            currentEpisodeYear = safeValue(lastEpisodeInfo.getEpisodeYear());
+            currentEpisodeSeason = safeValue(lastEpisodeInfo.getEpisodeSeasonNum());
             lastEpisodeChangeTime = currentTime;
 
             startAutoSearch(lastEpisodeInfo, activity);
