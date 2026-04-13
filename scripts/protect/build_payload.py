@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
+import hashlib
 import json
 import pathlib
 import shutil
+import subprocess
 import sys
 import zipfile
+from datetime import datetime, timezone
 
 PAYLOAD_SOURCES = [
     "app/src/main/java/com/github/catvod/spider/protect/impl/PayloadEntry.java",
@@ -23,6 +26,24 @@ PAYLOAD_SOURCES = [
     "app/src/main/java/com/github/catvod/spider/TVFocusHelper.java",
     "app/src/main/java/com/github/catvod/spider/danmu/SharedPreferencesService.java",
 ]
+
+
+def sha256_file(path: pathlib.Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def git_commit(project_root: pathlib.Path) -> str:
+    try:
+        return subprocess.check_output(
+            ["git", "-C", str(project_root), "rev-parse", "HEAD"],
+            text=True,
+        ).strip()
+    except Exception:
+        return "unknown"
 
 
 def main() -> int:
@@ -50,10 +71,30 @@ def main() -> int:
 
     meta = {
         "projectRoot": str(project_root),
+        "gitCommit": git_commit(project_root),
+        "stage": "phase7-release-chain",
+        "builtAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "payloadJar": str(payload_jar),
+        "payloadJarSha256": sha256_file(payload_jar),
         "sourcesRequested": PAYLOAD_SOURCES,
         "sourcesPacked": found,
-        "note": "Phase 3 payload execution entry enabled; loader now prefers payload-only entry class while fallback remains available.",
+        "sourcesPackedCount": len(found),
+        "payloadCoverage": [
+            "PayloadEntry",
+            "RealLeodanmu",
+            "homeContent/categoryContent/detailContent/playerContent",
+            "init",
+            "liveContent"
+        ],
+        "outerStableZone": [
+            "Leodanmu shell entry",
+            "DanmakuConfig",
+            "DanmakuConfigManager",
+            "EpisodeInfo",
+            "entity/**",
+            "bean/**"
+        ],
+        "note": "Phase 7 release-chain hardening: keep source maintenance stable while strengthening payload packaging metadata and protected artifact traceability.",
     }
     meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"[payload] built {payload_jar}")

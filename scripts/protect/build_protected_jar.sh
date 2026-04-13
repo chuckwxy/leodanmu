@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+sha256_file() {
+  sha256sum "$1" | awk '{print $1}'
+}
+
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT_DIR"
 
@@ -19,6 +23,10 @@ WORK_DIR="jar/protected_work"
 TEMPLATE_DIR="$WORK_DIR/spider.jar"
 SMALI_DIR="$WORK_DIR/Smali_classes"
 META_OUT="jar/${OUT_NAME}.meta.txt"
+BUILDINFO_OUT="jar/${OUT_NAME}.buildinfo.json"
+STAGE_OUT="jar/${OUT_NAME}.stage.txt"
+SHA256_OUT="jar/${OUT_NAME}.sha256"
+PAYLOAD_SHA256_OUT="jar/${OUT_NAME}.payload.sha256"
 MAP_SRC="app/build/outputs/mapping/protectedRelease/mapping.txt"
 MAP_DST="jar/${OUT_NAME}.mapping.txt"
 
@@ -35,7 +43,7 @@ if [ -z "$APK_PATH" ]; then
   exit 1
 fi
 
-rm -f "jar/${OUT_NAME}" "jar/${OUT_NAME}.md5" "$META_OUT" "$MAP_DST"
+rm -f "jar/${OUT_NAME}" "jar/${OUT_NAME}.md5" "$META_OUT" "$BUILDINFO_OUT" "$STAGE_OUT" "$SHA256_OUT" "$PAYLOAD_SHA256_OUT" "$MAP_DST"
 rm -rf "$WORK_DIR" "$PAYLOAD_WORK_DIR"
 mkdir -p "$WORK_DIR" "$PAYLOAD_DIR"
 
@@ -70,15 +78,36 @@ echo "[protect] rebuild protected dex.jar"
 java -jar "$APKTOOL_PATH" b "$TEMPLATE_DIR" -c
 mv "$TEMPLATE_DIR/dist/dex.jar" "jar/${OUT_NAME}"
 md5sum "jar/${OUT_NAME}" | awk '{print $1}' > "jar/${OUT_NAME}.md5"
+sha256_file "jar/${OUT_NAME}" > "$SHA256_OUT"
+sha256_file "$PAYLOAD_BIN" > "$PAYLOAD_SHA256_OUT"
 
 {
   echo "name=${OUT_NAME}"
+  echo "stage=phase7-release-chain"
   echo "apk_path=${APK_PATH}"
   echo "mapping_saved=$( [ -f "$MAP_SRC" ] && echo yes || echo no )"
   echo "payload_bin=$(basename "$PAYLOAD_BIN")"
   echo "payload_meta=$(basename "$PAYLOAD_META")"
+  echo "payload_sha256=$(cat "$PAYLOAD_SHA256_OUT")"
+  echo "jar_sha256=$(cat "$SHA256_OUT")"
   echo "built_at=$(date -u +%FT%TZ)"
 } > "$META_OUT"
+
+cat > "$BUILDINFO_OUT" <<EOF
+{
+  "name": "${OUT_NAME}",
+  "stage": "phase7-release-chain",
+  "apkPath": "${APK_PATH}",
+  "builtAt": "$(date -u +%FT%TZ)",
+  "jarSha256": "$(cat "$SHA256_OUT")",
+  "payloadSha256": "$(cat "$PAYLOAD_SHA256_OUT")",
+  "mappingSaved": "$( [ -f "$MAP_SRC" ] && echo yes || echo no )",
+  "payloadMeta": "$(basename "$PAYLOAD_META")",
+  "payloadBin": "$(basename "$PAYLOAD_BIN")"
+}
+EOF
+
+echo "phase7-release-chain" > "$STAGE_OUT"
 
 if [ -f "$MAP_SRC" ]; then
   cp "$MAP_SRC" "$MAP_DST"
@@ -93,3 +122,5 @@ echo "[protect] generated jar/${OUT_NAME}"
 ls -lh "jar/${OUT_NAME}"
 ls -lh "jar/${OUT_NAME}.payload.bin" "jar/${OUT_NAME}.payload.meta.json"
 echo "[protect] md5: $(cat "jar/${OUT_NAME}.md5")"
+echo "[protect] sha256: $(cat "$SHA256_OUT")"
+echo "[protect] payload sha256: $(cat "$PAYLOAD_SHA256_OUT")"

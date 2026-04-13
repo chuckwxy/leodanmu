@@ -42,10 +42,14 @@ jobs:
           path: |
             jar/leodm-protected.jar
             jar/leodm-protected.jar.md5
+            jar/leodm-protected.jar.sha256
             jar/leodm-protected.jar.meta.txt
+            jar/leodm-protected.jar.buildinfo.json
+            jar/leodm-protected.jar.stage.txt
             jar/leodm-protected.jar.mapping.txt
             jar/leodm-protected.jar.payload.bin
             jar/leodm-protected.jar.payload.meta.json
+            jar/leodm-protected.jar.payload.sha256
           retention-days: 30
 
       - name: Create protected release
@@ -57,11 +61,17 @@ jobs:
           body: |
             自动保护构建
             Commit: ${{ github.sha }}
+            Stage: phase7-release-chain
+            Payload coverage: PayloadEntry / RealLeodanmu / home-category-detail-player / init / liveContent
           files: |
             jar/leodm-protected.jar
             jar/leodm-protected.jar.md5
+            jar/leodm-protected.jar.sha256
             jar/leodm-protected.jar.meta.txt
+            jar/leodm-protected.jar.buildinfo.json
+            jar/leodm-protected.jar.stage.txt
             jar/leodm-protected.jar.payload.meta.json
+            jar/leodm-protected.jar.payload.sha256
           draft: false
           prerelease: true
         env:
