@@ -37,6 +37,7 @@ public class RealLeodanmu implements PayloadBridge {
         }
 
         Leodanmu.cacheExtForShell(extend);
+        Leodanmu.tryApplyEntryExtIfLocalEmpty(context, extend, "init-entry-ext");
         Leodanmu.doInitWork(context, extend);
     }
 

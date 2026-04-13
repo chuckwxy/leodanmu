@@ -113,12 +113,16 @@ public class Leodanmu extends Spider {
             if (configLoaded) return;
             try {
                 if (context != null) {
+                    if (!hasLocalApiUrlsForShell(context) && !TextUtils.isEmpty(cachedExt)) {
+                        tryApplyEntryExtIfLocalEmpty(context, cachedExt, "ensureConfig-entry-ext");
+                    }
+
                     DanmakuConfig config = DanmakuConfigManager.getConfig(context);
                     if (config == null) config = new DanmakuConfig();
 
                     boolean hasLocalApiUrls = config.getApiUrls() != null && !config.getApiUrls().isEmpty();
                     if (!hasLocalApiUrls) {
-                        log("ensureConfig: 本地 apiUrls 为空，已禁用自动补 ext，请在前台手动保存");
+                        log("ensureConfig: 本地 apiUrls 为空，当前无可用入口 ext，请前台手动保存");
                     } else {
                         log("ensureConfig: 使用已保存配置, apiUrls=" + config.getApiUrls()
                                 + ", autoPush=" + config.isAutoPushEnabled()
@@ -171,6 +175,27 @@ public class Leodanmu extends Spider {
             cachedExtHash = extend.hashCode();
             configLoaded = false;
         }
+    }
+
+    public static boolean hasLocalApiUrlsForShell(Context context) {
+        if (context == null) return false;
+        try {
+            DanmakuConfig config = DanmakuConfigManager.getConfig(context);
+            return config != null && config.getApiUrls() != null && !config.getApiUrls().isEmpty();
+        } catch (Exception e) {
+            log("hasLocalApiUrlsForShell 异常: " + e.getMessage());
+            return false;
+        }
+    }
+
+    public static void tryApplyEntryExtIfLocalEmpty(Context context, String extend, String stage) {
+        if (context == null || TextUtils.isEmpty(extend)) return;
+        if (hasLocalApiUrlsForShell(context)) {
+            log(stage + ": 检测到本地已有配置，保持前台配置优先");
+            return;
+        }
+        log(stage + ": 本地配置为空，首次使用入口 ext 落盘");
+        saveFetchedExtToConfig(context, extend, stage);
     }
 
     public static synchronized void doInitWork(Context context, String extend) {
