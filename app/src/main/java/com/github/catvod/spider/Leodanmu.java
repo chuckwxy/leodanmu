@@ -161,6 +161,18 @@ public class Leodanmu extends Spider {
     }
 
 
+    public static String getCachedExtForShell() {
+        return cachedExt;
+    }
+
+    public static void cacheExtForShell(String extend) {
+        if (!TextUtils.isEmpty(extend)) {
+            cachedExt = extend;
+            cachedExtHash = extend.hashCode();
+            configLoaded = false;
+        }
+    }
+
     public static synchronized void doInitWork(Context context, String extend) {
         Utils.initAppContext(context);
         // log("doInitWork enter: initialized=" + initialized
