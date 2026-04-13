@@ -328,6 +328,9 @@ public class DanmakuScanner {
         String specialTag = extractSpecialTag(rawFileName);
         String specialType = extractSpecialType(specialTag);
         String specialSuffix = extractSpecialSuffix(specialTag);
+        if (TextUtils.isEmpty(specialSuffix)) {
+            specialSuffix = extractEpisodePartSuffix(rawFileName);
+        }
         String episodeDateCode = extractDateCode(rawFileName);
 
         // 构建剧集名称列表：搜索阶段只保留清理后的主关键词，不把季数/集数/特殊标签带进主搜索词
@@ -398,6 +401,13 @@ public class DanmakuScanner {
         if (TextUtils.isEmpty(tag)) return "";
         if (tag.endsWith("上")) return "上";
         if (tag.endsWith("下")) return "下";
+        return "";
+    }
+
+    private static String extractEpisodePartSuffix(String text) {
+        if (TextUtils.isEmpty(text)) return "";
+        Matcher matcher = Pattern.compile("第\\s*\\d+\\s*[期集]\\s*([上下])").matcher(text);
+        if (matcher.find()) return matcher.group(1);
         return "";
     }
 
