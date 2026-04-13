@@ -46,6 +46,9 @@
 -keep class com.github.catvod.spider.Leodanmu { public <init>(...); public <methods>; }
 -keep class com.github.catvod.spider.Init { public <init>(...); public <methods>; }
 -keep class com.github.catvod.spider.GoProxySpider { public <init>(...); public <methods>; }
+-keep class com.github.catvod.spider.protect.ProtectedLoader { *; }
+-keep class com.github.catvod.spider.protect.PayloadBridge { *; }
+-keep class com.github.catvod.spider.protect.RealLeodanmu { *; }
 
 # Keep web server / nanohttpd methods stable enough for runtime dispatch
 -keep class fi.iki.elonen.** { *; }

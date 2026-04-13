@@ -26,6 +26,8 @@ jobs:
         run: |
           chmod +x gradlew
           chmod +x scripts/protect/build_protected_jar.sh
+          chmod +x scripts/protect/build_payload.py
+          chmod +x scripts/protect/encrypt_payload.py
 
       - name: Build Protected Release APK
         run: ./gradlew assembleProtectedRelease
@@ -42,6 +44,8 @@ jobs:
             jar/leodm-protected.jar.md5
             jar/leodm-protected.jar.meta.txt
             jar/leodm-protected.jar.mapping.txt
+            jar/leodm-protected.jar.payload.bin
+            jar/leodm-protected.jar.payload.meta.json
           retention-days: 30
 
       - name: Create protected release
@@ -57,6 +61,7 @@ jobs:
             jar/leodm-protected.jar
             jar/leodm-protected.jar.md5
             jar/leodm-protected.jar.meta.txt
+            jar/leodm-protected.jar.payload.meta.json
           draft: false
           prerelease: true
         env:

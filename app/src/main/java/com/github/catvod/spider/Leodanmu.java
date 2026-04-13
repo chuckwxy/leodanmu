@@ -8,6 +8,8 @@ import android.os.Looper;
 import android.text.TextUtils;
 
 import com.github.catvod.spider.entity.DanmakuItem;
+import com.github.catvod.spider.protect.PayloadBridge;
+import com.github.catvod.spider.protect.ProtectedLoader;
 
 import com.github.catvod.crawler.Spider;
 import com.github.catvod.crawler.SpiderDebug;
@@ -75,7 +77,10 @@ public class Leodanmu extends Spider {
     @Override
     public void init(Context context, String extend) throws Exception {
         super.init(context, extend);
+        getPayloadBridge(context).init(context, extend);
+    }
 
+    public static void initShellFallback(Context context, String extend) throws Exception {
         // log("init enter: ctx=" + (context == null ? "null" : context.getClass().getName())
         //         + ", extendEmpty=" + TextUtils.isEmpty(extend)
         //         + ", extendHash=" + getExtHash(extend));
@@ -505,11 +510,15 @@ public class Leodanmu extends Spider {
     // TVBox接口
     @Override
     public String homeContent(boolean filter) {
+        return getPayloadBridge(Utils.getTopActivity()).homeContent(filter);
+    }
+
+    public static String homeContentShellFallback(boolean filter) {
         ensureConfig(Utils.getTopActivity());
         try {
             JSONObject result = new JSONObject();
             JSONArray classes = new JSONArray();
-            classes.put(createClass("leo_danmaku_config", "Leo弹幕设置"));
+            classes.put(createClassStatic("leo_danmaku_config", "Leo弹幕设置"));
             result.put("class", classes);
             result.put("list", new JSONArray());
             return result.toString();
@@ -520,6 +529,10 @@ public class Leodanmu extends Spider {
 
     @Override
     public String categoryContent(String tid, String pg, boolean filter, HashMap<String, String> extend) {
+        return getPayloadBridge(Utils.getTopActivity()).categoryContent(tid, pg, filter, extend);
+    }
+
+    public static String categoryContentShellFallback(String tid, String pg, boolean filter, HashMap<String, String> extend) {
         ensureConfig(Utils.getTopActivity());
         try {
             Activity activity = Utils.getTopActivity();
@@ -528,24 +541,24 @@ public class Leodanmu extends Spider {
             JSONArray list = new JSONArray();
 
             // 创建弹幕配置按钮
-            JSONObject configVod = createVod("config", "弹幕配置", "", "配置弹幕API");
+            JSONObject configVod = createVodStatic("config", "弹幕配置", "", "配置弹幕API");
             list.put(configVod);
 
             // 创建自动推送弹幕按钮（保持开启状态）
-            JSONObject autoPushVod = createVod("auto_push", "自动推送弹幕", "",
+            JSONObject autoPushVod = createVodStatic("auto_push", "自动推送弹幕", "",
                     config.isAutoPushEnabled() ? "已开启" : "已关闭");
             list.put(autoPushVod);
 
             // 创建查看日志按钮
-            JSONObject logVod = createVod("log", "查看日志", "", "调试信息");
+            JSONObject logVod = createVodStatic("log", "查看日志", "", "调试信息");
             list.put(logVod);
 
             // 创建 Hook 诊断按钮
-            JSONObject hookDiagVod = createVod("hook_diag", "Hook诊断", "", getHookStatusSummary());
+            JSONObject hookDiagVod = createVodStatic("hook_diag", "Hook诊断", "", getHookStatusSummary());
             list.put(hookDiagVod);
 
             // 创建布局配置按钮
-            JSONObject lpConfigVod = createVod("lp_config", "布局配置", "", "调整弹窗大小和透明度");
+            JSONObject lpConfigVod = createVodStatic("lp_config", "布局配置", "", "调整弹窗大小和透明度");
             list.put(lpConfigVod);
 
             result.put("list", list);
@@ -562,6 +575,10 @@ public class Leodanmu extends Spider {
 
     @Override
     public String detailContent(List<String> ids) {
+        return getPayloadBridge(Utils.getTopActivity()).detailContent(ids);
+    }
+
+    public static String detailContentShellFallback(List<String> ids) {
         ensureConfig(Utils.getTopActivity());
         if (ids == null || ids.isEmpty()) return "";
         final String id = ids.get(0);
@@ -589,7 +606,7 @@ public class Leodanmu extends Spider {
                                             config.isAutoPushEnabled() ? "自动推送已开启" : "自动推送已关闭");
 
                                     // 重新加载页面以更新状态显示
-                                    refreshCategoryContent(ctx);
+                                    refreshCategoryContentStatic(ctx);
                                 } else if (id.equals("lp_config")) {
                                     DanmakuUIHelper.showLpConfigDialog(ctx);
                                 } else if (id.equals("log")) {
@@ -636,9 +653,9 @@ public class Leodanmu extends Spider {
     }
 
     // 添加刷新分类内容的方法
-    private void refreshCategoryContent(Activity ctx) {
+    private static void refreshCategoryContentStatic(Activity ctx) {
         try {
-            String content = categoryContent("", "", false, new HashMap<>());
+            String content = categoryContentShellFallback("", "", false, new HashMap<String, String>());
             if (!TextUtils.isEmpty(content)) {
                 JSONObject result = new JSONObject(content);
                 JSONArray list = result.getJSONArray("list");
@@ -661,12 +678,20 @@ public class Leodanmu extends Spider {
 
     @Override
     public String playerContent(String flag, String id, List<String> vipFlags) {
+        return getPayloadBridge(Utils.getTopActivity()).playerContent(flag, id, vipFlags);
+    }
+
+    public static String playerContentShellFallback(String flag, String id, List<String> vipFlags) {
         ensureConfig(Utils.getTopActivity());
         return "";
     }
 
     @Override
     public String liveContent(String url) throws Exception {
+        return getPayloadBridge(Utils.getTopActivity()).liveContent(url);
+    }
+
+    public static String liveContentShellFallback(String url) throws Exception {
         // 直播接口：JarLoader 缓存 Spider 实例，init() 只在第一次创建时调用一次。
         // 若第一次创建时 ext 为空（顶层 spider 字段加载），apiUrls 不会被初始化。
         // 必须每次从 SharedPreferences 强制重读，不能依赖 cachedExt 或内存缓存。
@@ -676,7 +701,7 @@ public class Leodanmu extends Spider {
             DanmakuConfigManager.saveConfig(context, freshConfig);
             log("liveContent: 配置已刷新，当前 apiUrls=" + freshConfig.getApiUrls());
         }
-        return super.liveContent(url);
+        return new Leodanmu().superLiveContent(url);
     }
 
     private static String getHookStatusSummary() {
@@ -709,14 +734,22 @@ public class Leodanmu extends Spider {
         }
     }
 
-    private JSONObject createClass(String id, String name) throws Exception {
+    private static PayloadBridge getPayloadBridge(Context context) {
+        return ProtectedLoader.getBridge(context);
+    }
+
+    protected String superLiveContent(String url) throws Exception {
+        return super.liveContent(url);
+    }
+
+    private static JSONObject createClassStatic(String id, String name) throws Exception {
         JSONObject cls = new JSONObject();
         cls.put("type_id", id);
         cls.put("type_name", name);
         return cls;
     }
 
-    private JSONObject createVod(String id, String name, String pic, String remark) throws Exception {
+    private static JSONObject createVodStatic(String id, String name, String pic, String remark) throws Exception {
         JSONObject vod = new JSONObject();
         vod.put("vod_id", id);
         vod.put("vod_name", name);
