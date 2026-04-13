@@ -33,7 +33,7 @@ public final class ProtectedLoader {
     private static final String PAYLOAD_ASSET_PATH = "payload/payload.bin";
     private static final String PAYLOAD_DEX_NAME = "payload.dex";
     private static final String PAYLOAD_META_NAME = "payload.meta.json";
-    private static final String REAL_IMPL_CLASS = "com.github.catvod.spider.protect.RealLeodanmu";
+    private static final String REAL_IMPL_CLASS = "com.github.catvod.spider.protect.impl.PayloadEntry";
 
     private ProtectedLoader() {
     }
@@ -48,7 +48,7 @@ public final class ProtectedLoader {
                 if (bridge == null) {
                     lastLoadStatus = "fallback";
                     bridge = new RealLeodanmu();
-                    Leodanmu.log("[shell] payload 未启用，已回退外层实现");
+                    Leodanmu.log("[shell] payload 主入口未启用，已回退兜底实现");
                 }
             }
             return bridge;

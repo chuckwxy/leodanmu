@@ -49,6 +49,7 @@
 -keep class com.github.catvod.spider.protect.ProtectedLoader { *; }
 -keep class com.github.catvod.spider.protect.PayloadBridge { *; }
 -keep class com.github.catvod.spider.protect.RealLeodanmu { *; }
+-keep class com.github.catvod.spider.protect.impl.PayloadEntry { *; }
 
 # Keep web server / nanohttpd methods stable enough for runtime dispatch
 -keep class fi.iki.elonen.** { *; }

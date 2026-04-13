@@ -6,6 +6,7 @@ import sys
 import zipfile
 
 PAYLOAD_SOURCES = [
+    "app/src/main/java/com/github/catvod/spider/protect/impl/PayloadEntry.java",
     "app/src/main/java/com/github/catvod/spider/protect/RealLeodanmu.java",
     "app/src/main/java/com/github/catvod/spider/protect/PayloadBridge.java",
     "app/src/main/java/com/github/catvod/spider/protect/ProtectedLoader.java",
@@ -52,7 +53,7 @@ def main() -> int:
         "payloadJar": str(payload_jar),
         "sourcesRequested": PAYLOAD_SOURCES,
         "sourcesPacked": found,
-        "note": "V1 phase-2 payload target manifest expanded; runtime still allows fallback if payload cannot be classloaded.",
+        "note": "Phase 3 payload execution entry enabled; loader now prefers payload-only entry class while fallback remains available.",
     }
     meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"[payload] built {payload_jar}")
