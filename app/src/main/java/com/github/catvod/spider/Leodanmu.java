@@ -710,6 +710,10 @@ public class Leodanmu extends Spider {
         return "阶段:" + stage + " 来源:" + source;
     }
 
+    public static String getHookStatusSummaryForShell() {
+        return getHookStatusSummary();
+    }
+
     private static String getHookStatusDetail() {
         StringBuilder sb = new StringBuilder();
         sb.append("阶段: ").append(TextUtils.isEmpty(hookLastStage) ? "idle" : hookLastStage);
@@ -719,6 +723,10 @@ public class Leodanmu extends Spider {
         sb.append("\next预览: ").append(TextUtils.isEmpty(hookLastExtPreview) ? "-" : hookLastExtPreview);
         sb.append("\n错误: ").append(TextUtils.isEmpty(hookLastError) ? "-" : hookLastError);
         return sb.toString();
+    }
+
+    public static String getHookStatusDetailForShell() {
+        return getHookStatusDetail();
     }
 
     public static void updateHookStatus(String stage, String source, String className, String methodName, String ext, String error) {
