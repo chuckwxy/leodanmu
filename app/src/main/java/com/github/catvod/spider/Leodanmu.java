@@ -783,7 +783,7 @@ public class Leodanmu extends Spider {
         return ProtectedLoader.getBridge(context);
     }
 
-    protected String superLiveContent(String url) throws Exception {
+    public String superLiveContent(String url) throws Exception {
         return super.liveContent(url);
     }
 

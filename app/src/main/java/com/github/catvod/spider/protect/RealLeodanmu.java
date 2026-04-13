@@ -153,7 +153,16 @@ public class RealLeodanmu implements PayloadBridge {
 
     @Override
     public String liveContent(String url) throws Exception {
-        return Leodanmu.liveContentShellFallback(url);
+        Activity context = Utils.getTopActivity();
+        if (context != null) {
+            if (!Leodanmu.hasLocalApiUrlsForShell(context) && !TextUtils.isEmpty(Leodanmu.getCachedExtForShell())) {
+                Leodanmu.tryApplyEntryExtIfLocalEmpty(context, Leodanmu.getCachedExtForShell(), "liveContent-entry-ext");
+            }
+            DanmakuConfig freshConfig = DanmakuConfigManager.loadConfig(context);
+            DanmakuConfigManager.saveConfig(context, freshConfig);
+            Leodanmu.log("liveContent: 配置已刷新，当前 apiUrls=" + freshConfig.getApiUrls());
+        }
+        return new Leodanmu().superLiveContent(url);
     }
 
     private static JSONObject createClass(String id, String name) throws Exception {
