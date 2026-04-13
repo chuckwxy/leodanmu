@@ -530,11 +530,12 @@ public class LeoDanmakuService {
         if (!TextUtils.isEmpty(specialTag)) {
             if (allText.contains(specialTag.toLowerCase())) score += 60;
             if (!TextUtils.isEmpty(specialType) && allText.contains(specialType.toLowerCase())) score += 25;
-            if (!TextUtils.isEmpty(specialSuffix)) {
-                if (allText.contains(specialSuffix.toLowerCase())) score += 20;
-                String opposite = "上".equals(specialSuffix) ? "下" : ("下".equals(specialSuffix) ? "上" : "");
-                if (!TextUtils.isEmpty(opposite) && allText.contains(opposite)) score -= 40;
-            }
+        }
+
+        if (!TextUtils.isEmpty(specialSuffix)) {
+            if (allText.contains(specialSuffix.toLowerCase())) score += 40;
+            String opposite = "上".equals(specialSuffix) ? "下" : ("下".equals(specialSuffix) ? "上" : "");
+            if (!TextUtils.isEmpty(opposite) && allText.contains(opposite)) score -= 60;
         }
 
         if (!TextUtils.isEmpty(dateCode)) {
