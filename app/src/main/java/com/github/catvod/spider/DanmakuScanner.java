@@ -461,17 +461,81 @@ public class DanmakuScanner {
         if (targetEpisodeInfo == null) return false;
 
         String targetYear = safeValue(targetEpisodeInfo.getEpisodeYear());
-        String targetSeason = safeValue(targetEpisodeInfo.getEpisodeSeasonNum());
+        String targetSeason = normalizeSeasonValue(targetEpisodeInfo.getEpisodeSeasonNum());
+        String currentYear = safeValue(currentEpisodeYear);
+        String currentSeason = normalizeSeasonValue(currentEpisodeSeason);
 
-        if (!TextUtils.isEmpty(currentEpisodeYear) && !TextUtils.isEmpty(targetYear) && !currentEpisodeYear.equals(targetYear)) {
+        if (!TextUtils.isEmpty(currentYear) && !TextUtils.isEmpty(targetYear) && !currentYear.equals(targetYear)) {
             return false;
         }
 
-        if (!TextUtils.isEmpty(currentEpisodeSeason) && !TextUtils.isEmpty(targetSeason) && !currentEpisodeSeason.equals(targetSeason)) {
+        if (!TextUtils.isEmpty(currentSeason) && !TextUtils.isEmpty(targetSeason) && !currentSeason.equals(targetSeason)) {
             return false;
         }
 
         return true;
+    }
+
+    private static String normalizeSeasonValue(String season) {
+        String value = safeValue(season);
+        if (TextUtils.isEmpty(value)) return "";
+        try {
+            return String.valueOf(Integer.parseInt(value));
+        } catch (Exception ignored) {
+            return value;
+        }
+    }
+
+    public static void syncResolvedDanmakuState(EpisodeInfo episodeInfo, DanmakuItem item) {
+        if (episodeInfo == null && item == null) return;
+
+        if (episodeInfo != null) {
+            lastEpisodeInfo = episodeInfo;
+            currentSeriesName = safeValue(episodeInfo.getSeriesName());
+            currentEpisodeNum = safeValue(episodeInfo.getEpisodeNum());
+            currentEpisodePart = normalizeEpisodePart(episodeInfo.getSpecialSuffix());
+            currentEpisodeYear = safeValue(episodeInfo.getEpisodeYear());
+            currentEpisodeSeason = normalizeSeasonValue(episodeInfo.getEpisodeSeasonNum());
+            lastEpisodeChangeTime = System.currentTimeMillis();
+        }
+
+        if (item != null) {
+            String animeTitle = safeValue(item.getAnimeTitle());
+            if (!TextUtils.isEmpty(animeTitle)) {
+                String extractedSeries = extractSeriesName(animeTitle);
+                String extractedYear = extractYear2(animeTitle);
+                if (TextUtils.isEmpty(extractedYear)) {
+                    extractedYear = extractYear(animeTitle);
+                }
+                String extractedSeason = normalizeSeasonValue(extractSeasonNum(animeTitle));
+                if (!TextUtils.isEmpty(extractedSeries)) currentSeriesName = extractedSeries;
+                if (!TextUtils.isEmpty(extractedYear)) currentEpisodeYear = extractedYear;
+                if (!TextUtils.isEmpty(extractedSeason)) currentEpisodeSeason = extractedSeason;
+            }
+
+            String episodeTitle = safeValue(item.getEpTitle());
+            String extractedEpisodeNum = extractEpisodeNum(episodeTitle);
+            if (!TextUtils.isEmpty(extractedEpisodeNum)) {
+                currentEpisodeNum = extractedEpisodeNum;
+            }
+            String extractedPart = normalizeEpisodePart(extractEpisodePartSuffix(episodeTitle));
+            if (!TextUtils.isEmpty(extractedPart)) {
+                currentEpisodePart = extractedPart;
+            }
+        }
+
+        Leodanmu.log("🧷 同步当前弹幕链状态: series=" + currentSeriesName
+                + ", year=" + currentEpisodeYear
+                + ", season=" + currentEpisodeSeason
+                + ", ep=" + formatEpisodeDisplay(TextUtils.isEmpty(currentEpisodeNum) ? 0 : safeParseEpisodeNum(currentEpisodeNum), currentEpisodePart));
+    }
+
+    private static int safeParseEpisodeNum(String episodeNum) {
+        try {
+            return Integer.parseInt(safeValue(episodeNum));
+        } catch (Exception ignored) {
+            return 0;
+        }
     }
 
     private static String extractDateCode(String text) {

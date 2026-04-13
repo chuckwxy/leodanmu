@@ -597,6 +597,7 @@ public class LeoDanmakuService {
 
                         // 立即记录弹幕URL（在推送前）
                         Leodanmu.recordDanmakuUrl(result.item, true);
+                        DanmakuScanner.syncResolvedDanmakuState(episodeInfo, result.item);
 
                         found[0] = true;
 
@@ -674,6 +675,7 @@ public class LeoDanmakuService {
         lastPushTimes.put(danmakuUrl, currentTime);
         cleanupOldPushTimes(currentTime);
         Leodanmu.recordDanmakuUrl(danmakuItem, isAuto);
+        DanmakuScanner.syncResolvedDanmakuState(null, danmakuItem);
 
         boolean isMainThread = Looper.myLooper() == Looper.getMainLooper();
         if (isMainThread) {
