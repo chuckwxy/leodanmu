@@ -69,10 +69,12 @@ mkdir -p "$TEMPLATE_DIR/smali/org/slf4j/"
 mkdir -p "$TEMPLATE_DIR/lib"
 
 [ -d "$SMALI_DIR/smali/com/github/catvod/spider" ] && mv "$SMALI_DIR/smali/com/github/catvod/spider" "$TEMPLATE_DIR/smali/com/github/catvod/"
-[ -d "$SMALI_DIR/smali/com/github/catvod/js" ]     && mv "$SMALI_DIR/smali/com/github/catvod/js"     "$TEMPLATE_DIR/smali/com/github/catvod/"
+# QuickJS 仅作为实验性剥离验证：当前 protected jar 先不携带 com/github/catvod/js
+# [ -d "$SMALI_DIR/smali/com/github/catvod/js" ]     && mv "$SMALI_DIR/smali/com/github/catvod/js"     "$TEMPLATE_DIR/smali/com/github/catvod/"
 [ -d "$SMALI_DIR/smali/com/github/catvod/net" ]    && mv "$SMALI_DIR/smali/com/github/catvod/net"    "$TEMPLATE_DIR/smali/com/github/catvod/"
 [ -d "$SMALI_DIR/smali/org/slf4j" ]                && mv "$SMALI_DIR/smali/org/slf4j"                "$TEMPLATE_DIR/smali/org/"
 [ -d "$SMALI_DIR/lib" ] && cp -R "$SMALI_DIR/lib/." "$TEMPLATE_DIR/lib/"
+find "$TEMPLATE_DIR/lib" -type f -name 'libquickjs-android-wrapper.so' -delete
 
 rm -rf "$TEMPLATE_DIR/assets"
 mkdir -p "$TEMPLATE_DIR/assets/x"
