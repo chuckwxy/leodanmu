@@ -2,16 +2,29 @@
 import hashlib
 import json
 import pathlib
+import subprocess
 import sys
 import zlib
 
 KEY = b"Leo:Shell:V1"
 MAGIC = b"LEO1"
 PART_COUNT = 3
+STAGE = "phase9-derived-key"
 
 
-def derive_key(data: bytes) -> bytes:
-    return hashlib.sha256(KEY + hashlib.sha256(data).digest()).digest()
+def git_commit(src: pathlib.Path) -> str:
+    current = src.parent.resolve()
+    for candidate in [current] + list(current.parents):
+        if (candidate / '.git').exists():
+            try:
+                return subprocess.check_output(["git", "-C", str(candidate), "rev-parse", "HEAD"], text=True).strip()
+            except Exception:
+                break
+    return "unknown"
+
+
+def derive_key(data: bytes, commit: str) -> bytes:
+    return hashlib.sha256(KEY + commit.encode("utf-8") + STAGE.encode("utf-8") + hashlib.sha256(data).digest()).digest()
 
 
 def xor_bytes(data: bytes, key: bytes) -> bytes:
@@ -40,7 +53,9 @@ def main() -> int:
     out_dir = pathlib.Path(sys.argv[2])
     raw = src.read_bytes()
     compressed = zlib.compress(raw, level=9)
-    key = derive_key(raw)
+    commit = git_commit(src.resolve())
+    raw_sha256 = hashlib.sha256(raw).hexdigest()
+    key = derive_key(raw, commit)
     encrypted = xor_bytes(compressed, key)
     header = {
         "v": 2,
@@ -56,10 +71,17 @@ def main() -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
     manifest = {
         "v": 1,
-        "stage": "phase8-segmented-payload",
+        "stage": STAGE,
         "partCount": PART_COUNT,
         "totalSize": len(merged),
         "mergedSha256": hashlib.sha256(merged).hexdigest(),
+        "gitCommit": commit,
+        "keyDerivation": "build-bound",
+        "keySeed": {
+            "gitCommit": commit,
+            "stage": STAGE,
+            "payloadRawSha256": raw_sha256,
+        },
         "parts": []
     }
 

@@ -105,7 +105,7 @@ done
 
 {
   echo "name=${OUT_NAME}"
-  echo "stage=phase8-segmented-payload"
+  echo "stage=phase9-derived-key"
   echo "apk_path=${APK_PATH}"
   echo "mapping_saved=$( [ -f "$MAP_SRC" ] && echo yes || echo no )"
   echo "payload_index=$(basename "$PAYLOAD_INDEX")"
@@ -118,7 +118,7 @@ done
 cat > "$BUILDINFO_OUT" <<EOF
 {
   "name": "${OUT_NAME}",
-  "stage": "phase8-segmented-payload",
+  "stage": "phase9-derived-key",
   "apkPath": "${APK_PATH}",
   "builtAt": "$(date -u +%FT%TZ)",
   "jarSha256": "$(cat "$SHA256_OUT")",
@@ -134,7 +134,7 @@ PY
 }
 EOF
 
-echo "phase8-segmented-payload" > "$STAGE_OUT"
+echo "phase9-derived-key" > "$STAGE_OUT"
 
 if [ -f "$MAP_SRC" ]; then
   cp "$MAP_SRC" "$MAP_DST"

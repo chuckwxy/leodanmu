@@ -67,7 +67,7 @@ jobs:
           body: |
             自动保护构建
             Commit: ${{ github.sha }}
-            Stage: phase8-segmented-payload
+            Stage: phase9-derived-key
             Payload coverage: PayloadEntry / RealLeodanmu / home-category-detail-player / init / liveContent
           files: |
             jar/leodm-protected.jar

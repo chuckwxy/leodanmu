@@ -72,7 +72,7 @@ def main() -> int:
     meta = {
         "projectRoot": str(project_root),
         "gitCommit": git_commit(project_root),
-        "stage": "phase8-segmented-payload",
+        "stage": "phase9-derived-key",
         "builtAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "payloadJar": str(payload_jar),
         "payloadJarSha256": sha256_file(payload_jar),
@@ -97,7 +97,9 @@ def main() -> int:
             "entity/**",
             "bean/**"
         ],
-        "note": "Phase 8 segmented payload: keep source maintenance stable while splitting protected payload into multiple asset parts with runtime reassembly.",
+        "keyDerivation": "build-bound",
+        "keySeed": "gitCommit+stage+payloadRawSha256",
+        "note": "Phase 9 derived-key payload: keep source maintenance stable while binding payload decryption key to build metadata and protected payload fingerprint.",
     }
     meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"[payload] built {payload_jar}")

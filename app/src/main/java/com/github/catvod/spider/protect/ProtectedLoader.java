@@ -13,6 +13,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.Arrays;
 
 import org.json.JSONArray;
@@ -74,14 +75,15 @@ public final class ProtectedLoader {
         }
 
         try {
-            byte[] raw = readPayloadBundle(appContext);
+            JSONObject payloadIndex = readPayloadIndex(appContext);
+            byte[] raw = readPayloadBundle(appContext, payloadIndex);
             if (raw == null || raw.length == 0) {
                 lastLoadStatus = "payload-missing";
                 Leodanmu.log("[shell] segmented payload 不存在，保持 fallback");
                 return null;
             }
 
-            byte[] decoded = decodePayload(raw);
+            byte[] decoded = decodePayload(raw, payloadIndex);
             File shellDir = new File(appContext.getCacheDir(), "leo_shell");
             if (!shellDir.exists()) shellDir.mkdirs();
             File dexFile = new File(shellDir, PAYLOAD_DEX_NAME);
@@ -135,10 +137,14 @@ public final class ProtectedLoader {
         }
     }
 
-    private static byte[] readPayloadBundle(Context context) throws Exception {
+    private static JSONObject readPayloadIndex(Context context) throws Exception {
         byte[] indexRaw = readAsset(context, PAYLOAD_INDEX_ASSET_PATH);
         if (indexRaw == null || indexRaw.length == 0) return null;
-        JSONObject index = new JSONObject(new String(indexRaw, StandardCharsets.UTF_8));
+        return new JSONObject(new String(indexRaw, StandardCharsets.UTF_8));
+    }
+
+    private static byte[] readPayloadBundle(Context context, JSONObject index) throws Exception {
+        if (index == null) return null;
         JSONArray parts = index.optJSONArray("parts");
         if (parts == null || parts.length() == 0) return null;
         try (ByteArrayOutputStream merged = new ByteArrayOutputStream()) {
@@ -157,8 +163,8 @@ public final class ProtectedLoader {
         }
     }
 
-    private static byte[] decodePayload(byte[] raw) {
-        byte[] key = buildKey();
+    private static byte[] decodePayload(byte[] raw, JSONObject payloadIndex) throws Exception {
+        byte[] key = buildKey(payloadIndex);
         byte[] out = Arrays.copyOf(raw, raw.length);
         for (int i = 0; i < out.length; i++) {
             out[i] = (byte) (out[i] ^ key[i % key.length]);
@@ -166,11 +172,18 @@ public final class ProtectedLoader {
         return out;
     }
 
-    private static byte[] buildKey() {
-        String p1 = "Leo";
-        String p2 = "Shell";
-        String p3 = "V1";
-        return (p1 + ":" + p2 + ":" + p3).getBytes(StandardCharsets.UTF_8);
+    private static byte[] buildKey(JSONObject payloadIndex) throws Exception {
+        String base = "Leo:Shell:V1";
+        String gitCommit = payloadIndex == null ? "unknown" : payloadIndex.optString("gitCommit", "unknown");
+        String stage = payloadIndex == null ? "phase9-derived-key" : payloadIndex.optString("stage", "phase9-derived-key");
+        JSONObject seed = payloadIndex == null ? null : payloadIndex.optJSONObject("keySeed");
+        String payloadRawSha256 = seed == null ? "" : seed.optString("payloadRawSha256", "");
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        digest.update(base.getBytes(StandardCharsets.UTF_8));
+        digest.update(gitCommit.getBytes(StandardCharsets.UTF_8));
+        digest.update(stage.getBytes(StandardCharsets.UTF_8));
+        digest.update(payloadRawSha256.getBytes(StandardCharsets.UTF_8));
+        return digest.digest();
     }
 
     private static JSONObject buildMeta(byte[] raw, byte[] decoded, File dexFile) throws Exception {
