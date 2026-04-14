@@ -13,7 +13,7 @@ APKTOOL_PATH="jar/3rd/apktool_2.11.0.jar"
 PAYLOAD_WORK_DIR="jar/payload_work"
 PAYLOAD_DIR="$PAYLOAD_WORK_DIR/out"
 PAYLOAD_JAR="$PAYLOAD_DIR/payload.jar"
-PAYLOAD_BIN="$PAYLOAD_DIR/payload.bin"
+PAYLOAD_INDEX="$PAYLOAD_DIR/index.json"
 PAYLOAD_META="$PAYLOAD_DIR/payload.meta.json"
 APK_CANDIDATES=(
   "app/build/outputs/apk/protectedRelease/app-protectedRelease-unsigned.apk"
@@ -27,6 +27,9 @@ BUILDINFO_OUT="jar/${OUT_NAME}.buildinfo.json"
 STAGE_OUT="jar/${OUT_NAME}.stage.txt"
 SHA256_OUT="jar/${OUT_NAME}.sha256"
 PAYLOAD_SHA256_OUT="jar/${OUT_NAME}.payload.sha256"
+PAYLOAD_MANIFEST_OUT="jar/${OUT_NAME}.payload.index.json"
+PAYLOAD_PARTS_GLOB="jar/${OUT_NAME}.payload.part*.dat"
+PAYLOAD_PART_SHA_GLOB="jar/${OUT_NAME}.payload.part*.sha256"
 MAP_SRC="app/build/outputs/mapping/protectedRelease/mapping.txt"
 MAP_DST="jar/${OUT_NAME}.mapping.txt"
 
@@ -43,14 +46,14 @@ if [ -z "$APK_PATH" ]; then
   exit 1
 fi
 
-rm -f "jar/${OUT_NAME}" "jar/${OUT_NAME}.md5" "$META_OUT" "$BUILDINFO_OUT" "$STAGE_OUT" "$SHA256_OUT" "$PAYLOAD_SHA256_OUT" "$MAP_DST"
+rm -f "jar/${OUT_NAME}" "jar/${OUT_NAME}.md5" "$META_OUT" "$BUILDINFO_OUT" "$STAGE_OUT" "$SHA256_OUT" "$PAYLOAD_SHA256_OUT" "$PAYLOAD_MANIFEST_OUT" $PAYLOAD_PARTS_GLOB $PAYLOAD_PART_SHA_GLOB "$MAP_DST"
 rm -rf "$WORK_DIR" "$PAYLOAD_WORK_DIR"
 mkdir -p "$WORK_DIR" "$PAYLOAD_DIR"
 
 cp -R jar/spider.jar "$TEMPLATE_DIR"
 
 python3 scripts/protect/build_payload.py "$ROOT_DIR" "$PAYLOAD_DIR"
-python3 scripts/protect/encrypt_payload.py "$PAYLOAD_JAR" "$PAYLOAD_BIN"
+python3 scripts/protect/encrypt_payload.py "$PAYLOAD_JAR" "$PAYLOAD_DIR"
 
 echo "[protect] using apk: $APK_PATH"
 echo "[protect] decompile protected APK main classes"
@@ -71,22 +74,41 @@ mkdir -p "$TEMPLATE_DIR/smali/org/slf4j/"
 # Replace plain assets with shell payload asset.
 rm -rf "$TEMPLATE_DIR/assets"
 mkdir -p "$TEMPLATE_DIR/assets/payload"
-cp "$PAYLOAD_BIN" "$TEMPLATE_DIR/assets/payload/payload.bin"
-cp "$PAYLOAD_META" "$TEMPLATE_DIR/assets/payload/payload.meta.json"
+cp "$PAYLOAD_INDEX" "$TEMPLATE_DIR/assets/payload/index.json"
+for part in "$PAYLOAD_DIR"/seg-*.dat; do
+  cp "$part" "$TEMPLATE_DIR/assets/payload/$(basename "$part")"
+done
 
 echo "[protect] rebuild protected dex.jar"
 java -jar "$APKTOOL_PATH" b "$TEMPLATE_DIR" -c
 mv "$TEMPLATE_DIR/dist/dex.jar" "jar/${OUT_NAME}"
 md5sum "jar/${OUT_NAME}" | awk '{print $1}' > "jar/${OUT_NAME}.md5"
 sha256_file "jar/${OUT_NAME}" > "$SHA256_OUT"
-sha256_file "$PAYLOAD_BIN" > "$PAYLOAD_SHA256_OUT"
+PAYLOAD_INDEX_ENV="$PAYLOAD_INDEX" PAYLOAD_SHA256_OUT_ENV="$PAYLOAD_SHA256_OUT" python3 <<'PY'
+import hashlib, json, os, pathlib
+idx = pathlib.Path(os.environ['PAYLOAD_INDEX_ENV'])
+out = pathlib.Path(os.environ['PAYLOAD_SHA256_OUT_ENV'])
+manifest = json.loads(idx.read_text())
+merged = b''
+base = idx.parent
+for part in manifest['parts']:
+    merged += (base / part['name']).read_bytes()
+out.write_text(hashlib.sha256(merged).hexdigest() + '\n', encoding='utf-8')
+PY
+cp "$PAYLOAD_INDEX" "$PAYLOAD_MANIFEST_OUT"
+part_num=0
+for part in "$PAYLOAD_DIR"/seg-*.dat; do
+  cp "$part" "jar/${OUT_NAME}.payload.part${part_num}.dat"
+  sha256_file "$part" > "jar/${OUT_NAME}.payload.part${part_num}.sha256"
+  part_num=$((part_num + 1))
+done
 
 {
   echo "name=${OUT_NAME}"
-  echo "stage=phase7-release-chain"
+  echo "stage=phase8-segmented-payload"
   echo "apk_path=${APK_PATH}"
   echo "mapping_saved=$( [ -f "$MAP_SRC" ] && echo yes || echo no )"
-  echo "payload_bin=$(basename "$PAYLOAD_BIN")"
+  echo "payload_index=$(basename "$PAYLOAD_INDEX")"
   echo "payload_meta=$(basename "$PAYLOAD_META")"
   echo "payload_sha256=$(cat "$PAYLOAD_SHA256_OUT")"
   echo "jar_sha256=$(cat "$SHA256_OUT")"
@@ -96,31 +118,35 @@ sha256_file "$PAYLOAD_BIN" > "$PAYLOAD_SHA256_OUT"
 cat > "$BUILDINFO_OUT" <<EOF
 {
   "name": "${OUT_NAME}",
-  "stage": "phase7-release-chain",
+  "stage": "phase8-segmented-payload",
   "apkPath": "${APK_PATH}",
   "builtAt": "$(date -u +%FT%TZ)",
   "jarSha256": "$(cat "$SHA256_OUT")",
   "payloadSha256": "$(cat "$PAYLOAD_SHA256_OUT")",
   "mappingSaved": "$( [ -f "$MAP_SRC" ] && echo yes || echo no )",
   "payloadMeta": "$(basename "$PAYLOAD_META")",
-  "payloadBin": "$(basename "$PAYLOAD_BIN")"
+  "payloadIndex": "$(basename "$PAYLOAD_INDEX")",
+  "payloadPartCount": "$(PAYLOAD_INDEX_ENV="$PAYLOAD_INDEX" python3 - <<'PY'
+import json, os
+print(len(json.load(open(os.environ['PAYLOAD_INDEX_ENV']))['parts']))
+PY
+)"
 }
 EOF
 
-echo "phase7-release-chain" > "$STAGE_OUT"
+echo "phase8-segmented-payload" > "$STAGE_OUT"
 
 if [ -f "$MAP_SRC" ]; then
   cp "$MAP_SRC" "$MAP_DST"
 fi
 
-cp "$PAYLOAD_BIN" "jar/${OUT_NAME}.payload.bin"
 cp "$PAYLOAD_META" "jar/${OUT_NAME}.payload.meta.json"
 
 rm -rf "$WORK_DIR" "$PAYLOAD_WORK_DIR"
 
 echo "[protect] generated jar/${OUT_NAME}"
 ls -lh "jar/${OUT_NAME}"
-ls -lh "jar/${OUT_NAME}.payload.bin" "jar/${OUT_NAME}.payload.meta.json"
+ls -lh "$PAYLOAD_MANIFEST_OUT" "jar/${OUT_NAME}.payload.meta.json" jar/${OUT_NAME}.payload.part*.dat
 echo "[protect] md5: $(cat "jar/${OUT_NAME}.md5")"
 echo "[protect] sha256: $(cat "$SHA256_OUT")"
 echo "[protect] payload sha256: $(cat "$PAYLOAD_SHA256_OUT")"

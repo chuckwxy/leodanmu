@@ -8,12 +8,14 @@ import com.github.catvod.spider.Utils;
 
 import org.json.JSONObject;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+
+import org.json.JSONArray;
 
 import dalvik.system.DexClassLoader;
 
@@ -30,7 +32,7 @@ public final class ProtectedLoader {
     private static volatile boolean loadAttempted = false;
     private static volatile String lastLoadStatus = "idle";
 
-    private static final String PAYLOAD_ASSET_PATH = "payload/payload.bin";
+    private static final String PAYLOAD_INDEX_ASSET_PATH = "payload/index.json";
     private static final String PAYLOAD_DEX_NAME = "payload.dex";
     private static final String PAYLOAD_META_NAME = "payload.meta.json";
     private static final String REAL_IMPL_CLASS = "com.github.catvod.spider.protect.impl.PayloadEntry";
@@ -60,7 +62,7 @@ public final class ProtectedLoader {
     }
 
     public static String getPayloadAssetPath() {
-        return PAYLOAD_ASSET_PATH;
+        return PAYLOAD_INDEX_ASSET_PATH;
     }
 
     private static PayloadBridge tryLoadPayloadBridge(Context context) {
@@ -72,10 +74,10 @@ public final class ProtectedLoader {
         }
 
         try {
-            byte[] raw = readAsset(appContext, PAYLOAD_ASSET_PATH);
+            byte[] raw = readPayloadBundle(appContext);
             if (raw == null || raw.length == 0) {
                 lastLoadStatus = "payload-missing";
-                Leodanmu.log("[shell] payload.bin 不存在，保持 fallback");
+                Leodanmu.log("[shell] segmented payload 不存在，保持 fallback");
                 return null;
             }
 
@@ -122,7 +124,7 @@ public final class ProtectedLoader {
         try (InputStream is = context.getAssets().open(path)) {
             byte[] buffer = new byte[8192];
             int len;
-            try (java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream()) {
+            try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
                 while ((len = is.read(buffer)) != -1) {
                     baos.write(buffer, 0, len);
                 }
@@ -130,6 +132,28 @@ public final class ProtectedLoader {
             }
         } catch (Throwable ignored) {
             return null;
+        }
+    }
+
+    private static byte[] readPayloadBundle(Context context) throws Exception {
+        byte[] indexRaw = readAsset(context, PAYLOAD_INDEX_ASSET_PATH);
+        if (indexRaw == null || indexRaw.length == 0) return null;
+        JSONObject index = new JSONObject(new String(indexRaw, StandardCharsets.UTF_8));
+        JSONArray parts = index.optJSONArray("parts");
+        if (parts == null || parts.length() == 0) return null;
+        try (ByteArrayOutputStream merged = new ByteArrayOutputStream()) {
+            for (int i = 0; i < parts.length(); i++) {
+                JSONObject part = parts.optJSONObject(i);
+                if (part == null) continue;
+                String name = part.optString("name", "");
+                if (TextUtils.isEmpty(name)) continue;
+                byte[] chunk = readAsset(context, "payload/" + name);
+                if (chunk == null || chunk.length == 0) {
+                    throw new IllegalStateException("payload part missing: " + name);
+                }
+                merged.write(chunk);
+            }
+            return merged.toByteArray();
         }
     }
 
@@ -151,7 +175,7 @@ public final class ProtectedLoader {
 
     private static JSONObject buildMeta(byte[] raw, byte[] decoded, File dexFile) throws Exception {
         JSONObject meta = new JSONObject();
-        meta.put("asset", PAYLOAD_ASSET_PATH);
+        meta.put("asset", PAYLOAD_INDEX_ASSET_PATH);
         meta.put("rawLength", raw == null ? 0 : raw.length);
         meta.put("decodedLength", decoded == null ? 0 : decoded.length);
         meta.put("dexPath", dexFile == null ? "" : dexFile.getAbsolutePath());

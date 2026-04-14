@@ -72,10 +72,13 @@ def main() -> int:
     meta = {
         "projectRoot": str(project_root),
         "gitCommit": git_commit(project_root),
-        "stage": "phase7-release-chain",
+        "stage": "phase8-segmented-payload",
         "builtAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "payloadJar": str(payload_jar),
         "payloadJarSha256": sha256_file(payload_jar),
+        "payloadPackaging": "segmented",
+        "payloadPartsPlanned": 3,
+        "payloadPartNaming": "seg-*.dat",
         "sourcesRequested": PAYLOAD_SOURCES,
         "sourcesPacked": found,
         "sourcesPackedCount": len(found),
@@ -94,7 +97,7 @@ def main() -> int:
             "entity/**",
             "bean/**"
         ],
-        "note": "Phase 7 release-chain hardening: keep source maintenance stable while strengthening payload packaging metadata and protected artifact traceability.",
+        "note": "Phase 8 segmented payload: keep source maintenance stable while splitting protected payload into multiple asset parts with runtime reassembly.",
     }
     meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"[payload] built {payload_jar}")
