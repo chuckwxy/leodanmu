@@ -9,6 +9,7 @@ add_library(
     secure_bundle.cpp
     secure_guard.cpp
     secure_util.cpp
+    sha256_lite.cpp
 )
 
 target_link_libraries(

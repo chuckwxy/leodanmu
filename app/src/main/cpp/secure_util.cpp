@@ -1,13 +1,16 @@
 #include "secure_util.h"
+#include "sha256_lite.h"
 
-#include <openssl/sha.h>
 #include <zlib.h>
 
 #include <stdexcept>
 
 std::vector<uint8_t> sha256_bytes(const std::vector<uint8_t>& input) {
-    std::vector<uint8_t> out(SHA256_DIGEST_LENGTH);
-    SHA256(input.data(), input.size(), out.data());
+    std::vector<uint8_t> out(32);
+    SHA256_CTX_LITE ctx{};
+    sha256_lite_init(&ctx);
+    sha256_lite_update(&ctx, input.data(), input.size());
+    sha256_lite_final(&ctx, out.data());
     return out;
 }
 
