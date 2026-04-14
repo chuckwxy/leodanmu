@@ -9,7 +9,10 @@ import zlib
 KEY = b"Leo:Shell:V1"
 MAGIC = b"LEO1"
 PART_COUNT = 3
-STAGE = "phase9-derived-key"
+STAGE = "phase10-obscured-assets"
+INDEX_NAME = "m.json"
+PART_PREFIX = "r"
+PART_SUFFIX = ".bin"
 
 
 def git_commit(src: pathlib.Path) -> str:
@@ -86,7 +89,7 @@ def main() -> int:
     }
 
     for i, chunk in enumerate(parts):
-        name = f"seg-{i}.dat"
+        name = f"{PART_PREFIX}{i}{PART_SUFFIX}"
         path = out_dir / name
         path.write_bytes(chunk)
         manifest["parts"].append({
@@ -96,7 +99,7 @@ def main() -> int:
             "order": i,
         })
 
-    (out_dir / 'index.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding='utf-8')
+    (out_dir / INDEX_NAME).write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding='utf-8')
     print(f"[payload] encrypted {src} -> {out_dir} ({len(merged)} bytes, raw={len(raw)}, packed={len(compressed)}, parts={PART_COUNT})")
     return 0
 

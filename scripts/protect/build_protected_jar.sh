@@ -13,7 +13,7 @@ APKTOOL_PATH="jar/3rd/apktool_2.11.0.jar"
 PAYLOAD_WORK_DIR="jar/payload_work"
 PAYLOAD_DIR="$PAYLOAD_WORK_DIR/out"
 PAYLOAD_JAR="$PAYLOAD_DIR/payload.jar"
-PAYLOAD_INDEX="$PAYLOAD_DIR/index.json"
+PAYLOAD_INDEX="$PAYLOAD_DIR/m.json"
 PAYLOAD_META="$PAYLOAD_DIR/payload.meta.json"
 APK_CANDIDATES=(
   "app/build/outputs/apk/protectedRelease/app-protectedRelease-unsigned.apk"
@@ -71,12 +71,12 @@ mkdir -p "$TEMPLATE_DIR/smali/org/slf4j/"
 [ -d "$SMALI_DIR/smali/com/github/catvod/net" ]    && mv "$SMALI_DIR/smali/com/github/catvod/net"    "$TEMPLATE_DIR/smali/com/github/catvod/"
 [ -d "$SMALI_DIR/smali/org/slf4j" ]                && mv "$SMALI_DIR/smali/org/slf4j"                "$TEMPLATE_DIR/smali/org/"
 
-# Replace plain assets with shell payload asset.
+# Replace plain assets with shell bundle assets.
 rm -rf "$TEMPLATE_DIR/assets"
-mkdir -p "$TEMPLATE_DIR/assets/payload"
-cp "$PAYLOAD_INDEX" "$TEMPLATE_DIR/assets/payload/index.json"
-for part in "$PAYLOAD_DIR"/seg-*.dat; do
-  cp "$part" "$TEMPLATE_DIR/assets/payload/$(basename "$part")"
+mkdir -p "$TEMPLATE_DIR/assets/r"
+cp "$PAYLOAD_INDEX" "$TEMPLATE_DIR/assets/r/m.json"
+for part in "$PAYLOAD_DIR"/r*.bin; do
+  cp "$part" "$TEMPLATE_DIR/assets/r/$(basename "$part")"
 done
 
 echo "[protect] rebuild protected dex.jar"
@@ -97,7 +97,7 @@ out.write_text(hashlib.sha256(merged).hexdigest() + '\n', encoding='utf-8')
 PY
 cp "$PAYLOAD_INDEX" "$PAYLOAD_MANIFEST_OUT"
 part_num=0
-for part in "$PAYLOAD_DIR"/seg-*.dat; do
+for part in "$PAYLOAD_DIR"/r*.bin; do
   cp "$part" "jar/${OUT_NAME}.payload.part${part_num}.dat"
   sha256_file "$part" > "jar/${OUT_NAME}.payload.part${part_num}.sha256"
   part_num=$((part_num + 1))
@@ -105,7 +105,7 @@ done
 
 {
   echo "name=${OUT_NAME}"
-  echo "stage=phase9-derived-key"
+  echo "stage=phase10-obscured-assets"
   echo "apk_path=${APK_PATH}"
   echo "mapping_saved=$( [ -f "$MAP_SRC" ] && echo yes || echo no )"
   echo "payload_index=$(basename "$PAYLOAD_INDEX")"
@@ -118,7 +118,7 @@ done
 cat > "$BUILDINFO_OUT" <<EOF
 {
   "name": "${OUT_NAME}",
-  "stage": "phase9-derived-key",
+  "stage": "phase10-obscured-assets",
   "apkPath": "${APK_PATH}",
   "builtAt": "$(date -u +%FT%TZ)",
   "jarSha256": "$(cat "$SHA256_OUT")",
@@ -134,7 +134,7 @@ PY
 }
 EOF
 
-echo "phase9-derived-key" > "$STAGE_OUT"
+echo "phase10-obscured-assets" > "$STAGE_OUT"
 
 if [ -f "$MAP_SRC" ]; then
   cp "$MAP_SRC" "$MAP_DST"

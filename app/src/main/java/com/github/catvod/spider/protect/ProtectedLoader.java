@@ -33,9 +33,9 @@ public final class ProtectedLoader {
     private static volatile boolean loadAttempted = false;
     private static volatile String lastLoadStatus = "idle";
 
-    private static final String PAYLOAD_INDEX_ASSET_PATH = "payload/index.json";
-    private static final String PAYLOAD_DEX_NAME = "payload.dex";
-    private static final String PAYLOAD_META_NAME = "payload.meta.json";
+    private static final String BUNDLE_INDEX_ASSET_PATH = "r/m.json";
+    private static final String BUNDLE_DEX_NAME = "inner.dex";
+    private static final String BUNDLE_META_NAME = "inner.json";
     private static final String REAL_IMPL_CLASS = "com.github.catvod.spider.protect.impl.PayloadEntry";
 
     private ProtectedLoader() {
@@ -51,7 +51,7 @@ public final class ProtectedLoader {
                 if (bridge == null) {
                     lastLoadStatus = "fallback";
                     bridge = new RealLeodanmu();
-                    Leodanmu.log("[shell] payload 主入口未启用，已回退兜底实现");
+                    Leodanmu.log("[shell] inner entry unavailable, fallback enabled");
                 }
             }
             return bridge;
@@ -63,14 +63,14 @@ public final class ProtectedLoader {
     }
 
     public static String getPayloadAssetPath() {
-        return PAYLOAD_INDEX_ASSET_PATH;
+        return BUNDLE_INDEX_ASSET_PATH;
     }
 
     private static PayloadBridge tryLoadPayloadBridge(Context context) {
         Context appContext = context != null ? context.getApplicationContext() : Utils.getAppContext();
         if (appContext == null) {
             lastLoadStatus = "no-context";
-            Leodanmu.log("[shell] 无法加载 payload：context 为空");
+            Leodanmu.log("[shell] unable to load inner bundle: no context");
             return null;
         }
 
@@ -78,21 +78,21 @@ public final class ProtectedLoader {
             JSONObject payloadIndex = readPayloadIndex(appContext);
             byte[] raw = readPayloadBundle(appContext, payloadIndex);
             if (raw == null || raw.length == 0) {
-                lastLoadStatus = "payload-missing";
-                Leodanmu.log("[shell] segmented payload 不存在，保持 fallback");
+                lastLoadStatus = "bundle-missing";
+                Leodanmu.log("[shell] inner bundle missing, fallback enabled");
                 return null;
             }
 
             byte[] decoded = decodePayload(raw, payloadIndex);
             File shellDir = new File(appContext.getCacheDir(), "leo_shell");
             if (!shellDir.exists()) shellDir.mkdirs();
-            File dexFile = new File(shellDir, PAYLOAD_DEX_NAME);
+            File dexFile = new File(shellDir, BUNDLE_DEX_NAME);
             try (FileOutputStream fos = new FileOutputStream(dexFile, false)) {
                 fos.write(decoded);
             }
 
             JSONObject meta = buildMeta(raw, decoded, dexFile);
-            File metaFile = new File(shellDir, PAYLOAD_META_NAME);
+            File metaFile = new File(shellDir, BUNDLE_META_NAME);
             try (FileOutputStream fos = new FileOutputStream(metaFile, false)) {
                 fos.write(meta.toString(2).getBytes(StandardCharsets.UTF_8));
             }
@@ -107,17 +107,17 @@ public final class ProtectedLoader {
             Class<?> implClass = classLoader.loadClass(REAL_IMPL_CLASS);
             Object instance = implClass.newInstance();
             if (instance instanceof PayloadBridge) {
-                lastLoadStatus = "payload-loaded";
-                Leodanmu.log("[shell] payload 已加载: " + REAL_IMPL_CLASS);
+                lastLoadStatus = "inner-loaded";
+                Leodanmu.log("[shell] inner entry loaded: " + REAL_IMPL_CLASS);
                 return (PayloadBridge) instance;
             }
 
-            lastLoadStatus = "payload-not-bridge";
-            Leodanmu.log("[shell] payload 实现未实现 PayloadBridge，保持 fallback");
+            lastLoadStatus = "inner-not-bridge";
+            Leodanmu.log("[shell] inner impl invalid, fallback enabled");
             return null;
         } catch (Throwable e) {
-            lastLoadStatus = "payload-error:" + e.getClass().getSimpleName();
-            Leodanmu.log("[shell] payload 加载失败，保持 fallback: " + e.getMessage());
+            lastLoadStatus = "inner-error:" + e.getClass().getSimpleName();
+            Leodanmu.log("[shell] inner load failed, fallback enabled: " + e.getMessage());
             return null;
         }
     }
@@ -138,7 +138,7 @@ public final class ProtectedLoader {
     }
 
     private static JSONObject readPayloadIndex(Context context) throws Exception {
-        byte[] indexRaw = readAsset(context, PAYLOAD_INDEX_ASSET_PATH);
+        byte[] indexRaw = readAsset(context, BUNDLE_INDEX_ASSET_PATH);
         if (indexRaw == null || indexRaw.length == 0) return null;
         return new JSONObject(new String(indexRaw, StandardCharsets.UTF_8));
     }
@@ -153,9 +153,9 @@ public final class ProtectedLoader {
                 if (part == null) continue;
                 String name = part.optString("name", "");
                 if (TextUtils.isEmpty(name)) continue;
-                byte[] chunk = readAsset(context, "payload/" + name);
+                byte[] chunk = readAsset(context, "r/" + name);
                 if (chunk == null || chunk.length == 0) {
-                    throw new IllegalStateException("payload part missing: " + name);
+                    throw new IllegalStateException("bundle chunk missing: " + name);
                 }
                 merged.write(chunk);
             }
@@ -175,7 +175,7 @@ public final class ProtectedLoader {
     private static byte[] buildKey(JSONObject payloadIndex) throws Exception {
         String base = "Leo:Shell:V1";
         String gitCommit = payloadIndex == null ? "unknown" : payloadIndex.optString("gitCommit", "unknown");
-        String stage = payloadIndex == null ? "phase9-derived-key" : payloadIndex.optString("stage", "phase9-derived-key");
+        String stage = payloadIndex == null ? "phase10-obscured-assets" : payloadIndex.optString("stage", "phase10-obscured-assets");
         JSONObject seed = payloadIndex == null ? null : payloadIndex.optJSONObject("keySeed");
         String payloadRawSha256 = seed == null ? "" : seed.optString("payloadRawSha256", "");
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
@@ -188,7 +188,7 @@ public final class ProtectedLoader {
 
     private static JSONObject buildMeta(byte[] raw, byte[] decoded, File dexFile) throws Exception {
         JSONObject meta = new JSONObject();
-        meta.put("asset", PAYLOAD_INDEX_ASSET_PATH);
+        meta.put("asset", BUNDLE_INDEX_ASSET_PATH);
         meta.put("rawLength", raw == null ? 0 : raw.length);
         meta.put("decodedLength", decoded == null ? 0 : decoded.length);
         meta.put("dexPath", dexFile == null ? "" : dexFile.getAbsolutePath());
