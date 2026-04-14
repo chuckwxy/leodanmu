@@ -12,10 +12,13 @@ add_library(
     sha256_lite.cpp
 )
 
+find_library(ZLIB_LIB z)
+
 target_link_libraries(
     shieldx
     log
     android
+    ${ZLIB_LIB}
 )
 
 set_target_properties(shieldx PROPERTIES
