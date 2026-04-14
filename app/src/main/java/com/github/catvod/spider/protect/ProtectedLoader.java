@@ -6,6 +6,7 @@ import android.text.TextUtils;
 import com.github.catvod.spider.Leodanmu;
 import com.github.catvod.spider.Utils;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
@@ -13,30 +14,31 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.util.Arrays;
-
-import org.json.JSONArray;
 
 import dalvik.system.DexClassLoader;
 
-/**
- * V1 最小壳骨架：
- * 1) 先让 payload.bin 真正进入产物链；
- * 2) 运行时能提取/解码/尝试装载；
- * 3) 装载失败时安全回退到外层稳定实现。
- */
 public final class ProtectedLoader {
 
     private static final Object LOCK = new Object();
     private static volatile PayloadBridge bridge;
     private static volatile boolean loadAttempted = false;
     private static volatile String lastLoadStatus = "idle";
+    private static volatile boolean nativeReady = false;
 
-    private static final String BUNDLE_INDEX_ASSET_PATH = "r/m.json";
-    private static final String BUNDLE_DEX_NAME = "inner.dex";
-    private static final String BUNDLE_META_NAME = "inner.json";
+    private static final String BUNDLE_INDEX_ASSET_PATH = "x/c.bin";
+    private static final String BUNDLE_DEX_NAME = "ivx.dex";
+    private static final String BUNDLE_META_NAME = "ivx.json";
+    private static final String NATIVE_LIB_NAME = "shieldx";
     private static final String REAL_IMPL_CLASS = "com.github.catvod.spider.protect.impl.PayloadEntry";
+
+    static {
+        try {
+            System.loadLibrary(NATIVE_LIB_NAME);
+            nativeReady = true;
+        } catch (Throwable e) {
+            nativeReady = false;
+        }
+    }
 
     private ProtectedLoader() {
     }
@@ -73,17 +75,51 @@ public final class ProtectedLoader {
             Leodanmu.log("[shell] unable to load inner bundle: no context");
             return null;
         }
+        if (!nativeReady) {
+            lastLoadStatus = "native-unavailable";
+            Leodanmu.log("[shell] native bridge unavailable, fallback enabled");
+            return null;
+        }
 
         try {
-            JSONObject payloadIndex = readPayloadIndex(appContext);
-            byte[] raw = readPayloadBundle(appContext, payloadIndex);
-            if (raw == null || raw.length == 0) {
+            JSONObject index = readBundleIndex(appContext);
+            if (index == null) {
+                lastLoadStatus = "index-missing";
+                Leodanmu.log("[shell] inner index missing, fallback enabled");
+                return null;
+            }
+
+            byte[][] parts = readBundleParts(appContext, index);
+            if (parts == null || parts.length == 0) {
                 lastLoadStatus = "bundle-missing";
                 Leodanmu.log("[shell] inner bundle missing, fallback enabled");
                 return null;
             }
 
-            byte[] decoded = decodePayload(raw, payloadIndex);
+            JSONObject seed = index.optJSONObject("k");
+            String stage = index.optString("s", "v3-native-full");
+            String gitCommit = index.optString("g", "unknown");
+            String payloadRawSha256 = seed == null ? "" : seed.optString("r", "");
+
+            int env = nativeCheckEnv();
+            if (env != 0) {
+                lastLoadStatus = "env-blocked:" + env;
+                Leodanmu.log("[shell] native env blocked, fallback enabled: " + env);
+                return null;
+            }
+
+            byte[] decoded = nativeDecodeBundle(
+                    stage.getBytes(StandardCharsets.UTF_8),
+                    gitCommit.getBytes(StandardCharsets.UTF_8),
+                    payloadRawSha256.getBytes(StandardCharsets.UTF_8),
+                    parts
+            );
+            if (decoded == null || decoded.length == 0) {
+                lastLoadStatus = "decode-empty";
+                Leodanmu.log("[shell] native decode returned empty, fallback enabled");
+                return null;
+            }
+
             File shellDir = new File(appContext.getCacheDir(), "leo_shell");
             if (!shellDir.exists()) shellDir.mkdirs();
             File dexFile = new File(shellDir, BUNDLE_DEX_NAME);
@@ -91,7 +127,7 @@ public final class ProtectedLoader {
                 fos.write(decoded);
             }
 
-            JSONObject meta = buildMeta(raw, decoded, dexFile);
+            JSONObject meta = buildMeta(index, decoded, dexFile);
             File metaFile = new File(shellDir, BUNDLE_META_NAME);
             try (FileOutputStream fos = new FileOutputStream(metaFile, false)) {
                 fos.write(meta.toString(2).getBytes(StandardCharsets.UTF_8));
@@ -122,6 +158,30 @@ public final class ProtectedLoader {
         }
     }
 
+    private static JSONObject readBundleIndex(Context context) throws Exception {
+        byte[] indexRaw = readAsset(context, BUNDLE_INDEX_ASSET_PATH);
+        if (indexRaw == null || indexRaw.length == 0) return null;
+        return new JSONObject(new String(indexRaw, StandardCharsets.UTF_8));
+    }
+
+    private static byte[][] readBundleParts(Context context, JSONObject index) throws Exception {
+        JSONArray parts = index.optJSONArray("p");
+        if (parts == null || parts.length() == 0) return null;
+        byte[][] out = new byte[parts.length()][];
+        for (int i = 0; i < parts.length(); i++) {
+            JSONObject part = parts.optJSONObject(i);
+            if (part == null) return null;
+            String name = part.optString("n", "");
+            if (TextUtils.isEmpty(name)) return null;
+            byte[] chunk = readAsset(context, "x/" + name);
+            if (chunk == null || chunk.length == 0) {
+                throw new IllegalStateException("bundle chunk missing: " + name);
+            }
+            out[i] = chunk;
+        }
+        return out;
+    }
+
     private static byte[] readAsset(Context context, String path) {
         try (InputStream is = context.getAssets().open(path)) {
             byte[] buffer = new byte[8192];
@@ -137,63 +197,18 @@ public final class ProtectedLoader {
         }
     }
 
-    private static JSONObject readPayloadIndex(Context context) throws Exception {
-        byte[] indexRaw = readAsset(context, BUNDLE_INDEX_ASSET_PATH);
-        if (indexRaw == null || indexRaw.length == 0) return null;
-        return new JSONObject(new String(indexRaw, StandardCharsets.UTF_8));
-    }
-
-    private static byte[] readPayloadBundle(Context context, JSONObject index) throws Exception {
-        if (index == null) return null;
-        JSONArray parts = index.optJSONArray("parts");
-        if (parts == null || parts.length() == 0) return null;
-        try (ByteArrayOutputStream merged = new ByteArrayOutputStream()) {
-            for (int i = 0; i < parts.length(); i++) {
-                JSONObject part = parts.optJSONObject(i);
-                if (part == null) continue;
-                String name = part.optString("name", "");
-                if (TextUtils.isEmpty(name)) continue;
-                byte[] chunk = readAsset(context, "r/" + name);
-                if (chunk == null || chunk.length == 0) {
-                    throw new IllegalStateException("bundle chunk missing: " + name);
-                }
-                merged.write(chunk);
-            }
-            return merged.toByteArray();
-        }
-    }
-
-    private static byte[] decodePayload(byte[] raw, JSONObject payloadIndex) throws Exception {
-        byte[] key = buildKey(payloadIndex);
-        byte[] out = Arrays.copyOf(raw, raw.length);
-        for (int i = 0; i < out.length; i++) {
-            out[i] = (byte) (out[i] ^ key[i % key.length]);
-        }
-        return out;
-    }
-
-    private static byte[] buildKey(JSONObject payloadIndex) throws Exception {
-        String base = "Leo:Shell:V1";
-        String gitCommit = payloadIndex == null ? "unknown" : payloadIndex.optString("gitCommit", "unknown");
-        String stage = payloadIndex == null ? "phase10-obscured-assets" : payloadIndex.optString("stage", "phase10-obscured-assets");
-        JSONObject seed = payloadIndex == null ? null : payloadIndex.optJSONObject("keySeed");
-        String payloadRawSha256 = seed == null ? "" : seed.optString("payloadRawSha256", "");
-        MessageDigest digest = MessageDigest.getInstance("SHA-256");
-        digest.update(base.getBytes(StandardCharsets.UTF_8));
-        digest.update(gitCommit.getBytes(StandardCharsets.UTF_8));
-        digest.update(stage.getBytes(StandardCharsets.UTF_8));
-        digest.update(payloadRawSha256.getBytes(StandardCharsets.UTF_8));
-        return digest.digest();
-    }
-
-    private static JSONObject buildMeta(byte[] raw, byte[] decoded, File dexFile) throws Exception {
+    private static JSONObject buildMeta(JSONObject index, byte[] decoded, File dexFile) throws Exception {
         JSONObject meta = new JSONObject();
         meta.put("asset", BUNDLE_INDEX_ASSET_PATH);
-        meta.put("rawLength", raw == null ? 0 : raw.length);
         meta.put("decodedLength", decoded == null ? 0 : decoded.length);
         meta.put("dexPath", dexFile == null ? "" : dexFile.getAbsolutePath());
         meta.put("status", lastLoadStatus);
         meta.put("impl", REAL_IMPL_CLASS);
+        meta.put("stage", index == null ? "v3-native-full" : index.optString("s", "v3-native-full"));
         return meta;
     }
+
+    private static native byte[] nativeDecodeBundle(byte[] stage, byte[] gitCommit, byte[] payloadRawSha256, byte[][] parts);
+
+    private static native int nativeCheckEnv();
 }

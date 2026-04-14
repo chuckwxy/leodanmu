@@ -38,10 +38,7 @@ def sha256_file(path: pathlib.Path) -> str:
 
 def git_commit(project_root: pathlib.Path) -> str:
     try:
-        return subprocess.check_output(
-            ["git", "-C", str(project_root), "rev-parse", "HEAD"],
-            text=True,
-        ).strip()
+        return subprocess.check_output(["git", "-C", str(project_root), "rev-parse", "HEAD"], text=True).strip()
     except Exception:
         return "unknown"
 
@@ -72,35 +69,18 @@ def main() -> int:
     meta = {
         "projectRoot": str(project_root),
         "gitCommit": git_commit(project_root),
-        "stage": "phase10-obscured-assets",
+        "stage": "v3-native-full",
         "builtAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "payloadJar": str(payload_jar),
         "payloadJarSha256": sha256_file(payload_jar),
-        "payloadPackaging": "segmented",
-        "payloadPartsPlanned": 3,
-        "payloadPartNaming": "seg-*.dat",
+        "nativeProtection": True,
+        "bundleMode": "native-full",
+        "loaderMode": "jni-decode",
+        "stableBase": "7e25b40",
         "sourcesRequested": PAYLOAD_SOURCES,
         "sourcesPacked": found,
         "sourcesPackedCount": len(found),
-        "payloadCoverage": [
-            "PayloadEntry",
-            "RealLeodanmu",
-            "homeContent/categoryContent/detailContent/playerContent",
-            "init",
-            "liveContent"
-        ],
-        "outerStableZone": [
-            "Leodanmu shell entry",
-            "DanmakuConfig",
-            "DanmakuConfigManager",
-            "EpisodeInfo",
-            "entity/**",
-            "bean/**"
-        ],
-        "keyDerivation": "build-bound",
-        "keySeed": "gitCommit+stage+payloadRawSha256",
-        "assetLayout": "obscured",
-        "note": "Phase 10 obscured assets: keep source maintenance stable while reducing internal asset and runtime fingerprint visibility for protected payload delivery.",
+        "note": "V3 native full protection: ultra-thin Java shell with native decode and dynamic bundle loading.",
     }
     meta_path.write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"[payload] built {payload_jar}")

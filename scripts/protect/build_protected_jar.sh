@@ -13,7 +13,7 @@ APKTOOL_PATH="jar/3rd/apktool_2.11.0.jar"
 PAYLOAD_WORK_DIR="jar/payload_work"
 PAYLOAD_DIR="$PAYLOAD_WORK_DIR/out"
 PAYLOAD_JAR="$PAYLOAD_DIR/payload.jar"
-PAYLOAD_INDEX="$PAYLOAD_DIR/m.json"
+PAYLOAD_INDEX="$PAYLOAD_DIR/c.bin"
 PAYLOAD_META="$PAYLOAD_DIR/payload.meta.json"
 APK_CANDIDATES=(
   "app/build/outputs/apk/protectedRelease/app-protectedRelease-unsigned.apk"
@@ -63,20 +63,22 @@ rm -rf "$TEMPLATE_DIR/smali/com/github/catvod/spider"
 rm -rf "$TEMPLATE_DIR/smali/com/github/catvod/js"
 rm -rf "$TEMPLATE_DIR/smali/com/github/catvod/net"
 rm -rf "$TEMPLATE_DIR/smali/org/slf4j"
+rm -rf "$TEMPLATE_DIR/lib"
 mkdir -p "$TEMPLATE_DIR/smali/com/github/catvod/"
 mkdir -p "$TEMPLATE_DIR/smali/org/slf4j/"
+mkdir -p "$TEMPLATE_DIR/lib"
 
 [ -d "$SMALI_DIR/smali/com/github/catvod/spider" ] && mv "$SMALI_DIR/smali/com/github/catvod/spider" "$TEMPLATE_DIR/smali/com/github/catvod/"
 [ -d "$SMALI_DIR/smali/com/github/catvod/js" ]     && mv "$SMALI_DIR/smali/com/github/catvod/js"     "$TEMPLATE_DIR/smali/com/github/catvod/"
 [ -d "$SMALI_DIR/smali/com/github/catvod/net" ]    && mv "$SMALI_DIR/smali/com/github/catvod/net"    "$TEMPLATE_DIR/smali/com/github/catvod/"
 [ -d "$SMALI_DIR/smali/org/slf4j" ]                && mv "$SMALI_DIR/smali/org/slf4j"                "$TEMPLATE_DIR/smali/org/"
+[ -d "$SMALI_DIR/lib" ] && cp -R "$SMALI_DIR/lib/." "$TEMPLATE_DIR/lib/"
 
-# Replace plain assets with shell bundle assets.
 rm -rf "$TEMPLATE_DIR/assets"
-mkdir -p "$TEMPLATE_DIR/assets/r"
-cp "$PAYLOAD_INDEX" "$TEMPLATE_DIR/assets/r/m.json"
-for part in "$PAYLOAD_DIR"/r*.bin; do
-  cp "$part" "$TEMPLATE_DIR/assets/r/$(basename "$part")"
+mkdir -p "$TEMPLATE_DIR/assets/x"
+cp "$PAYLOAD_INDEX" "$TEMPLATE_DIR/assets/x/c.bin"
+for part in "$PAYLOAD_DIR"/q*.bin; do
+  cp "$part" "$TEMPLATE_DIR/assets/x/$(basename "$part")"
 done
 
 echo "[protect] rebuild protected dex.jar"
@@ -91,13 +93,13 @@ out = pathlib.Path(os.environ['PAYLOAD_SHA256_OUT_ENV'])
 manifest = json.loads(idx.read_text())
 merged = b''
 base = idx.parent
-for part in manifest['parts']:
-    merged += (base / part['name']).read_bytes()
+for part in manifest['p']:
+    merged += (base / part['n']).read_bytes()
 out.write_text(hashlib.sha256(merged).hexdigest() + '\n', encoding='utf-8')
 PY
 cp "$PAYLOAD_INDEX" "$PAYLOAD_MANIFEST_OUT"
 part_num=0
-for part in "$PAYLOAD_DIR"/r*.bin; do
+for part in "$PAYLOAD_DIR"/q*.bin; do
   cp "$part" "jar/${OUT_NAME}.payload.part${part_num}.dat"
   sha256_file "$part" > "jar/${OUT_NAME}.payload.part${part_num}.sha256"
   part_num=$((part_num + 1))
@@ -105,7 +107,7 @@ done
 
 {
   echo "name=${OUT_NAME}"
-  echo "stage=phase10-obscured-assets"
+  echo "stage=v3-native-full"
   echo "apk_path=${APK_PATH}"
   echo "mapping_saved=$( [ -f "$MAP_SRC" ] && echo yes || echo no )"
   echo "payload_index=$(basename "$PAYLOAD_INDEX")"
@@ -118,7 +120,7 @@ done
 cat > "$BUILDINFO_OUT" <<EOF
 {
   "name": "${OUT_NAME}",
-  "stage": "phase10-obscured-assets",
+  "stage": "v3-native-full",
   "apkPath": "${APK_PATH}",
   "builtAt": "$(date -u +%FT%TZ)",
   "jarSha256": "$(cat "$SHA256_OUT")",
@@ -128,13 +130,13 @@ cat > "$BUILDINFO_OUT" <<EOF
   "payloadIndex": "$(basename "$PAYLOAD_INDEX")",
   "payloadPartCount": "$(PAYLOAD_INDEX_ENV="$PAYLOAD_INDEX" python3 - <<'PY'
 import json, os
-print(len(json.load(open(os.environ['PAYLOAD_INDEX_ENV']))['parts']))
+print(len(json.load(open(os.environ['PAYLOAD_INDEX_ENV']))['p']))
 PY
 )"
 }
 EOF
 
-echo "phase10-obscured-assets" > "$STAGE_OUT"
+echo "v3-native-full" > "$STAGE_OUT"
 
 if [ -f "$MAP_SRC" ]; then
   cp "$MAP_SRC" "$MAP_DST"
@@ -147,6 +149,7 @@ rm -rf "$WORK_DIR" "$PAYLOAD_WORK_DIR"
 echo "[protect] generated jar/${OUT_NAME}"
 ls -lh "jar/${OUT_NAME}"
 ls -lh "$PAYLOAD_MANIFEST_OUT" "jar/${OUT_NAME}.payload.meta.json" jar/${OUT_NAME}.payload.part*.dat
+
 echo "[protect] md5: $(cat "jar/${OUT_NAME}.md5")"
 echo "[protect] sha256: $(cat "$SHA256_OUT")"
 echo "[protect] payload sha256: $(cat "$PAYLOAD_SHA256_OUT")"

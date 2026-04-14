@@ -8,10 +8,10 @@ import zlib
 
 KEY = b"Leo:Shell:V1"
 MAGIC = b"LEO1"
-PART_COUNT = 3
-STAGE = "phase10-obscured-assets"
-INDEX_NAME = "m.json"
-PART_PREFIX = "r"
+PART_COUNT = 4
+STAGE = "v3-native-full"
+INDEX_NAME = "c.bin"
+PART_PREFIX = "q"
 PART_SUFFIX = ".bin"
 
 
@@ -61,11 +61,11 @@ def main() -> int:
     key = derive_key(raw, commit)
     encrypted = xor_bytes(compressed, key)
     header = {
-        "v": 2,
-        "algo": "zlib+xor-sha256",
-        "rawSize": len(raw),
-        "packedSize": len(compressed),
-        "rawSha256": hashlib.sha256(raw).hexdigest(),
+        "v": 3,
+        "a": "zx",
+        "r": len(raw),
+        "p": len(compressed),
+        "h": raw_sha256,
     }
     header_bytes = json.dumps(header, separators=(",", ":")).encode("utf-8")
     merged = MAGIC + len(header_bytes).to_bytes(4, "big") + header_bytes + encrypted
@@ -73,33 +73,27 @@ def main() -> int:
 
     out_dir.mkdir(parents=True, exist_ok=True)
     manifest = {
-        "v": 1,
-        "stage": STAGE,
-        "partCount": PART_COUNT,
-        "totalSize": len(merged),
-        "mergedSha256": hashlib.sha256(merged).hexdigest(),
-        "gitCommit": commit,
-        "keyDerivation": "build-bound",
-        "keySeed": {
-            "gitCommit": commit,
-            "stage": STAGE,
-            "payloadRawSha256": raw_sha256,
-        },
-        "parts": []
+        "v": 3,
+        "s": STAGE,
+        "g": commit,
+        "t": len(merged),
+        "m": hashlib.sha256(merged).hexdigest(),
+        "k": {"r": raw_sha256},
+        "p": []
     }
 
     for i, chunk in enumerate(parts):
         name = f"{PART_PREFIX}{i}{PART_SUFFIX}"
         path = out_dir / name
         path.write_bytes(chunk)
-        manifest["parts"].append({
-            "name": name,
-            "size": len(chunk),
-            "sha256": hashlib.sha256(chunk).hexdigest(),
-            "order": i,
+        manifest["p"].append({
+            "n": name,
+            "z": len(chunk),
+            "h": hashlib.sha256(chunk).hexdigest(),
+            "o": i,
         })
 
-    (out_dir / INDEX_NAME).write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding='utf-8')
+    (out_dir / INDEX_NAME).write_text(json.dumps(manifest, ensure_ascii=False, separators=(",", ":")), encoding='utf-8')
     print(f"[payload] encrypted {src} -> {out_dir} ({len(merged)} bytes, raw={len(raw)}, packed={len(compressed)}, parts={PART_COUNT})")
     return 0
 

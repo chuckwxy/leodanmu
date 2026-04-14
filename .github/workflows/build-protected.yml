@@ -19,6 +19,11 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r26d
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
@@ -52,9 +57,11 @@ jobs:
             jar/leodm-protected.jar.payload.part0.dat
             jar/leodm-protected.jar.payload.part1.dat
             jar/leodm-protected.jar.payload.part2.dat
+            jar/leodm-protected.jar.payload.part3.dat
             jar/leodm-protected.jar.payload.part0.sha256
             jar/leodm-protected.jar.payload.part1.sha256
             jar/leodm-protected.jar.payload.part2.sha256
+            jar/leodm-protected.jar.payload.part3.sha256
             jar/leodm-protected.jar.payload.sha256
           retention-days: 30
 
@@ -67,8 +74,8 @@ jobs:
           body: |
             自动保护构建
             Commit: ${{ github.sha }}
-            Stage: phase10-obscured-assets
-            Payload coverage: PayloadEntry / RealLeodanmu / home-category-detail-player / init / liveContent
+            Stage: v3-native-full
+            Payload coverage: native key derivation / native decode / thin java shell / dynamic bundle load
           files: |
             jar/leodm-protected.jar
             jar/leodm-protected.jar.md5
@@ -81,6 +88,7 @@ jobs:
             jar/leodm-protected.jar.payload.part0.sha256
             jar/leodm-protected.jar.payload.part1.sha256
             jar/leodm-protected.jar.payload.part2.sha256
+            jar/leodm-protected.jar.payload.part3.sha256
             jar/leodm-protected.jar.payload.sha256
           draft: false
           prerelease: true
