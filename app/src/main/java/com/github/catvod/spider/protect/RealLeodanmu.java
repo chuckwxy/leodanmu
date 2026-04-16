@@ -8,9 +8,14 @@ import android.text.TextUtils;
 
 import com.github.catvod.spider.DanmakuConfig;
 import com.github.catvod.spider.DanmakuConfigManager;
+import com.github.catvod.spider.DanmakuScanner;
 import com.github.catvod.spider.DanmakuUIHelper;
+import com.github.catvod.spider.ExtFetcher;
 import com.github.catvod.spider.Leodanmu;
 import com.github.catvod.spider.Utils;
+import com.github.catvod.spider.WebServer;
+
+import java.io.IOException;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -163,6 +168,50 @@ public class RealLeodanmu implements PayloadBridge {
             Leodanmu.log("liveContent: 配置已刷新，当前 apiUrls=" + freshConfig.getApiUrls());
         }
         return new Leodanmu().superLiveContent(url);
+    }
+
+    @Override
+    public void startHookMonitor() {
+        DanmakuScanner.startHookMonitor();
+    }
+
+    @Override
+    public void clearScannerLastDetectedTitle() {
+        DanmakuScanner.lastDetectedTitle = "";
+    }
+
+    @Override
+    public void ensureWebServer(Context context) {
+        try {
+            new WebServer(9888);
+        } catch (IOException e) {
+            Leodanmu.log("WebServer 启动失败: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public String getExtTraceLog() {
+        return ExtFetcher.getTraceLog();
+    }
+
+    @Override
+    public String getLogContent() {
+        return Leodanmu.getLogContent();
+    }
+
+    @Override
+    public void clearLogs() {
+        Leodanmu.clearLogs();
+    }
+
+    @Override
+    public String getHookStatusSummary() {
+        return Leodanmu.getHookStatusSummaryForShell();
+    }
+
+    @Override
+    public String getHookStatusDetail() {
+        return Leodanmu.getHookStatusDetailForShell();
     }
 
     private static JSONObject createClass(String id, String name) throws Exception {

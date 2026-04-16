@@ -17,4 +17,20 @@ public interface PayloadBridge {
     String playerContent(String flag, String id, List<String> vipFlags);
 
     String liveContent(String url) throws Exception;
+
+    void startHookMonitor();
+
+    void clearScannerLastDetectedTitle();
+
+    void ensureWebServer(Context context);
+
+    String getExtTraceLog();
+
+    String getLogContent();
+
+    void clearLogs();
+
+    String getHookStatusSummary();
+
+    String getHookStatusDetail();
 }

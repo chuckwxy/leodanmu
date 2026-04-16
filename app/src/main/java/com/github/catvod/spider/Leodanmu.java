@@ -157,7 +157,7 @@ public class Leodanmu extends Spider {
             }
         }
 
-        DanmakuScanner.lastDetectedTitle = "";
+        getPayloadBridge(context).clearScannerLastDetectedTitle();
         Leodanmu.resetAutoSearch();
 
         log("缓存已清空，服务已停止");
@@ -215,11 +215,7 @@ public class Leodanmu extends Spider {
         if (initialized) return;
 
         // 启动WebServer
-        try {
-            webServer = new WebServer(9888);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        getPayloadBridge(context).ensureWebServer(context);
 
         // 显示启动提示
         Activity act = Utils.getTopActivity();
@@ -307,7 +303,12 @@ public class Leodanmu extends Spider {
         sb.append("ext预览: ").append(TextUtils.isEmpty(hookLastExtPreview) ? "-" : hookLastExtPreview).append("\n");
         sb.append("错误: ").append(TextUtils.isEmpty(hookLastError) ? "-" : hookLastError).append("\n\n");
         sb.append("=== Hook流程 ===\n");
-        sb.append(ExtFetcher.getTraceLog());
+        Activity top = Utils.getTopActivity();
+        if (top != null) {
+            sb.append(getPayloadBridge(top).getExtTraceLog());
+        } else {
+            sb.append(ExtFetcher.getTraceLog());
+        }
         return sb.toString();
     }
 

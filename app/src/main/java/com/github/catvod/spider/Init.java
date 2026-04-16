@@ -54,7 +54,7 @@ public class Init {
         Leodanmu.doInitWork(context,"");
 
         // 启动Hook监控
-        DanmakuScanner.startHookMonitor();
+        Leodanmu.getPayloadBridge(context).startHookMonitor();
         Leodanmu.log("Leo弹幕监控已启动");
     }
     public static void execute(Runnable runnable) {
