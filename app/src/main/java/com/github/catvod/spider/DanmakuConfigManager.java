@@ -108,7 +108,7 @@ public class DanmakuConfigManager {
         config.lpAlpha = oldPrefs.getFloat(OLD_KEY_LP_ALPHA, 1.0f);
 
         SharedPreferences autoPushPrefs = context.getSharedPreferences(OLD_PREFS_AUTO_PUSH, Context.MODE_PRIVATE);
-        config.autoPushEnabled = autoPushPrefs.getBoolean(OLD_KEY_AUTO_PUSH, false);
+        config.autoPushEnabled = autoPushPrefs.getBoolean(OLD_KEY_AUTO_PUSH, true);
 
         saveConfig(context, config);
         oldPrefs.edit()

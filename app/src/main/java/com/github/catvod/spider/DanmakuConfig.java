@@ -23,7 +23,7 @@ public class DanmakuConfig {
         lpWidth = 1.0f;
         lpHeight = 1.0f;
         lpAlpha = 1.0f;
-        autoPushEnabled = false;
+        autoPushEnabled = true;
     }
 
     public Set<String> getApiUrls() {
