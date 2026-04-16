@@ -370,6 +370,7 @@ public class DanmakuScanner {
         episodeInfo.setFileName(rawFileName);
         episodeInfo.setEpisodeUrl(media.getUrl());
         episodeInfo.setSearchKeyword(!episodeNames.isEmpty() ? episodeNames.get(0) : seriesName);
+        episodeInfo.setIgnoreSearchKeywordCache(false);
         episodeInfo.setSpecialTag(specialTag);
         episodeInfo.setSpecialType(specialType);
         episodeInfo.setSpecialSuffix(specialSuffix);
@@ -1394,6 +1395,7 @@ public class DanmakuScanner {
         if ((hasValidDanmakuCache || hasManualDanmaku) && hasNormalEpisodeNum) {
             if (!shouldUseIdStepping(lastEpisodeInfo)) {
                 Leodanmu.log("⚠️ 年份或季数变化，跳过ID递增逻辑，转自动搜索");
+                lastEpisodeInfo.setIgnoreSearchKeywordCache(true);
             } else {
                 Leodanmu.log("🔍 检测到有效弹幕缓存，尝试使用ID递增方式");
 
@@ -1468,6 +1470,7 @@ public class DanmakuScanner {
         if (isSameSeries && hasNormalEpisodeNum && !TextUtils.isEmpty(currentEpisodeNum)) {
             if (!shouldUseIdStepping(lastEpisodeInfo)) {
                 Leodanmu.log("⚠️ 同系列但年份或季数变化，跳过ID递增逻辑，转自动搜索");
+                lastEpisodeInfo.setIgnoreSearchKeywordCache(true);
                 LeoDanmakuService.autoSearch(lastEpisodeInfo, activity);
                 return;
             }

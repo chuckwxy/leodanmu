@@ -559,7 +559,12 @@ public class LeoDanmakuService {
             @Override
             public void run() {
                 StringBuilder sb = new StringBuilder();
-                String searchKeyword = !TextUtils.isEmpty(episodeInfo.getSearchKeyword()) ? episodeInfo.getSearchKeyword() : episodeInfo.getEpisodeName();
+                String searchKeyword;
+                if (episodeInfo.isIgnoreSearchKeywordCache()) {
+                    searchKeyword = !TextUtils.isEmpty(episodeInfo.getSeriesName()) ? episodeInfo.getSeriesName() : episodeInfo.getEpisodeName();
+                } else {
+                    searchKeyword = !TextUtils.isEmpty(episodeInfo.getSearchKeyword()) ? episodeInfo.getSearchKeyword() : episodeInfo.getEpisodeName();
+                }
                 sb.append("开始搜索弹幕 ").append(searchKeyword);
 //                Utils.safeShowToast(activity, sb.toString());
                 Leodanmu.log(sb.toString());

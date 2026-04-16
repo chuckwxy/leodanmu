@@ -13,6 +13,7 @@ public class EpisodeInfo {
     private String episodeUrl;
     private List<String> episodeNames;   // 新增：多候选名称列表
     private String searchKeyword;
+    private boolean ignoreSearchKeywordCache;
     private String specialTag;
     private String specialType;
     private String specialSuffix;
@@ -95,6 +96,14 @@ public class EpisodeInfo {
         this.searchKeyword = searchKeyword;
     }
 
+    public boolean isIgnoreSearchKeywordCache() {
+        return ignoreSearchKeywordCache;
+    }
+
+    public void setIgnoreSearchKeywordCache(boolean ignoreSearchKeywordCache) {
+        this.ignoreSearchKeywordCache = ignoreSearchKeywordCache;
+    }
+
     public String getSpecialTag() {
         return specialTag;
     }
@@ -140,6 +149,7 @@ public class EpisodeInfo {
                 ", episodeUrl='" + episodeUrl + '\'' +
                 ", episodeNames=" + episodeNames + '\'' +
                 ", searchKeyword='" + searchKeyword + '\'' +
+                ", ignoreSearchKeywordCache='" + ignoreSearchKeywordCache + '\'' +
                 ", specialTag='" + specialTag + '\'' +
                 ", specialType='" + specialType + '\'' +
                 ", specialSuffix='" + specialSuffix + '\'' +
