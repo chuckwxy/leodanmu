@@ -780,7 +780,7 @@ public class Leodanmu extends Spider {
         }
     }
 
-    private static PayloadBridge getPayloadBridge(Context context) {
+    public static PayloadBridge getPayloadBridge(Context context) {
         return ProtectedLoader.getBridge(context);
     }
 
