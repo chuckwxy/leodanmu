@@ -458,6 +458,83 @@ public class DanmakuScanner {
         return value == null ? "" : value.trim();
     }
 
+    public static void syncResolvedDanmakuState(EpisodeInfo episodeInfo, DanmakuItem item) {
+        if (episodeInfo == null && item == null) return;
+
+        if (episodeInfo != null) {
+            lastEpisodeInfo = episodeInfo;
+
+            if (!TextUtils.isEmpty(episodeInfo.getSeriesName())) {
+                currentSeriesName = safeValue(episodeInfo.getSeriesName());
+            }
+            if (!TextUtils.isEmpty(episodeInfo.getEpisodeNum())) {
+                currentEpisodeNum = safeValue(episodeInfo.getEpisodeNum());
+            }
+
+            String part = normalizeEpisodePart(episodeInfo.getSpecialSuffix());
+            if (!TextUtils.isEmpty(part)) {
+                currentEpisodePart = part;
+            }
+
+            if (!TextUtils.isEmpty(episodeInfo.getEpisodeYear())) {
+                currentEpisodeYear = safeValue(episodeInfo.getEpisodeYear());
+            }
+            if (!TextUtils.isEmpty(episodeInfo.getEpisodeSeasonNum())) {
+                currentEpisodeSeason = safeValue(episodeInfo.getEpisodeSeasonNum());
+            }
+
+            lastEpisodeChangeTime = System.currentTimeMillis();
+        }
+
+        if (item != null) {
+            String animeTitle = safeValue(item.getAnimeTitle());
+            String episodeTitle = safeValue(item.getEpTitle());
+
+            if (TextUtils.isEmpty(currentSeriesName) && !TextUtils.isEmpty(animeTitle)) {
+                String extractedSeries = extractSeriesName(animeTitle);
+                if (!TextUtils.isEmpty(extractedSeries)) {
+                    currentSeriesName = extractedSeries;
+                }
+            }
+
+            if (TextUtils.isEmpty(currentEpisodeNum) && !TextUtils.isEmpty(episodeTitle)) {
+                String extractedEpisodeNum = extractEpisodeNum(episodeTitle);
+                if (!TextUtils.isEmpty(extractedEpisodeNum)) {
+                    currentEpisodeNum = extractedEpisodeNum;
+                }
+            }
+
+            if (TextUtils.isEmpty(currentEpisodePart) && !TextUtils.isEmpty(episodeTitle)) {
+                String extractedPart = normalizeEpisodePart(extractEpisodePartSuffix(episodeTitle));
+                if (!TextUtils.isEmpty(extractedPart)) {
+                    currentEpisodePart = extractedPart;
+                }
+            }
+
+            if (TextUtils.isEmpty(currentEpisodeYear) && !TextUtils.isEmpty(animeTitle)) {
+                String extractedYear = extractYear2(animeTitle);
+                if (TextUtils.isEmpty(extractedYear)) {
+                    extractedYear = extractYear(animeTitle);
+                }
+                if (!TextUtils.isEmpty(extractedYear)) {
+                    currentEpisodeYear = extractedYear;
+                }
+            }
+
+            if (TextUtils.isEmpty(currentEpisodeSeason) && !TextUtils.isEmpty(animeTitle)) {
+                String extractedSeason = extractSeasonNum(animeTitle);
+                if (!TextUtils.isEmpty(extractedSeason)) {
+                    currentEpisodeSeason = safeValue(extractedSeason);
+                }
+            }
+        }
+
+        Leodanmu.log("🧷 同步当前弹幕链状态: series=" + currentSeriesName
+                + ", year=" + currentEpisodeYear
+                + ", season=" + currentEpisodeSeason
+                + ", ep=" + currentEpisodeNum + currentEpisodePart);
+    }
+
     private static boolean shouldUseIdStepping(EpisodeInfo targetEpisodeInfo) {
         if (targetEpisodeInfo == null) return false;
 
