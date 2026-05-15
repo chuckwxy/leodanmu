@@ -527,7 +527,7 @@ public class DanmakuUIHelper {
                 offsetDecBtn.setFocusableInTouchMode(true);
                 offsetDecBtn.setClickable(true);
 
-                int iconSize = dpToPx(activity, 40);
+                int iconSize = dpToPx(activity, 30);
                 LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(iconSize, iconSize);
                 iconParams.setMargins(dpToPx(activity, 2), 0, dpToPx(activity, 2), 0);
                 offsetDecBtn.setLayoutParams(iconParams);
@@ -568,7 +568,7 @@ public class DanmakuUIHelper {
                     circleBg.setShape(GradientDrawable.OVAL);
                     circleBg.setColor(colors.bgSecondary);
                     if (hasFocus) {
-                        v.animate().scaleX(1.15f).scaleY(1.15f).setDuration(150).start();
+                        v.animate().scaleX(1.1f).scaleY(1.1f).setDuration(150).start();
                         circleBg.setStroke(dpToPx(activity, 2), colors.focusBorder);
                     } else {
                         v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start();
