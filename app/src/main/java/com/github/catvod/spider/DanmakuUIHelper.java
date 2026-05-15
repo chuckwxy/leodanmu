@@ -494,105 +494,123 @@ public class DanmakuUIHelper {
                 leftArea.setClipChildren(false);
 
                 // 第零行：时移
-                LinearLayout offsetRow = new LinearLayout(activity);
-                offsetRow.setOrientation(LinearLayout.HORIZONTAL);
-                offsetRow.setGravity(Gravity.CENTER_VERTICAL);
-                offsetRow.setLayoutParams(new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-                offsetRow.setClipChildren(false);
-                offsetRow.setFocusable(false);
-                offsetRow.setFocusableInTouchMode(false);
+LinearLayout offsetRow = new LinearLayout(activity);
+offsetRow.setOrientation(LinearLayout.HORIZONTAL);
+offsetRow.setGravity(Gravity.CENTER_VERTICAL);
+offsetRow.setLayoutParams(new LinearLayout.LayoutParams(
+        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+offsetRow.setClipChildren(false);
+offsetRow.setFocusable(false);
+offsetRow.setFocusableInTouchMode(false);
 
-                TextView offsetLabel = new TextView(activity);
-                offsetLabel.setText("时移");
-                offsetLabel.setTextSize(14);
-                offsetLabel.setTextColor(colors.textPrimary);
-                offsetLabel.setPadding(dpToPx(activity, 6), 0, dpToPx(activity, 8), 0);
-                offsetLabel.setFocusable(false);
+TextView offsetLabel = new TextView(activity);
+offsetLabel.setText("时移");
+offsetLabel.setTextSize(14);
+offsetLabel.setTextColor(colors.textPrimary);
+offsetLabel.setPadding(dpToPx(activity, 6), 0, dpToPx(activity, 8), 0);
+offsetLabel.setFocusable(false);
 
-                final int[] currentOffset = new int[]{config.getDanmakuTimeOffsetMs()};
+final int[] currentOffset = new int[]{config.getDanmakuTimeOffsetMs()};
 
-                View offsetSpacer = new View(activity);
-                LinearLayout.LayoutParams offsetSpacerParams = new LinearLayout.LayoutParams(0, 0, 1);
-                offsetSpacer.setLayoutParams(offsetSpacerParams);
-                offsetRow.addView(offsetLabel);
-                offsetRow.addView(offsetSpacer);
+View offsetSpacer = new View(activity);
+LinearLayout.LayoutParams offsetSpacerParams = new LinearLayout.LayoutParams(0, 0, 1);
+offsetSpacer.setLayoutParams(offsetSpacerParams);
 
-                Button offsetDecBtn = new Button(activity);
-                offsetDecBtn.setText("－");
-                offsetDecBtn.setTextSize(16);
-                offsetDecBtn.setTextColor(colors.textPrimary);
-                offsetDecBtn.setTypeface(null, android.graphics.Typeface.BOLD);
-                offsetDecBtn.setFocusable(true);
-                offsetDecBtn.setFocusableInTouchMode(true);
-                offsetDecBtn.setClickable(true);
+offsetRow.addView(offsetLabel);
+offsetRow.addView(offsetSpacer);
 
-                int iconSize = dpToPx(activity, 30);
-                LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(iconSize, iconSize);
-                iconParams.setMargins(dpToPx(activity, 2), 0, dpToPx(activity, 2), 0);
-                offsetDecBtn.setLayoutParams(iconParams);
-                offsetDecBtn.setPadding(0, 0, 0, 0);
+// 按钮大小
+int iconSize = dpToPx(activity, 30);
 
-                GradientDrawable iconBg = new GradientDrawable();
-                iconBg.setShape(GradientDrawable.OVAL);
-                iconBg.setColor(colors.bgSecondary);
-                iconBg.setStroke(dpToPx(activity, 1), colors.divider);
-                offsetDecBtn.setBackground(iconBg);
+// 减号按钮
+Button offsetDecBtn = new Button(activity);
+offsetDecBtn.setText("－");
+offsetDecBtn.setTextSize(16);
+offsetDecBtn.setTextColor(colors.textPrimary);
+offsetDecBtn.setTypeface(null, android.graphics.Typeface.BOLD);
+offsetDecBtn.setFocusable(true);
+offsetDecBtn.setFocusableInTouchMode(true);
+offsetDecBtn.setClickable(true);
+LinearLayout.LayoutParams decParams = new LinearLayout.LayoutParams(iconSize, iconSize);
+decParams.setMargins(dpToPx(activity, 2), 0, dpToPx(activity, 2), 0);
+offsetDecBtn.setLayoutParams(decParams);
+offsetDecBtn.setPadding(0, 0, 0, 0);
+GradientDrawable decBg = new GradientDrawable();
+decBg.setShape(GradientDrawable.OVAL);
+decBg.setColor(colors.bgSecondary);
+decBg.setStroke(dpToPx(activity, 1), colors.divider);
+offsetDecBtn.setBackground(decBg);
 
-                TextView offsetVal = new TextView(activity);
-                offsetVal.setText(formatOffsetMs(currentOffset[0]));
-                offsetVal.setTextSize(12);
-                offsetVal.setTextColor(colors.textSecondary);
-                offsetVal.setGravity(Gravity.CENTER);
-                offsetVal.setPadding(dpToPx(activity, 4), 0, dpToPx(activity, 4), 0);
+// 包裹减号按钮
+FrameLayout decWrapper = new FrameLayout(activity);
+decWrapper.setClipChildren(false);
+decWrapper.addView(offsetDecBtn);
 
-                Button offsetIncBtn = new Button(activity);
-                offsetIncBtn.setText("＋");
-                offsetIncBtn.setTextSize(16);
-                offsetIncBtn.setTextColor(colors.textPrimary);
-                offsetIncBtn.setTypeface(null, android.graphics.Typeface.BOLD);
-                offsetIncBtn.setFocusable(true);
-                offsetIncBtn.setFocusableInTouchMode(true);
-                offsetIncBtn.setClickable(true);
-                offsetIncBtn.setLayoutParams(new LinearLayout.LayoutParams(iconSize, iconSize));
-                offsetIncBtn.setPadding(0, 0, 0, 0);
+// 数值显示
+TextView offsetVal = new TextView(activity);
+offsetVal.setText(formatOffsetMs(currentOffset[0]));
+offsetVal.setTextSize(12);
+offsetVal.setTextColor(colors.textSecondary);
+offsetVal.setGravity(Gravity.CENTER);
+offsetVal.setPadding(dpToPx(activity, 4), 0, dpToPx(activity, 4), 0);
 
-                GradientDrawable iconBg2 = new GradientDrawable();
-                iconBg2.setShape(GradientDrawable.OVAL);
-                iconBg2.setColor(colors.bgSecondary);
-                iconBg2.setStroke(dpToPx(activity, 1), colors.divider);
-                offsetIncBtn.setBackground(iconBg2);
+// 加号按钮
+Button offsetIncBtn = new Button(activity);
+offsetIncBtn.setText("＋");
+offsetIncBtn.setTextSize(16);
+offsetIncBtn.setTextColor(colors.textPrimary);
+offsetIncBtn.setTypeface(null, android.graphics.Typeface.BOLD);
+offsetIncBtn.setFocusable(true);
+offsetIncBtn.setFocusableInTouchMode(true);
+offsetIncBtn.setClickable(true);
+LinearLayout.LayoutParams incParams = new LinearLayout.LayoutParams(iconSize, iconSize);
+incParams.setMargins(dpToPx(activity, 2), 0, dpToPx(activity, 2), 0);
+offsetIncBtn.setLayoutParams(incParams);
+offsetIncBtn.setPadding(0, 0, 0, 0);
+GradientDrawable incBg = new GradientDrawable();
+incBg.setShape(GradientDrawable.OVAL);
+incBg.setColor(colors.bgSecondary);
+incBg.setStroke(dpToPx(activity, 1), colors.divider);
+offsetIncBtn.setBackground(incBg);
 
-                View.OnFocusChangeListener iconFocus = (v, hasFocus) -> {
-                    GradientDrawable circleBg = new GradientDrawable();
-                    circleBg.setShape(GradientDrawable.OVAL);
-                    circleBg.setColor(colors.bgSecondary);
-                    if (hasFocus) {
-                        v.animate().scaleX(1.1f).scaleY(1.1f).setDuration(150).start();
-                        circleBg.setStroke(dpToPx(activity, 2), colors.focusBorder);
-                    } else {
-                        v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start();
-                        circleBg.setStroke(dpToPx(activity, 1), colors.divider);
-                    }
-                    v.setBackground(circleBg);
-                };
-                offsetDecBtn.setOnFocusChangeListener(iconFocus);
-                offsetIncBtn.setOnFocusChangeListener(iconFocus);
+// 包裹加号按钮
+FrameLayout incWrapper = new FrameLayout(activity);
+incWrapper.setClipChildren(false);
+incWrapper.addView(offsetIncBtn);
 
-                offsetDecBtn.setOnClickListener(v -> {
-                    currentOffset[0] = Math.max(-300000, currentOffset[0] - 500);
-                    offsetVal.setText(formatOffsetMs(currentOffset[0]));
-                });
+// 焦点动画
+View.OnFocusChangeListener iconFocus = (v, hasFocus) -> {
+    GradientDrawable circleBg = new GradientDrawable();
+    circleBg.setShape(GradientDrawable.OVAL);
+    circleBg.setColor(colors.bgSecondary);
+    if (hasFocus) {
+        v.animate().scaleX(1.1f).scaleY(1.1f).setDuration(150).start();
+        circleBg.setStroke(dpToPx(activity, 2), colors.focusBorder);
+    } else {
+        v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start();
+        circleBg.setStroke(dpToPx(activity, 1), colors.divider);
+    }
+    v.setBackground(circleBg);
+};
+offsetDecBtn.setOnFocusChangeListener(iconFocus);
+offsetIncBtn.setOnFocusChangeListener(iconFocus);
 
-                offsetIncBtn.setOnClickListener(v -> {
-                    currentOffset[0] = Math.min(300000, currentOffset[0] + 500);
-                    offsetVal.setText(formatOffsetMs(currentOffset[0]));
-                });
+// 点击事件
+offsetDecBtn.setOnClickListener(v -> {
+    currentOffset[0] = Math.max(-300000, currentOffset[0] - 500);
+    offsetVal.setText(formatOffsetMs(currentOffset[0]));
+});
+offsetIncBtn.setOnClickListener(v -> {
+    currentOffset[0] = Math.min(300000, currentOffset[0] + 500);
+    offsetVal.setText(formatOffsetMs(currentOffset[0]));
+});
 
-                offsetRow.addView(offsetDecBtn);
-                offsetRow.addView(offsetVal);
-                offsetRow.addView(offsetIncBtn);
-                leftArea.addView(offsetRow);
+// 添加到行中
+offsetRow.addView(decWrapper);
+offsetRow.addView(offsetVal);
+offsetRow.addView(incWrapper);
+
+leftArea.addView(offsetRow);
 
                 // 第一行：推送提示开关
                 LinearLayout toastRow = new LinearLayout(activity);
