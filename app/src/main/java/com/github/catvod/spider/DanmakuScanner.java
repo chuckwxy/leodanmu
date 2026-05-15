@@ -2063,7 +2063,7 @@ public class DanmakuScanner {
     private static boolean isTargetAnchor(String anchorText) {
         if (TextUtils.isEmpty(anchorText)) return false;
         String t = anchorText.trim();
-        return t.contains("弹幕开") || t.contains("弹幕关");
+        return t.contains("字幕") || t.contains("弹幕");
     }
 
     // 兼容低版本的View ID生成方法
