@@ -638,6 +638,94 @@ public class DanmakuUIHelper {
                 themeRow.addView(lightThemeBtn);
                 leftArea.addView(themeRow);
 
+                // ========== 时间偏移控制行 ==========
+                LinearLayout offsetRow = new LinearLayout(activity);
+                offsetRow.setOrientation(LinearLayout.HORIZONTAL);
+                offsetRow.setGravity(Gravity.CENTER_VERTICAL);
+                offsetRow.setLayoutParams(new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+                offsetRow.setClipChildren(false);
+                offsetRow.setFocusable(false);
+                offsetRow.setFocusableInTouchMode(false);
+
+                TextView offsetLabel = new TextView(activity);
+                offsetLabel.setText("时间偏移");
+                offsetLabel.setTextSize(14);
+                offsetLabel.setTextColor(colors.textPrimary);
+                offsetLabel.setPadding(dpToPx(activity, 6), 0, dpToPx(activity, 8), 0);
+                offsetLabel.setFocusable(false);
+
+                Button offsetDecBtn = new Button(activity);
+                offsetDecBtn.setText("-500");
+                offsetDecBtn.setTextSize(13);
+                offsetDecBtn.setTypeface(null, android.graphics.Typeface.BOLD);
+                offsetDecBtn.setPadding(dpToPx(activity, 4), dpToPx(activity, 2),
+                        dpToPx(activity, 4), dpToPx(activity, 2));
+
+                Button offsetIncBtn = new Button(activity);
+                offsetIncBtn.setText("+500");
+                offsetIncBtn.setTextSize(13);
+                offsetIncBtn.setTypeface(null, android.graphics.Typeface.BOLD);
+                offsetIncBtn.setPadding(dpToPx(activity, 4), dpToPx(activity, 2),
+                        dpToPx(activity, 4), dpToPx(activity, 2));
+
+                final int[] currentOffset = new int[]{config.getDanmakuTimeOffsetMs()};
+
+                TextView offsetValue = new TextView(activity);
+                offsetValue.setText(formatOffsetMs(currentOffset[0]));
+                offsetValue.setTextSize(14);
+                offsetValue.setTextColor(colors.textPrimary);
+                offsetValue.setGravity(Gravity.CENTER);
+                offsetValue.setTypeface(null, android.graphics.Typeface.BOLD);
+
+                LinearLayout.LayoutParams offsetBtnParams = new LinearLayout.LayoutParams(
+                        dpToPx(activity, 64), dpToPx(activity, 36));
+                offsetBtnParams.setMargins(dpToPx(activity, 2), 0, dpToPx(activity, 2), 0);
+                offsetDecBtn.setLayoutParams(offsetBtnParams);
+                offsetIncBtn.setLayoutParams(offsetBtnParams);
+
+                GradientDrawable offsetDecBg = new GradientDrawable();
+                offsetDecBg.setShape(GradientDrawable.RECTANGLE);
+                offsetDecBg.setCornerRadius(dpToPx(activity, 8));
+                offsetDecBg.setColor(Color.TRANSPARENT);
+                offsetDecBg.setStroke(dpToPx(activity, 1), colors.divider);
+                offsetDecBtn.setBackground(offsetDecBg);
+
+                GradientDrawable offsetIncBg = new GradientDrawable();
+                offsetIncBg.setShape(GradientDrawable.RECTANGLE);
+                offsetIncBg.setCornerRadius(dpToPx(activity, 8));
+                offsetIncBg.setColor(Color.TRANSPARENT);
+                offsetIncBg.setStroke(dpToPx(activity, 1), colors.divider);
+                offsetIncBtn.setBackground(offsetIncBg);
+
+                View.OnFocusChangeListener offsetFocusListener = (v, hasFocus) -> {
+                    GradientDrawable drawable = (GradientDrawable) v.getBackground();
+                    if (hasFocus) {
+                        drawable.setStroke(dpToPx(activity, 2), colors.focusBorder);
+                    } else {
+                        drawable.setStroke(dpToPx(activity, 1), colors.divider);
+                    }
+                    v.setBackground(drawable);
+                };
+                offsetDecBtn.setOnFocusChangeListener(offsetFocusListener);
+                offsetIncBtn.setOnFocusChangeListener(offsetFocusListener);
+
+                offsetDecBtn.setOnClickListener(v -> {
+                    currentOffset[0] = Math.max(-300000, currentOffset[0] - 500);
+                    offsetValue.setText(formatOffsetMs(currentOffset[0]));
+                });
+
+                offsetIncBtn.setOnClickListener(v -> {
+                    currentOffset[0] = Math.min(300000, currentOffset[0] + 500);
+                    offsetValue.setText(formatOffsetMs(currentOffset[0]));
+                });
+
+                offsetRow.addView(offsetLabel);
+                offsetRow.addView(offsetDecBtn);
+                offsetRow.addView(offsetValue);
+                offsetRow.addView(offsetIncBtn);
+                leftArea.addView(offsetRow);
+
                 // 第四行：布局按钮
                 Button toolBtn = createStaticBorderButton(activity, "布局");
                 toolBtn.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
@@ -788,6 +876,7 @@ public class DanmakuUIHelper {
                     latestConfig.setAutoPushEnabled(autoSwitch.isChecked());
                     latestConfig.setPushToastEnabled(toastSwitch.isChecked());
                     latestConfig.setTheme(config.getTheme());
+                    latestConfig.setDanmakuTimeOffsetMs(currentOffset[0]);
                     DanmakuConfigManager.saveConfig(activity, latestConfig);
                     Utils.safeShowToast(activity, "配置已保存");
                     Leodanmu.log("已保存新配置");
@@ -1400,6 +1489,12 @@ public class DanmakuUIHelper {
                 }
             }
         }, 1000, 1000);
+    }
+
+    private static String formatOffsetMs(int ms) {
+        if (ms == 0) return "0ms";
+        float sec = ms / 1000f;
+        return (ms > 0 ? "+" : "") + String.format("%.1fs", sec);
     }
 
     private static int dpToPx(Context context, int dp) {

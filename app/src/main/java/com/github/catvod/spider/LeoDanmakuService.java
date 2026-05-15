@@ -722,12 +722,42 @@ public class LeoDanmakuService {
 
             if (fastPushThenVerify) {
                 Leodanmu.log("⚡ 命中已验证链路，先推送后异步校验: " + danmakuItem.getEpTitle());
-                String fastPushResp = pushDanmakuToPlayer(danmakuItem);
-                if (!TextUtils.isEmpty(fastPushResp) && fastPushResp.toLowerCase().contains("ok")) {
-                    Leodanmu.log("✅ 快速推送已发送，等待异步校验: " + danmakuItem.getDanmakuUrl());
+                String localIp = NetworkUtils.getLocalIpAddress();
+                DanmakuConfig config = DanmakuConfigManager.getConfig(activity);
+                int offsetMs = config != null ? config.getDanmakuTimeOffsetMs() : 0;
+                String refreshPath = buildDanmakuRefreshPath(danmakuItem, localIp, offsetMs);
+                if (offsetMs != 0) {
+                    Leodanmu.log("启用弹幕时间偏移: " + DanmakuUtils.formatOffsetLabel(offsetMs) + "，通过本地代理推送");
+                }
+                String pushResult = null;
+                boolean reflectionPushed = activity != null && tryPushDanmakuByReflection(danmakuItem, activity, refreshPath);
+                if (reflectionPushed) {
+                    pushResult = "OK";
+                    Leodanmu.log("✅ 快速推送已通过反射发送: " + buildDanmakuDisplayName(danmakuItem));
+                } else {
+                    Leodanmu.log("反射推送不可用，快速推送回退到HTTP");
+                    String pushUrl = "http://" + localIp + ":" + Utils.getPort() + "/action?do=refresh&type=danmaku&path=" +
+                            URLEncoder.encode(refreshPath, "UTF-8");
+                    for (int i = 0; i < 3; i++) {
+                        pushResult = NetworkUtils.robustHttpGet(pushUrl);
+                        Leodanmu.log("快速推送尝试 " + (i + 1) + "/3: " + (!TextUtils.isEmpty(pushResult) ? "成功" : "失败"));
+                        if (!TextUtils.isEmpty(pushResult) && pushResult.toLowerCase().contains("ok")) {
+                            Leodanmu.log("✅ 快速推送已发送");
+                            break;
+                        }
+                        if (i < 2) {
+                            try {
+                                Thread.sleep(1000);
+                            } catch (InterruptedException ie) {
+                                Thread.currentThread().interrupt();
+                            }
+                        }
+                    }
+                }
+                if (!TextUtils.isEmpty(pushResult) && pushResult.toLowerCase().contains("ok")) {
                     verifyDanmakuAfterPushAsync(danmakuItem, activity);
                 } else {
-                    Leodanmu.log("❌ 快速推送失败，响应: " + fastPushResp);
+                    Leodanmu.log("❌ 快速推送失败，响应: " + pushResult);
                 }
                 return;
             }
