@@ -564,21 +564,17 @@ public class DanmakuUIHelper {
                 offsetIncBtn.setBackground(iconBg2);
 
                 View.OnFocusChangeListener iconFocus = (v, hasFocus) -> {
+                    GradientDrawable circleBg = new GradientDrawable();
+                    circleBg.setShape(GradientDrawable.OVAL);
+                    circleBg.setColor(colors.bgSecondary);
                     if (hasFocus) {
                         v.animate().scaleX(1.15f).scaleY(1.15f).setDuration(150).start();
-                        GradientDrawable bg = new GradientDrawable();
-                        bg.setShape(GradientDrawable.OVAL);
-                        bg.setColor(colors.bgSecondary);
-                        bg.setStroke(dpToPx(activity, 2), colors.focusBorder);
-                        v.setBackground(bg);
+                        circleBg.setStroke(dpToPx(activity, 2), colors.focusBorder);
                     } else {
                         v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start();
-                        GradientDrawable bg = new GradientDrawable();
-                        bg.setShape(GradientDrawable.OVAL);
-                        bg.setColor(colors.bgSecondary);
-                        bg.setStroke(dpToPx(activity, 1), colors.divider);
-                        v.setBackground(bg);
+                        circleBg.setStroke(dpToPx(activity, 1), colors.divider);
                     }
+                    v.setBackground(circleBg);
                 };
                 offsetDecBtn.setOnFocusChangeListener(iconFocus);
                 offsetIncBtn.setOnFocusChangeListener(iconFocus);
