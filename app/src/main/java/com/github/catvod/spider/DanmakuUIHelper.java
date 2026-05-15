@@ -532,6 +532,93 @@ public class DanmakuUIHelper {
 
                 toastRow.addView(toastLabel);
                 toastRow.addView(toastSwitch);
+
+                // 时间偏移 +/- 图标按钮
+                final int[] currentOffset = new int[]{config.getDanmakuTimeOffsetMs()};
+
+                View spacer = new View(activity);
+                LinearLayout.LayoutParams spacerParams = new LinearLayout.LayoutParams(0, 0, 1);
+                spacer.setLayoutParams(spacerParams);
+                toastRow.addView(spacer);
+
+                Button offsetDecBtn = new Button(activity);
+                offsetDecBtn.setText("－");
+                offsetDecBtn.setTextSize(16);
+                offsetDecBtn.setTextColor(colors.textPrimary);
+                offsetDecBtn.setTypeface(null, android.graphics.Typeface.BOLD);
+                offsetDecBtn.setFocusable(true);
+                offsetDecBtn.setFocusableInTouchMode(true);
+                offsetDecBtn.setClickable(true);
+
+                int iconSize = dpToPx(activity, 40);
+                LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(iconSize, iconSize);
+                iconParams.setMargins(dpToPx(activity, 2), 0, dpToPx(activity, 2), 0);
+                offsetDecBtn.setLayoutParams(iconParams);
+                offsetDecBtn.setPadding(0, 0, 0, 0);
+
+                GradientDrawable iconBg = new GradientDrawable();
+                iconBg.setShape(GradientDrawable.OVAL);
+                iconBg.setColor(colors.bgSecondary);
+                iconBg.setStroke(dpToPx(activity, 1), colors.divider);
+                offsetDecBtn.setBackground(iconBg);
+
+                TextView offsetVal = new TextView(activity);
+                offsetVal.setText(formatOffsetMs(currentOffset[0]));
+                offsetVal.setTextSize(12);
+                offsetVal.setTextColor(colors.textSecondary);
+                offsetVal.setGravity(Gravity.CENTER);
+                offsetVal.setPadding(dpToPx(activity, 4), 0, dpToPx(activity, 4), 0);
+
+                Button offsetIncBtn = new Button(activity);
+                offsetIncBtn.setText("＋");
+                offsetIncBtn.setTextSize(16);
+                offsetIncBtn.setTextColor(colors.textPrimary);
+                offsetIncBtn.setTypeface(null, android.graphics.Typeface.BOLD);
+                offsetIncBtn.setFocusable(true);
+                offsetIncBtn.setFocusableInTouchMode(true);
+                offsetIncBtn.setClickable(true);
+                offsetIncBtn.setLayoutParams(new LinearLayout.LayoutParams(iconSize, iconSize));
+                offsetIncBtn.setPadding(0, 0, 0, 0);
+
+                GradientDrawable iconBg2 = new GradientDrawable();
+                iconBg2.setShape(GradientDrawable.OVAL);
+                iconBg2.setColor(colors.bgSecondary);
+                iconBg2.setStroke(dpToPx(activity, 1), colors.divider);
+                offsetIncBtn.setBackground(iconBg2);
+
+                View.OnFocusChangeListener iconFocus = (v, hasFocus) -> {
+                    if (hasFocus) {
+                        v.animate().scaleX(1.15f).scaleY(1.15f).setDuration(150).start();
+                        GradientDrawable bg = new GradientDrawable();
+                        bg.setShape(GradientDrawable.OVAL);
+                        bg.setColor(colors.bgSecondary);
+                        bg.setStroke(dpToPx(activity, 2), colors.focusBorder);
+                        v.setBackground(bg);
+                    } else {
+                        v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start();
+                        GradientDrawable bg = new GradientDrawable();
+                        bg.setShape(GradientDrawable.OVAL);
+                        bg.setColor(colors.bgSecondary);
+                        bg.setStroke(dpToPx(activity, 1), colors.divider);
+                        v.setBackground(bg);
+                    }
+                };
+                offsetDecBtn.setOnFocusChangeListener(iconFocus);
+                offsetIncBtn.setOnFocusChangeListener(iconFocus);
+
+                offsetDecBtn.setOnClickListener(v -> {
+                    currentOffset[0] = Math.max(-300000, currentOffset[0] - 500);
+                    offsetVal.setText(formatOffsetMs(currentOffset[0]));
+                });
+
+                offsetIncBtn.setOnClickListener(v -> {
+                    currentOffset[0] = Math.min(300000, currentOffset[0] + 500);
+                    offsetVal.setText(formatOffsetMs(currentOffset[0]));
+                });
+
+                toastRow.addView(offsetDecBtn);
+                toastRow.addView(offsetVal);
+                toastRow.addView(offsetIncBtn);
                 leftArea.addView(toastRow);
 
                 // 第二行：自动推送弹幕
@@ -637,94 +724,6 @@ public class DanmakuUIHelper {
                 themeRow.addView(darkThemeBtn);
                 themeRow.addView(lightThemeBtn);
                 leftArea.addView(themeRow);
-
-                // ========== 时间偏移控制行 ==========
-                LinearLayout offsetRow = new LinearLayout(activity);
-                offsetRow.setOrientation(LinearLayout.HORIZONTAL);
-                offsetRow.setGravity(Gravity.CENTER_VERTICAL);
-                offsetRow.setLayoutParams(new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-                offsetRow.setClipChildren(false);
-                offsetRow.setFocusable(false);
-                offsetRow.setFocusableInTouchMode(false);
-
-                TextView offsetLabel = new TextView(activity);
-                offsetLabel.setText("时间偏移");
-                offsetLabel.setTextSize(14);
-                offsetLabel.setTextColor(colors.textPrimary);
-                offsetLabel.setPadding(dpToPx(activity, 6), 0, dpToPx(activity, 8), 0);
-                offsetLabel.setFocusable(false);
-
-                Button offsetDecBtn = new Button(activity);
-                offsetDecBtn.setText("-500");
-                offsetDecBtn.setTextSize(13);
-                offsetDecBtn.setTypeface(null, android.graphics.Typeface.BOLD);
-                offsetDecBtn.setPadding(dpToPx(activity, 4), dpToPx(activity, 2),
-                        dpToPx(activity, 4), dpToPx(activity, 2));
-
-                Button offsetIncBtn = new Button(activity);
-                offsetIncBtn.setText("+500");
-                offsetIncBtn.setTextSize(13);
-                offsetIncBtn.setTypeface(null, android.graphics.Typeface.BOLD);
-                offsetIncBtn.setPadding(dpToPx(activity, 4), dpToPx(activity, 2),
-                        dpToPx(activity, 4), dpToPx(activity, 2));
-
-                final int[] currentOffset = new int[]{config.getDanmakuTimeOffsetMs()};
-
-                TextView offsetValue = new TextView(activity);
-                offsetValue.setText(formatOffsetMs(currentOffset[0]));
-                offsetValue.setTextSize(14);
-                offsetValue.setTextColor(colors.textPrimary);
-                offsetValue.setGravity(Gravity.CENTER);
-                offsetValue.setTypeface(null, android.graphics.Typeface.BOLD);
-
-                LinearLayout.LayoutParams offsetBtnParams = new LinearLayout.LayoutParams(
-                        dpToPx(activity, 64), dpToPx(activity, 36));
-                offsetBtnParams.setMargins(dpToPx(activity, 2), 0, dpToPx(activity, 2), 0);
-                offsetDecBtn.setLayoutParams(offsetBtnParams);
-                offsetIncBtn.setLayoutParams(offsetBtnParams);
-
-                GradientDrawable offsetDecBg = new GradientDrawable();
-                offsetDecBg.setShape(GradientDrawable.RECTANGLE);
-                offsetDecBg.setCornerRadius(dpToPx(activity, 8));
-                offsetDecBg.setColor(Color.TRANSPARENT);
-                offsetDecBg.setStroke(dpToPx(activity, 1), colors.divider);
-                offsetDecBtn.setBackground(offsetDecBg);
-
-                GradientDrawable offsetIncBg = new GradientDrawable();
-                offsetIncBg.setShape(GradientDrawable.RECTANGLE);
-                offsetIncBg.setCornerRadius(dpToPx(activity, 8));
-                offsetIncBg.setColor(Color.TRANSPARENT);
-                offsetIncBg.setStroke(dpToPx(activity, 1), colors.divider);
-                offsetIncBtn.setBackground(offsetIncBg);
-
-                View.OnFocusChangeListener offsetFocusListener = (v, hasFocus) -> {
-                    GradientDrawable drawable = (GradientDrawable) v.getBackground();
-                    if (hasFocus) {
-                        drawable.setStroke(dpToPx(activity, 2), colors.focusBorder);
-                    } else {
-                        drawable.setStroke(dpToPx(activity, 1), colors.divider);
-                    }
-                    v.setBackground(drawable);
-                };
-                offsetDecBtn.setOnFocusChangeListener(offsetFocusListener);
-                offsetIncBtn.setOnFocusChangeListener(offsetFocusListener);
-
-                offsetDecBtn.setOnClickListener(v -> {
-                    currentOffset[0] = Math.max(-300000, currentOffset[0] - 500);
-                    offsetValue.setText(formatOffsetMs(currentOffset[0]));
-                });
-
-                offsetIncBtn.setOnClickListener(v -> {
-                    currentOffset[0] = Math.min(300000, currentOffset[0] + 500);
-                    offsetValue.setText(formatOffsetMs(currentOffset[0]));
-                });
-
-                offsetRow.addView(offsetLabel);
-                offsetRow.addView(offsetDecBtn);
-                offsetRow.addView(offsetValue);
-                offsetRow.addView(offsetIncBtn);
-                leftArea.addView(offsetRow);
 
                 // 第四行：布局按钮
                 Button toolBtn = createStaticBorderButton(activity, "布局");
