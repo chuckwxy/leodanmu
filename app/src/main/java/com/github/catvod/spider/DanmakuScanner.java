@@ -1718,7 +1718,7 @@ public class DanmakuScanner {
             CharSequence cs = tv.getText();
             if (cs != null && cs.length() > 0) {
                 String text = cs.toString().trim();
-                // 寻找合适的锚点按钮
+                // 只保留两类锚点：原影视的「片尾」和影视仓的「弹幕开/弹幕关」
                 if (isButtonAnchor(text)) {
                     Leodanmu.log("[按钮注入] 找到按钮锚点: " + text + " 深度: " + depth);
                     if (view.getParent() instanceof ViewGroup) {
@@ -1746,12 +1746,11 @@ public class DanmakuScanner {
         try {
             View existing = parent.findViewWithTag("danmu_button");
             String anchorText = anchor.getText().toString().trim();
-            boolean compatAnchor = isTargetAnchor(anchorText);
+            boolean useBefore = shouldInsertBefore(anchorText);
 
             // 逻辑：如果已存在按钮
             if (existing != null) {
-                // 如果当前锚点是影视仓兼容锚点或音轨类按钮，我们重新定位按钮
-                if (compatAnchor) {
+                if (useBefore) {
                     ViewParent existingParent = existing.getParent();
                     if (existingParent instanceof ViewGroup) {
                         ((ViewGroup) existingParent).removeView(existing);
@@ -2052,21 +2051,19 @@ public class DanmakuScanner {
     private static boolean isButtonAnchor(String text) {
         if (TextUtils.isEmpty(text)) return false;
         String t = text.trim();
-        return "片尾".equals(t)
-                || t.contains("搜索")
-                || isTargetAnchor(t);
+        return "片尾".equals(t) || isTargetAnchor(t);
     }
 
     private static boolean shouldInsertBefore(String anchorText) {
         if (TextUtils.isEmpty(anchorText)) return false;
         String t = anchorText.trim();
-        return t.contains("搜索") || isTargetAnchor(t);
+        return isTargetAnchor(t);
     }
 
     private static boolean isTargetAnchor(String anchorText) {
         if (TextUtils.isEmpty(anchorText)) return false;
         String t = anchorText.trim();
-        return t.contains("音轨") || t.contains("弹幕开") || t.contains("弹幕关");
+        return t.contains("弹幕开") || t.contains("弹幕关");
     }
 
     // 兼容低版本的View ID生成方法
