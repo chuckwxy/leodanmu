@@ -1769,7 +1769,7 @@ public class DanmakuScanner {
             }
 
             TextView btn;
-            if (existing != null && isTargetAnchor) {
+            if (existing != null && compatAnchor) {
                 btn = (TextView) existing; // 复用
             } else {
                 // 创建新的Leo弹幕按钮
