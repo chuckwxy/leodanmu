@@ -114,11 +114,18 @@ public class Utils {
     public static int getPort() {
         int port = 9978;
         try {
-            Class<?> clz = Class.forName("com.github.catvod.Proxy");
-            port = (int) clz.getMethod("getPort").invoke(null);
+            // 优先读取当前工程里真正会被打包进去的代理类
+            try {
+                Class<?> clz = Class.forName("com.github.catvod.spider.Proxy");
+                port = (int) clz.getMethod("getPort").invoke(null);
+            } catch (Throwable primary) {
+                // 兼容部分壳/旧包名写法，避免直接回落到默认端口导致推送失效
+                Class<?> clz = Class.forName("com.github.catvod.Proxy");
+                port = (int) clz.getMethod("getPort").invoke(null);
+            }
         } catch (Exception e) {
             Leodanmu.log("❌ 获取代理端口异常: " + e.getMessage());
         }
-        return port;
+        return port > 0 ? port : 9978;
     }
 }

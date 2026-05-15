@@ -12,6 +12,7 @@ import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewParent;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import com.github.catvod.spider.entity.DanmakuItem;
@@ -1716,10 +1717,9 @@ public class DanmakuScanner {
             TextView tv = (TextView) view;
             CharSequence cs = tv.getText();
             if (cs != null && cs.length() > 0) {
-                String text = cs.toString();
+                String text = cs.toString().trim();
                 // 寻找合适的锚点按钮
-                if (text.equals("片尾")) {
-//                if (text.equals("硬解") || text.equals("软解") || text.equals("字幕") || text.equals("视轨") || text.equals("音轨")) {
+                if (isButtonAnchor(text)) {
                     Leodanmu.log("[按钮注入] 找到按钮锚点: " + text + " 深度: " + depth);
                     if (view.getParent() instanceof ViewGroup) {
                         injectButton((ViewGroup) view.getParent(), tv);
@@ -1745,15 +1745,18 @@ public class DanmakuScanner {
     private static void injectButton(ViewGroup parent, TextView anchor) {
         try {
             View existing = parent.findViewWithTag("danmu_button");
-            String anchorText = anchor.getText().toString();
-            boolean isTargetAnchor = anchorText.contains("音轨");
+            String anchorText = anchor.getText().toString().trim();
+            boolean compatAnchor = isTargetAnchor(anchorText);
 
             // 逻辑：如果已存在按钮
             if (existing != null) {
-                // 如果当前锚点是"音轨"，我们重新定位按钮
-                if (isTargetAnchor) {
-                    ((ViewGroup) existing.getParent()).removeView(existing);
-                    Leodanmu.log("[按钮注入] 移除旧按钮，准备重新注入");
+                // 如果当前锚点是影视仓兼容锚点或音轨类按钮，我们重新定位按钮
+                if (compatAnchor) {
+                    ViewParent existingParent = existing.getParent();
+                    if (existingParent instanceof ViewGroup) {
+                        ((ViewGroup) existingParent).removeView(existing);
+                        Leodanmu.log("[按钮注入] 移除旧按钮，准备重新注入");
+                    }
                 } else {
 //                    DanmakuSpider.log("[按钮注入] 按钮已存在，跳过");
                     return; // 否则不重复添加
@@ -1884,7 +1887,7 @@ public class DanmakuScanner {
 
             // 插入位置逻辑
             int insertIndex = -1;
-            boolean isInsertBefore = anchorText.equals("弹幕搜索") || anchorText.contains("搜索") || isTargetAnchor;
+            boolean isInsertBefore = shouldInsertBefore(anchorText);
             int anchorIndex = parent.indexOfChild(anchor);
 
             if (isInsertBefore) {
@@ -2044,6 +2047,26 @@ public class DanmakuScanner {
         } catch (Exception e) {
             Leodanmu.log("创建菜单失败: " + e.getMessage());
         }
+    }
+
+    private static boolean isButtonAnchor(String text) {
+        if (TextUtils.isEmpty(text)) return false;
+        String t = text.trim();
+        return "片尾".equals(t)
+                || t.contains("搜索")
+                || isTargetAnchor(t);
+    }
+
+    private static boolean shouldInsertBefore(String anchorText) {
+        if (TextUtils.isEmpty(anchorText)) return false;
+        String t = anchorText.trim();
+        return t.contains("搜索") || isTargetAnchor(t);
+    }
+
+    private static boolean isTargetAnchor(String anchorText) {
+        if (TextUtils.isEmpty(anchorText)) return false;
+        String t = anchorText.trim();
+        return t.contains("音轨") || t.contains("弹幕开") || t.contains("弹幕关");
     }
 
     // 兼容低版本的View ID生成方法
