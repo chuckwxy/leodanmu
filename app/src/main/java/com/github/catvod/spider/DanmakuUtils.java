@@ -2,8 +2,23 @@ package com.github.catvod.spider;
 
 import android.text.TextUtils;
 
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.NodeList;
+import org.xml.sax.InputSource;
+
+import java.io.StringReader;
+import java.io.StringWriter;
+import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.transform.OutputKeys;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
 
 public class DanmakuUtils {
 
@@ -158,5 +173,100 @@ public class DanmakuUtils {
 
         double similarity = (double) matchCount / minLen;
         return similarity > 0.7;
+    }
+
+    // ========== 新增：弹幕时间偏移相关方法（参考 CatVodSpider） ==========
+
+    public static String applyTimeOffset(String xmlData, int offsetMs) {
+        if (offsetMs == 0 || TextUtils.isEmpty(xmlData)) return xmlData;
+
+        try {
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            disableExternalEntities(factory);
+            Document document = factory.newDocumentBuilder().parse(new InputSource(new StringReader(xmlData)));
+            NodeList nodes = document.getElementsByTagName("d");
+            int shiftedCount = 0;
+            double offsetSeconds = offsetMs / 1000.0;
+
+            for (int i = 0; i < nodes.getLength(); i++) {
+                if (!(nodes.item(i) instanceof Element)) continue;
+                Element element = (Element) nodes.item(i);
+                String p = element.getAttribute("p");
+                if (TextUtils.isEmpty(p)) continue;
+
+                String[] parts = p.split(",", -1);
+                if (parts.length == 0 || TextUtils.isEmpty(parts[0])) continue;
+
+                try {
+                    double originalSeconds = Double.parseDouble(parts[0]);
+                    double shiftedSeconds = Math.max(0, originalSeconds + offsetSeconds);
+                    parts[0] = formatSeconds(shiftedSeconds);
+                    element.setAttribute("p", joinComma(parts));
+                    shiftedCount++;
+                } catch (NumberFormatException ignored) {
+                }
+            }
+
+            if (shiftedCount == 0) return xmlData;
+
+            Transformer transformer = TransformerFactory.newInstance().newTransformer();
+            transformer.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
+            transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "no");
+            StringWriter writer = new StringWriter();
+            transformer.transform(new DOMSource(document), new StreamResult(writer));
+            Leodanmu.log("⏱ 已应用弹幕时间偏移: " + formatOffsetLabel(offsetMs) + "，处理 " + shiftedCount + " 条");
+            return writer.toString();
+        } catch (Exception e) {
+            Leodanmu.log("弹幕时间偏移处理失败，使用原始弹幕: " + e.getMessage());
+            return xmlData;
+        }
+    }
+
+    private static void disableExternalEntities(DocumentBuilderFactory factory) {
+        try {
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        } catch (Exception ignored) {
+        }
+        try {
+            factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+        } catch (Exception ignored) {
+        }
+        try {
+            factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+        } catch (Exception ignored) {
+        }
+        factory.setExpandEntityReferences(false);
+    }
+
+    private static String joinComma(String[] parts) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < parts.length; i++) {
+            if (i > 0) sb.append(',');
+            sb.append(parts[i]);
+        }
+        return sb.toString();
+    }
+
+    public static String formatSeconds(double seconds) {
+        String text = String.format(Locale.US, "%.3f", seconds);
+        while (text.contains(".") && text.endsWith("0")) {
+            text = text.substring(0, text.length() - 1);
+        }
+        if (text.endsWith(".")) {
+            text = text.substring(0, text.length() - 1);
+        }
+        return text;
+    }
+
+    public static String formatOffsetSeconds(int offsetMs) {
+        return formatSeconds(offsetMs / 1000.0);
+    }
+
+    public static String formatOffsetLabel(int offsetMs) {
+        if (offsetMs > 600000) offsetMs = 600000;
+        if (offsetMs < -600000) offsetMs = -600000;
+        if (offsetMs == 0) return "未启用";
+        String prefix = offsetMs > 0 ? "延后 " : "提前 ";
+        return prefix + formatOffsetSeconds(Math.abs(offsetMs)) + " 秒";
     }
 }

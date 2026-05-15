@@ -14,8 +14,9 @@ public class DanmakuConfig {
     public float lpHeight;
     public float lpAlpha;
     public boolean autoPushEnabled;
-    private boolean pushToastEnabled = true; // 新增，默认开启
-    private int theme = 0; // 0: 深色主题, 1: 浅色主题
+    private boolean pushToastEnabled = true;
+    private int theme = 0;
+    private int danmakuTimeOffsetMs = 0;
 
     public DanmakuConfig() {
         // 设置默认值
@@ -82,6 +83,14 @@ public class DanmakuConfig {
         this.theme = theme;
     }
 
+    public int getDanmakuTimeOffsetMs() {
+        return danmakuTimeOffsetMs;
+    }
+
+    public void setDanmakuTimeOffsetMs(int danmakuTimeOffsetMs) {
+        this.danmakuTimeOffsetMs = danmakuTimeOffsetMs;
+    }
+
     /**
      * 从JSON对象更新配置
      * @param json JSON对象，可包含 apiUrls、autoPushEnabled、lpWidth、lpHeight、lpAlpha、pushToastEnabled、theme
@@ -126,6 +135,9 @@ public class DanmakuConfig {
         }
         if (json.has("theme")) {
             setTheme(json.optInt("theme"));
+        }
+        if (json.has("danmakuTimeOffsetMs")) {
+            setDanmakuTimeOffsetMs(json.optInt("danmakuTimeOffsetMs"));
         }
     }
 }

@@ -13,6 +13,20 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.NodeList;
+import org.xml.sax.InputSource;
+
+import java.io.StringReader;
+import java.io.StringWriter;
+
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
+
 public class WebServer extends NanoHTTPD {
 
     // 【修复】使用固定的Token，确保手机端和TV端一致
@@ -212,6 +226,44 @@ public class WebServer extends NanoHTTPD {
                 }
             }
             return newFixedLengthResponse(Response.Status.NOT_FOUND, MIME_PLAINTEXT, "Danmaku not found with given epId.");
+        }
+        else if (uri.equals("/danmaku")) {
+            Map<String, String> params = session.getParms();
+            String danmakuUrl = params.get("url");
+
+            if (TextUtils.isEmpty(danmakuUrl)) {
+                String epIdStr = params.get("epId");
+                if (!TextUtils.isEmpty(epIdStr)) {
+                    try {
+                        int epId = Integer.parseInt(epIdStr);
+                        DanmakuItem item = DanmakuManager.lastDanmakuItemMap.get(epId);
+                        if (item != null) {
+                            danmakuUrl = item.getDanmakuUrl();
+                        }
+                    } catch (NumberFormatException ignored) {
+                    }
+                }
+            }
+
+            if (TextUtils.isEmpty(danmakuUrl)) {
+                return newFixedLengthResponse(Response.Status.BAD_REQUEST, MIME_PLAINTEXT, "Missing danmaku url.");
+            }
+
+            String xml = NetworkUtils.robustHttpGet(danmakuUrl);
+            if (TextUtils.isEmpty(xml)) {
+                return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, MIME_PLAINTEXT, "Fetch danmaku failed.");
+            }
+
+            Activity activity = Utils.getTopActivity();
+            DanmakuConfig config = DanmakuConfigManager.getConfig(activity);
+            int offsetMs = config != null ? config.getDanmakuTimeOffsetMs() : 0;
+            if (offsetMs != 0) {
+                Leodanmu.log("本地弹幕代理收到请求，时间偏移: " + DanmakuUtils.formatOffsetLabel(offsetMs));
+            }
+            String body = DanmakuUtils.applyTimeOffset(xml, offsetMs);
+            Response response = newFixedLengthResponse(Response.Status.OK, "application/xml; charset=utf-8", body);
+            response.addHeader("Access-Control-Allow-Origin", "*");
+            return response;
         }
         return newFixedLengthResponse(Response.Status.NOT_FOUND, MIME_PLAINTEXT, "Not Found");
     }

@@ -9,13 +9,11 @@ import com.github.catvod.spider.entity.DanmakuItem;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.net.URLEncoder;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -670,14 +668,18 @@ public class LeoDanmakuService {
             return;
         }
 
+        DanmakuConfig config = activity != null ? DanmakuConfigManager.getConfig(activity) : null;
+        int offsetMs = config != null ? config.getDanmakuTimeOffsetMs() : 0;
+        String pushKey = danmakuUrl + "#offset=" + offsetMs;
+
         long currentTime = System.currentTimeMillis();
-        Long lastPush = lastPushTimes.get(danmakuUrl);
+        Long lastPush = lastPushTimes.get(pushKey);
         if (lastPush != null && (currentTime - lastPush < PUSH_MIN_INTERVAL)) {
-            Leodanmu.log("⚠️ 推送过于频繁 (同一URL)，跳过: " + danmakuUrl);
+            Leodanmu.log("⚠️ 推送过于频繁 (同一URL和偏移)，跳过: " + pushKey);
             return;
         }
 
-        lastPushTimes.put(danmakuUrl, currentTime);
+        lastPushTimes.put(pushKey, currentTime);
         cleanupOldPushTimes(currentTime);
         Leodanmu.recordDanmakuUrl(danmakuItem, isAuto);
         if (TextUtils.isEmpty(DanmakuScanner.currentSeriesName)
@@ -736,7 +738,42 @@ public class LeoDanmakuService {
                 return;
             }
 
-            String pushResp = pushDanmakuToPlayer(danmakuItem);
+            String pushResp;
+            String localIp = NetworkUtils.getLocalIpAddress();
+            DanmakuConfig config = DanmakuConfigManager.getConfig(activity);
+            int offsetMs = config != null ? config.getDanmakuTimeOffsetMs() : 0;
+            String refreshPath = buildDanmakuRefreshPath(danmakuItem, localIp, offsetMs);
+
+            if (offsetMs != 0) {
+                Leodanmu.log("启用弹幕时间偏移: " + DanmakuUtils.formatOffsetLabel(offsetMs) + "，通过本地代理推送");
+            }
+
+            boolean reflectionPushed = activity != null && tryPushDanmakuByReflection(danmakuItem, activity, refreshPath);
+            if (reflectionPushed) {
+                pushResp = "OK";
+                Leodanmu.log("✅ 已通过反射方式推送弹幕: " + buildDanmakuDisplayName(danmakuItem));
+            } else {
+                String pushUrl = "http://" + localIp + ":" + Utils.getPort() + "/action?do=refresh&type=danmaku&path=" +
+                        URLEncoder.encode(refreshPath, "UTF-8");
+                Leodanmu.log("反射推送不可用，回退到HTTP推送: " + pushUrl);
+                pushResp = "";
+                for (int i = 0; i < 3; i++) {
+                    pushResp = NetworkUtils.robustHttpGet(pushUrl);
+                    Leodanmu.log("推送尝试 " + (i + 1) + "/3: " + (!TextUtils.isEmpty(pushResp) ? "成功" : "失败"));
+                    if (!TextUtils.isEmpty(pushResp) && pushResp.toLowerCase().contains("ok")) {
+                        Leodanmu.log("✅ 推送成功");
+                        break;
+                    }
+                    if (i < 2) {
+                        try {
+                            Thread.sleep(1000);
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                        }
+                    }
+                }
+            }
+
             notifyPushResult(activity, danmakuItem, danmakuCount, pushResp);
         } catch (Exception e) {
             Leodanmu.log("推送异常: " + e.getMessage());
@@ -856,20 +893,959 @@ public class LeoDanmakuService {
         }
     }
 
-    // private static String buildShortStack() {
-    //     StackTraceElement[] stack = Thread.currentThread().getStackTrace();
-    //     StringBuilder sb = new StringBuilder();
-    //     int count = 0;
-    //     for (StackTraceElement e : stack) {
-    //         String cls = e.getClassName();
-    //         if (cls.contains("Thread") || cls.contains("LeoDanmakuService")) continue;
-    //         if (count > 0) sb.append(" <- ");
-    //         sb.append(cls).append("#").append(e.getMethodName()).append(":").append(e.getLineNumber());
-    //         count++;
-    //         if (count >= 6) break;
-    //     }
-    //     return sb.toString();
-    // }
+    // ========== 新增：构建弹幕刷新路径（支持时间偏移本地代理）==========
+    private static String buildDanmakuRefreshPath(DanmakuItem danmakuItem, String localIp, int offsetMs) throws Exception {
+        String rawUrl = danmakuItem.getDanmakuUrl();
+        if (offsetMs == 0) return rawUrl;
+        return "http://" + localIp + ":" + getWebServerPort() + "/danmaku?url=" +
+                URLEncoder.encode(rawUrl, "UTF-8") +
+                "&t=" + System.currentTimeMillis();
+    }
+
+    private static int getWebServerPort() {
+        return 9888;
+    }
+
+    // ========== 新增：反射推送弹幕（参考 CatVodSpider）==========
+    private static boolean tryPushDanmakuByReflection(final DanmakuItem danmakuItem, final Activity activity, final String danmakuPath) {
+        if (activity == null || TextUtils.isEmpty(danmakuPath)) return false;
+
+        final int maxAttempts = 4;
+        String lastError = null;
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            final CountDownLatch latch = new CountDownLatch(1);
+            final boolean[] success = new boolean[]{false};
+            final String[] error = new String[]{null};
+
+            Runnable task = new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        Class<?> danmakuClass = resolveHostDanmakuClass(activity);
+                        if (danmakuClass == null) {
+                            error[0] = "未找到宿主Danmaku类";
+                            return;
+                        }
+                        Object player = resolveFongMiPlayer(activity, danmakuClass);
+                        if (player == null) {
+                            error[0] = "未找到宿主播放器实例";
+                            return;
+                        }
+                        Object danmaku = createFongMiDanmaku(activity, danmakuItem, danmakuPath, danmakuClass);
+                        if (danmaku == null) {
+                            error[0] = "未能构造宿主弹幕对象";
+                            return;
+                        }
+                        Method setDanmaku = findDanmakuMethod(player.getClass(), danmakuClass);
+                        if (setDanmaku == null) {
+                            error[0] = "宿主目标缺少setDanmaku/o方法: " + player.getClass().getName();
+                            return;
+                        }
+                        setDanmaku.setAccessible(true);
+                        setDanmaku.invoke(player, danmaku);
+                        success[0] = true;
+                    } catch (Throwable e) {
+                        error[0] = e.getClass().getSimpleName() + ": " + e.getMessage();
+                    } finally {
+                        latch.countDown();
+                    }
+                }
+            };
+
+            if (Looper.myLooper() == Looper.getMainLooper()) {
+                task.run();
+            } else {
+                activity.runOnUiThread(task);
+                try {
+                    latch.await(3, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    error[0] = "等待主线程反射推送被中断";
+                }
+            }
+
+            if (success[0]) {
+                if (attempt > 1) Leodanmu.log("反射推送重试命中，第 " + attempt + " 次成功");
+                return true;
+            }
+
+            lastError = error[0];
+            if (!TextUtils.isEmpty(lastError)) {
+                Leodanmu.log("反射推送尝试 " + attempt + "/" + maxAttempts + " 失败: " + lastError);
+            }
+
+            if (attempt < maxAttempts) {
+                try {
+                    Thread.sleep(350L * attempt);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    lastError = "等待反射重试被中断";
+                    break;
+                }
+            }
+        }
+
+        if (!TextUtils.isEmpty(lastError)) {
+            Leodanmu.log("反射推送失败: " + lastError);
+        }
+        return false;
+    }
+
+    private static Object resolveFongMiPlayer(Activity activity, Class<?> danmakuClass) throws Exception {
+        Object player = tryResolveExactFongMiDanmakuTarget(activity, danmakuClass);
+        if (player != null) return player;
+
+        Activity topActivity = Utils.getTopActivity();
+        if (topActivity != null && topActivity != activity) {
+            player = tryResolveExactFongMiDanmakuTarget(topActivity, danmakuClass);
+            if (player != null) return player;
+        }
+
+        player = tryResolveKnownHostControllerTarget(activity, danmakuClass);
+        if (player != null) return player;
+        if (topActivity != null && topActivity != activity) {
+            player = tryResolveKnownHostControllerTarget(topActivity, danmakuClass);
+            if (player != null) return player;
+        }
+
+        player = tryResolveDanmakuTargetFromActivityDirect(activity, danmakuClass);
+        if (player != null) return player;
+        if (topActivity != null && topActivity != activity) {
+            player = tryResolveDanmakuTargetFromActivityDirect(topActivity, danmakuClass);
+            if (player != null) return player;
+        }
+
+        Set<Object> visited = Collections.newSetFromMap(new IdentityHashMap<Object, Boolean>());
+        player = tryResolveDanmakuTargetFromObject(activity, "activity-root", 5, visited, true, danmakuClass);
+        if (player != null) return player;
+        if (topActivity != null && topActivity != activity) {
+            player = tryResolveDanmakuTargetFromObject(topActivity, "top-activity-root", 5, visited, true, danmakuClass);
+            if (player != null) return player;
+        }
+
+        player = tryResolvePlayerFromActivity(activity, danmakuClass);
+        if (player != null) return player;
+
+        if (topActivity != null && topActivity != activity) {
+            player = tryResolvePlayerFromActivity(topActivity, danmakuClass);
+            if (player != null) return player;
+        }
+
+        player = tryResolvePlayerFromServer(activity, danmakuClass);
+        if (player != null) return player;
+
+        player = tryResolvePlayerFromActivityFields(activity, danmakuClass);
+        if (player != null) return player;
+
+        if (topActivity != null && topActivity != activity) {
+            player = tryResolvePlayerFromActivityFields(topActivity, danmakuClass);
+            if (player != null) return player;
+        }
+
+        return null;
+    }
+
+    private static Object tryResolveExactFongMiDanmakuTarget(Activity activity, Class<?> danmakuClass) {
+        if (activity == null) return null;
+        try {
+            Field videoField = findField(activity.getClass(), "F");
+            if (videoField == null) {
+                Leodanmu.log("精确链路失败: VideoActivity.F 不存在");
+                return null;
+            }
+            videoField.setAccessible(true);
+            Object service = videoField.get(activity);
+            if (service == null) {
+                Leodanmu.log("精确链路失败: VideoActivity.F 为空");
+                return null;
+            }
+            if (!"com.fongmi.android.tv.service.PlaybackService".equals(service.getClass().getName())) {
+                Leodanmu.log("精确链路失败: VideoActivity.F 类型异常 -> " + service.getClass().getName());
+                return null;
+            }
+            Field danmakuField = findField(service.getClass(), "u");
+            if (danmakuField == null) {
+                Leodanmu.log("精确链路失败: PlaybackService 缺少字段 u");
+                return null;
+            }
+            danmakuField.setAccessible(true);
+            Object target = danmakuField.get(service);
+            if (target == null) {
+                Leodanmu.log("精确链路失败: PlaybackService.u 为空");
+                return null;
+            }
+            if (findDanmakuMethod(target.getClass(), danmakuClass) == null) {
+                Leodanmu.log("精确链路失败: PlaybackService.u 不含 Danmaku 方法 -> " + target.getClass().getName());
+                return null;
+            }
+            Leodanmu.log("精确链路命中: VideoActivity.F.u -> " + target.getClass().getName());
+            return target;
+        } catch (Throwable e) {
+            Leodanmu.log("精确链路反射失败: " + e.getMessage());
+            return null;
+        }
+    }
+
+    private static Object tryResolveKnownHostControllerTarget(Activity activity, Class<?> danmakuClass) {
+        if (activity == null) return null;
+        try {
+            Class<?> current = activity.getClass();
+            while (current != null) {
+                for (Field field : current.getDeclaredFields()) {
+                    field.setAccessible(true);
+                    Object value = field.get(activity);
+                    if (value == null) continue;
+                    Class<?> valueClass = value.getClass();
+                    String typeName = valueClass.getName();
+                    if (typeName.startsWith("defpackage.") && findDanmakuMethod(valueClass, danmakuClass) != null) {
+                        Leodanmu.log("已知Host控制器命中: " + current.getName() + "#" + field.getName() + " -> " + typeName);
+                        return value;
+                    }
+                }
+                current = current.getSuperclass();
+            }
+        } catch (Throwable e) {
+            Leodanmu.log("已知Host控制器反射失败: " + e.getMessage());
+        }
+        return null;
+    }
+
+    private static Class<?> resolveHostDanmakuClass(Activity activity) throws Exception {
+        ClassLoader loader = activity.getClassLoader() != null ? activity.getClassLoader() : LeoDanmakuService.class.getClassLoader();
+        return findHostClass(loader, activity, "bean.Danmaku");
+    }
+
+    private static Object createFongMiDanmaku(Activity activity, DanmakuItem danmakuItem, String danmakuPath, Class<?> danmakuClass) throws Exception {
+        if (danmakuClass == null) return null;
+        Constructor<?> constructor = danmakuClass.getDeclaredConstructor();
+        constructor.setAccessible(true);
+        Object danmaku = constructor.newInstance();
+
+        Method setName = findMethod(danmakuClass, "setName", String.class);
+        Method setUrl = findMethod(danmakuClass, "setUrl", String.class);
+        Method setSelected = findMethod(danmakuClass, "setSelected", boolean.class);
+        if (setUrl == null) return null;
+
+        if (setName != null) {
+            setName.setAccessible(true);
+            setName.invoke(danmaku, buildDanmakuDisplayName(danmakuItem));
+        }
+        setUrl.setAccessible(true);
+        setUrl.invoke(danmaku, danmakuPath);
+        if (setSelected != null) {
+            setSelected.setAccessible(true);
+            setSelected.invoke(danmaku, true);
+        }
+        return danmaku;
+    }
+
+    private static String buildDanmakuDisplayName(DanmakuItem danmakuItem) {
+        if (danmakuItem == null) return "弹幕";
+        String title = danmakuItem.getTitleWithEp();
+        String source = danmakuItem.getFrom();
+        if (!TextUtils.isEmpty(title) && !TextUtils.isEmpty(source)) return title + " · " + source;
+        if (!TextUtils.isEmpty(title)) return title;
+        if (!TextUtils.isEmpty(source)) return source;
+        if (!TextUtils.isEmpty(danmakuItem.getEpTitle())) return danmakuItem.getEpTitle();
+        if (!TextUtils.isEmpty(danmakuItem.getTitle())) return danmakuItem.getTitle();
+        return danmakuItem.getDanmakuUrl();
+    }
+
+    private static Method findCompatibleMethod(Class<?> type, String name, Class<?> parameterType) {
+        Class<?> current = type;
+        while (current != null) {
+            for (Method method : current.getDeclaredMethods()) {
+                Class<?>[] params = method.getParameterTypes();
+                if (method.getName().equals(name) &&
+                        params.length == 1 &&
+                        params[0].isAssignableFrom(parameterType)) {
+                    return method;
+                }
+            }
+            current = current.getSuperclass();
+        }
+        return null;
+    }
+
+    private static Method findMethod(Class<?> type, String name, Class<?>... parameterTypes) {
+        Class<?> current = type;
+        while (current != null) {
+            try {
+                return current.getDeclaredMethod(name, parameterTypes);
+            } catch (NoSuchMethodException ignored) {
+                current = current.getSuperclass();
+            }
+        }
+        return null;
+    }
+
+    private static Field findField(Class<?> type, String name) {
+        Class<?> current = type;
+        while (current != null) {
+            try {
+                return current.getDeclaredField(name);
+            } catch (NoSuchFieldException ignored) {
+                current = current.getSuperclass();
+            }
+        }
+        return null;
+    }
+
+    private static Object tryResolvePlayerFromActivity(Activity activity, Class<?> danmakuClass) {
+        if (activity == null) return null;
+        try {
+            Method playerMethod = findMethod(activity.getClass(), "player");
+            if (playerMethod != null) {
+                playerMethod.setAccessible(true);
+                Object player = playerMethod.invoke(activity);
+                if (player != null) {
+                    Object resolved = normalizeResolvedPlayerTarget(player, "activity.player()", danmakuClass, true);
+                    if (resolved != null) return resolved;
+                }
+                Leodanmu.log("activity.player() 返回空: " + activity.getClass().getName());
+            }
+        } catch (Throwable e) {
+            Leodanmu.log("activity.player() 反射失败: " + e.getMessage());
+        }
+
+        try {
+            Method serviceMethod = findMethod(activity.getClass(), "service");
+            if (serviceMethod != null) {
+                serviceMethod.setAccessible(true);
+                Object service = serviceMethod.invoke(activity);
+                if (service == null) {
+                    Leodanmu.log("activity.service() 返回空: " + activity.getClass().getName());
+                } else {
+                    Object player = tryResolvePlayerFromService(service, true, danmakuClass);
+                    if (player != null) {
+                        Leodanmu.log("反射定位播放器成功: activity.service().player() -> " + activity.getClass().getName());
+                        return player;
+                    }
+                }
+            }
+        } catch (Throwable e) {
+            Leodanmu.log("activity.service() 反射失败: " + e.getMessage());
+        }
+
+        try {
+            Field serviceField = findField(activity.getClass(), "mService");
+            if (serviceField != null) {
+                serviceField.setAccessible(true);
+                Object service = serviceField.get(activity);
+                if (service == null) {
+                    Leodanmu.log("activity.mService 返回空: " + activity.getClass().getName());
+                } else {
+                    Object player = tryResolvePlayerFromService(service, true, danmakuClass);
+                    if (player != null) {
+                        Leodanmu.log("反射定位播放器成功: activity.mService.player() -> " + activity.getClass().getName());
+                        return player;
+                    }
+                }
+            }
+        } catch (Throwable e) {
+            Leodanmu.log("activity.mService 反射失败: " + e.getMessage());
+        }
+
+        return null;
+    }
+
+    private static Object tryResolvePlayerFromServer(Activity activity, Class<?> danmakuClass) {
+        try {
+            ClassLoader loader = activity != null && activity.getClassLoader() != null ? activity.getClassLoader() : LeoDanmakuService.class.getClassLoader();
+            Class<?> serverClass = findHostClass(loader, activity, "server.Server");
+            if (serverClass == null) return null;
+            Method getMethod = findMethod(serverClass, "get");
+            Method getServiceMethod = findMethod(serverClass, "getService");
+            if (getMethod == null || getServiceMethod == null) return null;
+            getMethod.setAccessible(true);
+            Object server = getMethod.invoke(null);
+            if (server == null) return null;
+            getServiceMethod.setAccessible(true);
+            Object service = getServiceMethod.invoke(server);
+            if (service == null) {
+                Leodanmu.log("Server.get().getService() 返回空");
+                return null;
+            }
+            Object player = tryResolvePlayerFromService(service, true, danmakuClass);
+            if (player != null) {
+                Leodanmu.log("反射定位播放器成功: Server.get().getService().player()");
+                return player;
+            }
+        } catch (Throwable e) {
+            Leodanmu.log("Server.get().getService() 反射失败: " + e.getMessage());
+        }
+        return null;
+    }
+
+    private static Object tryResolvePlayerFromService(Object service, boolean verbose, Class<?> danmakuClass) {
+        if (service == null) return null;
+        try {
+            Object directTarget = tryResolveDanmakuTargetFromPlaybackServiceDirect(service, verbose, danmakuClass);
+            if (directTarget != null) return directTarget;
+
+            Object directCandidate = tryResolveDanmakuTargetFromObject(service, service.getClass().getName(), 2,
+                    Collections.newSetFromMap(new IdentityHashMap<Object, Boolean>()), false, danmakuClass);
+            if (directCandidate != null) {
+                if (verbose) Leodanmu.log("反射定位弹幕目标成功: service-root-scan -> " + directCandidate.getClass().getName());
+                return directCandidate;
+            }
+
+            Method playerMethod = findMethod(service.getClass(), "player");
+            if (playerMethod == null) {
+                if (verbose) Leodanmu.log("service.player() 方法不存在: " + service.getClass().getName());
+            } else {
+                playerMethod.setAccessible(true);
+                Object player = playerMethod.invoke(service);
+                if (player == null) {
+                    if (verbose) Leodanmu.log("service.player() 返回空: " + service.getClass().getName());
+                } else {
+                    Object resolved = normalizeResolvedPlayerTarget(player, "service.player()", danmakuClass, verbose);
+                    if (resolved != null) return resolved;
+                }
+            }
+
+            Field playerField = findField(service.getClass(), "player");
+            if (playerField == null) playerField = findField(service.getClass(), "mPlayer");
+            if (playerField != null) {
+                playerField.setAccessible(true);
+                Object player = playerField.get(service);
+                if (player == null) {
+                    if (verbose) Leodanmu.log("service.player 字段返回空: " + service.getClass().getName());
+                } else {
+                    Object resolved = normalizeResolvedPlayerTarget(player, "service.player field", danmakuClass, verbose);
+                    if (resolved != null) return resolved;
+                }
+            } else if (verbose) {
+                Leodanmu.log("service.player 字段不存在: " + service.getClass().getName());
+            }
+
+            Object candidate = tryResolveDanmakuTargetFromFields(service, service.getClass().getName(), 4, Collections.newSetFromMap(new IdentityHashMap<Object, Boolean>()), verbose, danmakuClass);
+            if (candidate != null) return candidate;
+        } catch (Throwable e) {
+            if (verbose) Leodanmu.log("service.player/service字段 反射失败: " + e.getMessage());
+        }
+        return null;
+    }
+
+    private static Object tryResolveDanmakuTargetFromActivityDirect(Activity activity, Class<?> danmakuClass) {
+        if (activity == null) return null;
+        try {
+            Field serviceField = findField(activity.getClass(), "F");
+            if (serviceField == null) return null;
+            serviceField.setAccessible(true);
+            Object service = serviceField.get(activity);
+            if (service == null) {
+                Leodanmu.log("activity.F 返回空: " + activity.getClass().getName());
+                return null;
+            }
+            Object target = tryResolveDanmakuTargetFromPlaybackServiceDirect(service, true, danmakuClass);
+            if (target != null) {
+                Leodanmu.log("反射定位弹幕目标成功: activity.F.u -> " + activity.getClass().getName() + " / " + target.getClass().getName());
+                return target;
+            }
+        } catch (Throwable e) {
+            Leodanmu.log("activity.F 反射失败: " + e.getMessage());
+        }
+
+        Object candidate = tryResolveDanmakuTargetFromLikelyActivityFields(activity, true, danmakuClass);
+        if (candidate != null) return candidate;
+        return null;
+    }
+
+    private static Object tryResolveDanmakuTargetFromPlaybackServiceDirect(Object service, boolean verbose, Class<?> danmakuClass) {
+        if (service == null) return null;
+        try {
+            Field danmakuField = findField(service.getClass(), "u");
+            if (danmakuField == null) {
+                if (verbose) Leodanmu.log("service.u 字段不存在: " + service.getClass().getName());
+                return null;
+            }
+            danmakuField.setAccessible(true);
+            Object target = danmakuField.get(service);
+            if (target == null) {
+                if (verbose) Leodanmu.log("service.u 返回空: " + service.getClass().getName());
+                return null;
+            }
+            if (findDanmakuMethod(target.getClass(), danmakuClass) != null) {
+                Object normalized = normalizeControllerLikeTarget(target, "service.u", danmakuClass, verbose);
+                if (normalized != null) return normalized;
+            }
+            if (verbose) Leodanmu.log("service.u 不含弹幕方法: " + target.getClass().getName());
+        } catch (Throwable e) {
+            if (verbose) Leodanmu.log("service.u 反射失败: " + e.getMessage());
+        }
+
+        try {
+            Class<?> current = service.getClass();
+            while (current != null) {
+                for (Field field : current.getDeclaredFields()) {
+                    field.setAccessible(true);
+                    Object value = field.get(service);
+                    if (value == null) continue;
+                    Class<?> valueClass = value.getClass();
+                    if (isSimpleValueType(valueClass)) continue;
+                    if (!isLikelyDanmakuCarrierField(field, valueClass) && findDanmakuMethod(valueClass, danmakuClass) == null) continue;
+                    Object resolved = tryResolveDanmakuTargetFromObject(value,
+                            service.getClass().getName() + "#" + field.getName(),
+                            2,
+                            Collections.newSetFromMap(new IdentityHashMap<Object, Boolean>()),
+                            false,
+                            danmakuClass);
+                    if (resolved != null) {
+                        if (verbose) Leodanmu.log("反射定位弹幕目标成功: service-field-scan -> " + valueClass.getName());
+                        return resolved;
+                    }
+                }
+                current = current.getSuperclass();
+            }
+        } catch (Throwable e) {
+            if (verbose) Leodanmu.log("service 字段扫描失败: " + e.getMessage());
+        }
+        return null;
+    }
+
+    private static Object tryResolvePlayerFromActivityFields(Activity activity, Class<?> danmakuClass) {
+        if (activity == null) return null;
+        Class<?> current = activity.getClass();
+        while (current != null) {
+            Field[] fields = current.getDeclaredFields();
+            for (Field field : fields) {
+                try {
+                    field.setAccessible(true);
+                    Object value = field.get(activity);
+                    if (value == null) continue;
+
+                    if (isFongMiPlayerClass(value.getClass())) {
+                        Object resolved = normalizeResolvedPlayerTarget(value, current.getName() + "#" + field.getName(), danmakuClass, true);
+                        if (resolved != null) return resolved;
+                    }
+
+                    if (isLikelyPlaybackServiceField(field, value)) {
+                        Object nestedPlayer = tryResolvePlayerFromService(value, true, danmakuClass);
+                        if (nestedPlayer != null) {
+                            Leodanmu.log("反射定位播放器成功: 字段服务 " + current.getName() + "#" + field.getName());
+                            return nestedPlayer;
+                        }
+                    }
+                } catch (Throwable ignored) {
+                }
+            }
+            current = current.getSuperclass();
+        }
+        return null;
+    }
+
+    private static Object normalizeResolvedPlayerTarget(Object candidate, String label, Class<?> danmakuClass, boolean verbose) {
+        if (candidate == null) return null;
+        Class<?> candidateClass = candidate.getClass();
+        if (findDanmakuMethod(candidateClass, danmakuClass) != null &&
+                !isViewOnlyDanmakuTarget(candidateClass) &&
+                !isWrapperOrAsyncTarget(candidateClass)) {
+            if (verbose) Leodanmu.log("反射定位弹幕目标成功: " + label + " -> " + candidateClass.getName());
+            return candidate;
+        }
+        if (isViewOnlyDanmakuTarget(candidateClass) || isWrapperOrAsyncTarget(candidateClass) || isLikelyPlayerWrapperClass(candidateClass)) {
+            Object nested = tryResolveDanmakuTargetFromObject(candidate,
+                    label + "#" + candidateClass.getSimpleName(),
+                    3,
+                    Collections.newSetFromMap(new IdentityHashMap<Object, Boolean>()),
+                    false,
+                    danmakuClass);
+            if (nested != null) {
+                if (verbose) Leodanmu.log("反射定位弹幕目标成功: " + label + " -> " + nested.getClass().getName());
+                return nested;
+            }
+            return null;
+        }
+        if (isFongMiPlayerClass(candidateClass)) {
+            if (verbose) Leodanmu.log("反射定位播放器成功: " + label + " -> " + candidateClass.getName());
+            return candidate;
+        }
+        return null;
+    }
+
+    private static boolean isFongMiPlayerClass(Class<?> type) {
+        if (type == null) return false;
+        String name = type.getName();
+        return name.endsWith(".player.PlayerManager") ||
+                name.endsWith(".player.Players") ||
+                name.startsWith("com.fongmi.android.tv.player.") ||
+                name.endsWith(".Player") ||
+                name.endsWith(".ExoMediaPlayer") ||
+                name.endsWith(".IjkPlayer") ||
+                name.endsWith(".VodPlayer");
+    }
+
+    private static boolean hasSingleArgMethodNamed(Class<?> type, String methodName) {
+        Class<?> current = type;
+        while (current != null) {
+            for (Method method : current.getDeclaredMethods()) {
+                if (method.getName().equals(methodName) && method.getParameterTypes().length == 1) {
+                    return true;
+                }
+            }
+            current = current.getSuperclass();
+        }
+        return false;
+    }
+
+    private static Method findDanmakuMethod(Class<?> targetClass, Class<?> danmakuClass) {
+        if (targetClass == null || danmakuClass == null) return null;
+        Method method = findCompatibleMethod(targetClass, "o", danmakuClass);
+        if (method != null) return method;
+        method = findCompatibleMethod(targetClass, "setDanmaku", danmakuClass);
+        if (method != null) return method;
+        return findAnyCompatibleSingleArgMethod(targetClass, danmakuClass);
+    }
+
+    private static Object tryResolveDanmakuTargetFromObject(Object holder, String ownerLabel, int depth, Set<Object> visited, boolean verbose, Class<?> danmakuClass) {
+        if (holder == null || depth < 0) return null;
+        if (visited.contains(holder)) return null;
+        visited.add(holder);
+
+        Class<?> holderClass = holder.getClass();
+        Method danmakuMethod = findDanmakuMethod(holderClass, danmakuClass);
+        if (danmakuMethod != null) {
+            Object normalized = normalizeControllerLikeTarget(holder, ownerLabel, danmakuClass, verbose);
+            if (normalized != null) return normalized;
+        }
+
+        if (isFongMiPlayerClass(holderClass) && !isLikelyPlayerWrapperClass(holderClass)) {
+            if (verbose) Leodanmu.log("反射定位弹幕目标成功: " + ownerLabel + " -> " + holderClass.getName());
+            return holder;
+        }
+
+        return tryResolveDanmakuTargetFromFields(holder, ownerLabel, depth, visited, verbose, danmakuClass);
+    }
+
+    private static Object tryResolveDanmakuTargetFromFields(Object holder, String ownerLabel, int depth, Set<Object> visited, boolean verbose, Class<?> danmakuClass) {
+        if (holder == null || depth < 0) return null;
+        Class<?> current = holder.getClass();
+        while (current != null) {
+            for (Field field : current.getDeclaredFields()) {
+                try {
+                    field.setAccessible(true);
+                    Object value = field.get(holder);
+                    if (value == null) continue;
+
+                    Class<?> valueClass = value.getClass();
+                    if (isSimpleValueType(valueClass)) continue;
+
+                    if (isFongMiPlayerClass(valueClass) &&
+                            !isLikelyPlayerWrapperClass(valueClass) &&
+                            !isViewOnlyDanmakuTarget(valueClass) &&
+                            !isWrapperOrAsyncTarget(valueClass)) {
+                        if (verbose) Leodanmu.log("反射定位播放器成功: " + ownerLabel + "#" + field.getName() + " -> " + valueClass.getName());
+                        return value;
+                    }
+
+                    if (findDanmakuMethod(valueClass, danmakuClass) != null) {
+                        Object normalized = normalizeControllerLikeTarget(value, ownerLabel + "#" + field.getName(), danmakuClass, verbose);
+                        if (normalized != null) return normalized;
+                    }
+
+                    if (isLikelyPlaybackServiceField(field, value)) {
+                        Object player = tryResolvePlayerFromService(value, false, danmakuClass);
+                        if (player != null) {
+                            if (verbose) Leodanmu.log("反射定位播放器成功: " + ownerLabel + "#" + field.getName() + " -> service-scan");
+                            return player;
+                        }
+                    }
+
+                    if (depth > 0) {
+                        Object nested = tryResolveDanmakuTargetFromObject(value, ownerLabel + "#" + field.getName(), depth - 1, visited, verbose, danmakuClass);
+                        if (nested != null) return nested;
+                    }
+                } catch (Throwable ignored) {
+                }
+            }
+            current = current.getSuperclass();
+        }
+        return null;
+    }
+
+    private static boolean isLikelyDanmakuCarrierField(Field field, Class<?> valueClass) {
+        if (field == null || valueClass == null) return false;
+        String fieldName = field.getName().toLowerCase();
+        String typeName = valueClass.getName().toLowerCase();
+        if ("u".equals(fieldName) || "f".equals(fieldName) || "h".equals(fieldName) || "d".equals(fieldName)) return true;
+        if (fieldName.contains("player") || fieldName.contains("manager") || fieldName.contains("controller") ||
+                fieldName.contains("session") || fieldName.contains("spec") || fieldName.contains("render") ||
+                fieldName.contains("engine") || fieldName.contains("media") || fieldName.contains("core")) return true;
+        return typeName.contains("player") || typeName.contains("manager") || typeName.contains("controller") ||
+                typeName.contains("session") || typeName.contains("spec") || typeName.contains("render") ||
+                typeName.contains("engine") || typeName.contains("media") || typeName.contains("exo") ||
+                typeName.contains("ijk");
+    }
+
+    private static boolean isSimpleValueType(Class<?> type) {
+        if (type == null) return true;
+        if (type.isPrimitive() || type.isArray() || type.isEnum()) return true;
+        String name = type.getName();
+        return name.startsWith("java.lang.") ||
+                name.startsWith("java.util.") ||
+                name.startsWith("android.animation.") ||
+                name.startsWith("android.graphics.") ||
+                name.startsWith("android.drawable.") ||
+                name.startsWith("android.content.res.") ||
+                name.startsWith("android.view.") ||
+                name.startsWith("android.view.animation.") ||
+                name.startsWith("android.widget.") ||
+                name.startsWith("androidx.");
+    }
+
+    private static boolean isLikelyPlaybackServiceField(Field field, Object value) {
+        if (field == null || value == null) return false;
+        String fieldName = field.getName().toLowerCase();
+        String typeName = value.getClass().getName().toLowerCase();
+        if (value instanceof CharSequence) return false;
+        if (isSimpleValueType(value.getClass())) return false;
+        if ("mservice".equals(fieldName) || "service".equals(fieldName)) return true;
+        return typeName.endsWith(".service.playbackservice") ||
+                typeName.equals("com.fongmi.android.tv.service.playbackservice") ||
+                typeName.contains("playbackservice");
+    }
+
+    private static boolean isLikelyPlayerWrapperClass(Class<?> type) {
+        if (type == null) return false;
+        String name = type.getName().toLowerCase();
+        if (name.endsWith(".players")) return true;
+        int objectFieldCount = 0;
+        int danmakuMethodCount = 0;
+        Class<?> current = type;
+        while (current != null) {
+            for (Method method : current.getDeclaredMethods()) {
+                if (method.getParameterTypes().length == 1) danmakuMethodCount++;
+            }
+            for (Field field : current.getDeclaredFields()) {
+                if (field.getType().isPrimitive()) continue;
+                if (isSimpleValueType(field.getType())) continue;
+                objectFieldCount++;
+            }
+            current = current.getSuperclass();
+        }
+        return danmakuMethodCount == 0 && objectFieldCount > 0;
+    }
+
+    private static boolean isViewOnlyDanmakuTarget(Class<?> type) {
+        if (type == null) return false;
+        String name = type.getName();
+        if (name.contains("master.flame.danmaku.ui.widget.DanmakuView")) return true;
+        Class<?> current = type;
+        while (current != null) {
+            if ("android.view.View".equals(current.getName())) return true;
+            current = current.getSuperclass();
+        }
+        return false;
+    }
+
+    private static Object normalizeControllerLikeTarget(Object candidate, String label, Class<?> danmakuClass, boolean verbose) {
+        if (candidate == null) return null;
+        Class<?> candidateClass = candidate.getClass();
+        Method method = findDanmakuMethod(candidateClass, danmakuClass);
+        if (method == null) return null;
+        if (isViewOnlyDanmakuTarget(candidateClass) || isWrapperOrAsyncTarget(candidateClass)) return null;
+        if (!looksLikePlaybackController(candidateClass, method) && !looksLikeDanmakuController(candidateClass, method)) return null;
+        if (verbose) Leodanmu.log("反射定位弹幕目标成功: " + label + " -> " + candidateClass.getName());
+        return candidate;
+    }
+
+    private static boolean looksLikePlaybackController(Class<?> type, Method danmakuMethod) {
+        if (type == null || danmakuMethod == null) return false;
+        String name = type.getName().toLowerCase();
+        if (name.startsWith("defpackage.")) {
+            int score = 0;
+            Class<?> current = type;
+            while (current != null) {
+                for (Field field : current.getDeclaredFields()) {
+                    Class<?> fieldType = field.getType();
+                    String fieldName = field.getName().toLowerCase();
+                    String fieldTypeName = fieldType.getName().toLowerCase();
+                    if (fieldName.equals("h") || fieldName.equals("d") || fieldName.equals("g") || fieldName.equals("c")) score++;
+                    if (fieldTypeName.contains("media3") || fieldTypeName.contains("danmaku") || fieldTypeName.contains("playback")) score += 2;
+                    if (fieldTypeName.contains("player") || fieldTypeName.contains("view")) score++;
+                }
+                current = current.getSuperclass();
+            }
+            if ("o".equals(danmakuMethod.getName())) score += 2;
+            return score >= 3;
+        }
+        return danmakuMethod.getName().equals("o");
+    }
+
+    private static boolean looksLikeDanmakuController(Class<?> type, Method danmakuMethod) {
+        if (type == null || danmakuMethod == null) return false;
+        String name = type.getName().toLowerCase();
+        int score = 0;
+        if (name.startsWith("defpackage.")) score++;
+        if ("o".equals(danmakuMethod.getName())) score += 2;
+        if (findMethod(type, "getRealUrl") != null) score++;
+        Class<?> current = type;
+        while (current != null) {
+            for (Field field : current.getDeclaredFields()) {
+                String fieldTypeName = field.getType().getName().toLowerCase();
+                String fieldName = field.getName().toLowerCase();
+                if (fieldTypeName.contains("danmakuview")) score += 2;
+                if (fieldTypeName.contains("ijkvideoview") || fieldTypeName.contains("playerview")) score++;
+                if (fieldTypeName.contains("okhttp") || fieldTypeName.contains("request")) score++;
+                if (fieldName.equals("g") || fieldName.equals("c") || fieldName.equals("i")) score++;
+            }
+            current = current.getSuperclass();
+        }
+        return score >= 3;
+    }
+
+    private static boolean isWrapperOrAsyncTarget(Class<?> type) {
+        if (type == null) return false;
+        String name = type.getName();
+        if (name.startsWith("java.util.concurrent.")) return true;
+        if (name.startsWith("kotlinx.coroutines.")) return true;
+        if (name.startsWith("android.animation.")) return true;
+        if (name.startsWith("android.graphics.drawable.")) return true;
+        if (name.startsWith("android.view.animation.")) return true;
+        if (Runnable.class.isAssignableFrom(type)) return true;
+        if (java.util.concurrent.Callable.class.isAssignableFrom(type)) return true;
+        if (java.util.concurrent.Executor.class.isAssignableFrom(type)) return true;
+        if (java.util.concurrent.Future.class.isAssignableFrom(type)) return true;
+        if (android.animation.Animator.class.isAssignableFrom(type)) return true;
+        if (android.graphics.drawable.Drawable.class.isAssignableFrom(type)) return true;
+        return false;
+    }
+
+    private static Object tryResolveDanmakuTargetFromLikelyActivityFields(Activity activity, boolean verbose, Class<?> danmakuClass) {
+        if (activity == null) return null;
+        try {
+            Set<Object> visited = Collections.newSetFromMap(new IdentityHashMap<Object, Boolean>());
+            Class<?> current = activity.getClass();
+            while (current != null) {
+                for (Field field : current.getDeclaredFields()) {
+                    field.setAccessible(true);
+                    Object value = field.get(activity);
+                    if (value == null) continue;
+                    Class<?> valueClass = value.getClass();
+                    if (isSimpleValueType(valueClass)) continue;
+
+                    if (isLikelyPlaybackServiceField(field, value)) {
+                        Object player = tryResolvePlayerFromService(value, false, danmakuClass);
+                        if (player != null) {
+                            if (verbose) Leodanmu.log("反射定位播放器成功: activity-field-service -> " + current.getName() + "#" + field.getName());
+                            return player;
+                        }
+                    }
+
+                    if (isLikelyDanmakuCarrierField(field, valueClass) || findDanmakuMethod(valueClass, danmakuClass) != null || isFongMiPlayerClass(valueClass)) {
+                        Object candidate = tryResolveDanmakuTargetFromObject(value,
+                                activity.getClass().getName() + "#" + field.getName(),
+                                3,
+                                visited,
+                                false,
+                                danmakuClass);
+                        if (candidate != null) {
+                            if (verbose) Leodanmu.log("反射定位弹幕目标成功: activity-field-scan -> " + current.getName() + "#" + field.getName());
+                            return candidate;
+                        }
+                    }
+                }
+                current = current.getSuperclass();
+            }
+        } catch (Throwable e) {
+            if (verbose) Leodanmu.log("activity 字段扫描失败: " + e.getMessage());
+        }
+        return null;
+    }
+
+    private static Method findAnyCompatibleSingleArgMethod(Class<?> type, Class<?> parameterType) {
+        Class<?> current = type;
+        while (current != null) {
+            for (Method method : current.getDeclaredMethods()) {
+                if (method.getParameterTypes().length != 1) continue;
+                Class<?> argType = method.getParameterTypes()[0];
+                if (!argType.isAssignableFrom(parameterType)) continue;
+                if (method.getReturnType() != Void.TYPE && method.getReturnType() != type) continue;
+                String name = method.getName();
+                if (name.startsWith("set") || name.length() <= 2 || name.contains("dan")) {
+                    return method;
+                }
+            }
+            current = current.getSuperclass();
+        }
+        return null;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Activity> getAliveActivities() {
+        List<Activity> result = new ArrayList<>();
+        try {
+            Class<?> activityThreadClass = Class.forName("android.app.ActivityThread");
+            Object activityThread = activityThreadClass.getMethod("currentActivityThread").invoke(null);
+            Field activitiesField = activityThreadClass.getDeclaredField("mActivities");
+            activitiesField.setAccessible(true);
+            Map<Object, Object> activities;
+            if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.KITKAT) {
+                activities = (java.util.HashMap<Object, Object>) activitiesField.get(activityThread);
+            } else {
+                activities = (android.util.ArrayMap<Object, Object>) activitiesField.get(activityThread);
+            }
+            for (Object activityRecord : activities.values()) {
+                if (activityRecord == null) continue;
+                Class<?> recordClass = activityRecord.getClass();
+                Field activityField = recordClass.getDeclaredField("activity");
+                activityField.setAccessible(true);
+                Activity act = (Activity) activityField.get(activityRecord);
+                if (act == null || act.isFinishing()) continue;
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.JELLY_BEAN_MR1 && act.isDestroyed()) {
+                    continue;
+                }
+                result.add(act);
+            }
+        } catch (Throwable e) {
+            Leodanmu.log("枚举存活Activity失败: " + e.getMessage());
+        }
+        return result;
+    }
+
+    private static Class<?> findHostClass(ClassLoader loader, Activity activity, String suffix) {
+        String[] prefixes = getHostPackagePrefixes(activity);
+        for (String prefix : prefixes) {
+            if (TextUtils.isEmpty(prefix)) continue;
+            try {
+                return Class.forName(prefix + "." + suffix, false, loader);
+            } catch (Throwable ignored) {
+            }
+        }
+        return null;
+    }
+
+    private static String[] getHostPackagePrefixes(Activity activity) {
+        List<String> prefixes = new ArrayList<>();
+        Activity topActivity = Utils.getTopActivity();
+        addPackagePrefixes(prefixes, activity);
+        if (topActivity != null && topActivity != activity) addPackagePrefixes(prefixes, topActivity);
+        if (prefixes.isEmpty()) prefixes.add("com.fongmi.android.tv");
+        return prefixes.toArray(new String[0]);
+    }
+
+    private static void addPackagePrefixes(List<String> prefixes, Activity activity) {
+        if (activity == null) return;
+        String name = activity.getClass().getName();
+        String[] markers = new String[]{
+                ".ui.activity.",
+                ".ui.",
+                ".activity."
+        };
+        for (String marker : markers) {
+            int index = name.indexOf(marker);
+            if (index > 0) {
+                String prefix = name.substring(0, index);
+                if (!prefixes.contains(prefix)) prefixes.add(prefix);
+            }
+        }
+        Package pkg = activity.getClass().getPackage();
+        if (pkg != null) {
+            String packageName = pkg.getName();
+            if (!prefixes.contains(packageName)) prefixes.add(packageName);
+        }
+    }
 
     // ========== 替换：DOM 解析统计弹幕条数 ==========
     private static int countDanmakuItems(String xmlData) {
