@@ -493,53 +493,30 @@ public class DanmakuUIHelper {
                 leftArea.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
                 leftArea.setClipChildren(false);
 
-                // 第一行：推送提示开关
-                LinearLayout toastRow = new LinearLayout(activity);
-                toastRow.setOrientation(LinearLayout.HORIZONTAL);
-                toastRow.setGravity(Gravity.CENTER_VERTICAL);
-                toastRow.setLayoutParams(new LinearLayout.LayoutParams(
+                // 第零行：时移
+                LinearLayout offsetRow = new LinearLayout(activity);
+                offsetRow.setOrientation(LinearLayout.HORIZONTAL);
+                offsetRow.setGravity(Gravity.CENTER_VERTICAL);
+                offsetRow.setLayoutParams(new LinearLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-                toastRow.setClipChildren(false);
-                toastRow.setFocusable(false);
-                toastRow.setFocusableInTouchMode(false);
+                offsetRow.setClipChildren(false);
+                offsetRow.setFocusable(false);
+                offsetRow.setFocusableInTouchMode(false);
 
-                TextView toastLabel = new TextView(activity);
-                toastLabel.setText("推送提示");
-                toastLabel.setTextSize(14);
-                toastLabel.setTextColor(colors.textPrimary);
-                toastLabel.setPadding(dpToPx(activity, 6), 0, dpToPx(activity, 8), 0);
-                toastLabel.setFocusable(false);
+                TextView offsetLabel = new TextView(activity);
+                offsetLabel.setText("时移");
+                offsetLabel.setTextSize(14);
+                offsetLabel.setTextColor(colors.textPrimary);
+                offsetLabel.setPadding(dpToPx(activity, 6), 0, dpToPx(activity, 8), 0);
+                offsetLabel.setFocusable(false);
 
-                Switch toastSwitch = new Switch(activity);
-                toastSwitch.setChecked(config.isPushToastEnabled());
-                toastSwitch.setFocusable(true);
-                toastSwitch.setFocusableInTouchMode(true);
-                toastSwitch.setClickable(true);
-
-                toastSwitch.setOnFocusChangeListener((v, hasFocus) -> {
-                    if (hasFocus) {
-                        v.animate().scaleX(1.05f).scaleY(1.05f).setDuration(150).start();
-                        GradientDrawable border = new GradientDrawable();
-                        border.setShape(GradientDrawable.RECTANGLE);
-                        border.setCornerRadius(dpToPx(activity, 16));
-                        border.setStroke(dpToPx(activity, 2), 0x80FFFFFF);
-                        v.setBackground(border);
-                    } else {
-                        v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start();
-                        v.setBackground(null);
-                    }
-                });
-
-                toastRow.addView(toastLabel);
-                toastRow.addView(toastSwitch);
-
-                // 时间偏移 +/- 图标按钮
                 final int[] currentOffset = new int[]{config.getDanmakuTimeOffsetMs()};
 
-                View spacer = new View(activity);
-                LinearLayout.LayoutParams spacerParams = new LinearLayout.LayoutParams(0, 0, 1);
-                spacer.setLayoutParams(spacerParams);
-                toastRow.addView(spacer);
+                View offsetSpacer = new View(activity);
+                LinearLayout.LayoutParams offsetSpacerParams = new LinearLayout.LayoutParams(0, 0, 1);
+                offsetSpacer.setLayoutParams(offsetSpacerParams);
+                offsetRow.addView(offsetLabel);
+                offsetRow.addView(offsetSpacer);
 
                 Button offsetDecBtn = new Button(activity);
                 offsetDecBtn.setText("－");
@@ -616,9 +593,50 @@ public class DanmakuUIHelper {
                     offsetVal.setText(formatOffsetMs(currentOffset[0]));
                 });
 
-                toastRow.addView(offsetDecBtn);
-                toastRow.addView(offsetVal);
-                toastRow.addView(offsetIncBtn);
+                offsetRow.addView(offsetDecBtn);
+                offsetRow.addView(offsetVal);
+                offsetRow.addView(offsetIncBtn);
+                leftArea.addView(offsetRow);
+
+                // 第一行：推送提示开关
+                LinearLayout toastRow = new LinearLayout(activity);
+                toastRow.setOrientation(LinearLayout.HORIZONTAL);
+                toastRow.setGravity(Gravity.CENTER_VERTICAL);
+                toastRow.setLayoutParams(new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+                toastRow.setClipChildren(false);
+                toastRow.setFocusable(false);
+                toastRow.setFocusableInTouchMode(false);
+
+                TextView toastLabel = new TextView(activity);
+                toastLabel.setText("推送提示");
+                toastLabel.setTextSize(14);
+                toastLabel.setTextColor(colors.textPrimary);
+                toastLabel.setPadding(dpToPx(activity, 6), 0, dpToPx(activity, 8), 0);
+                toastLabel.setFocusable(false);
+
+                Switch toastSwitch = new Switch(activity);
+                toastSwitch.setChecked(config.isPushToastEnabled());
+                toastSwitch.setFocusable(true);
+                toastSwitch.setFocusableInTouchMode(true);
+                toastSwitch.setClickable(true);
+
+                toastSwitch.setOnFocusChangeListener((v, hasFocus) -> {
+                    if (hasFocus) {
+                        v.animate().scaleX(1.05f).scaleY(1.05f).setDuration(150).start();
+                        GradientDrawable border = new GradientDrawable();
+                        border.setShape(GradientDrawable.RECTANGLE);
+                        border.setCornerRadius(dpToPx(activity, 16));
+                        border.setStroke(dpToPx(activity, 2), 0x80FFFFFF);
+                        v.setBackground(border);
+                    } else {
+                        v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start();
+                        v.setBackground(null);
+                    }
+                });
+
+                toastRow.addView(toastLabel);
+                toastRow.addView(toastSwitch);
                 leftArea.addView(toastRow);
 
                 // 第二行：自动推送弹幕
