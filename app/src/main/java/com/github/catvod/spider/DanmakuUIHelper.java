@@ -520,25 +520,32 @@ public class DanmakuUIHelper {
 
                 Button offsetDecBtn = new Button(activity);
                 offsetDecBtn.setText("－");
-                offsetDecBtn.setTextSize(16);
+                offsetDecBtn.setTextSize(14);
                 offsetDecBtn.setTextColor(colors.textPrimary);
                 offsetDecBtn.setTypeface(null, android.graphics.Typeface.BOLD);
                 offsetDecBtn.setFocusable(true);
                 offsetDecBtn.setFocusableInTouchMode(true);
                 offsetDecBtn.setClickable(true);
 
-                int iconSize = dpToPx(activity, 30);
+                int iconSize = dpToPx(activity, 36);
                 LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(iconSize, iconSize);
                 iconParams.setMargins(dpToPx(activity, 2), 0, dpToPx(activity, 2), 0);
                 offsetDecBtn.setLayoutParams(iconParams);
                 offsetDecBtn.setPadding(0, 0, 0, 0);
 
                 GradientDrawable iconBg = new GradientDrawable();
-                iconBg.setShape(GradientDrawable.OVAL);
+                iconBg.setShape(GradientDrawable.RECTANGLE); // 从OVAL改为RECTANGLE，更稳定
+                iconBg.setCornerRadius(dpToPx(activity, 6)); // 添加圆角
                 iconBg.setColor(colors.bgSecondary);
                 iconBg.setStroke(dpToPx(activity, 1), colors.divider);
                 offsetDecBtn.setBackground(iconBg);
 
+                // 包裹减号按钮，确保焦点边框不溢出
+                FrameLayout decWrapper = new FrameLayout(activity);
+                decWrapper.setClipChildren(true); // 改为true，防止子视图绘制超出边界
+                decWrapper.addView(offsetDecBtn);
+
+                
                 TextView offsetVal = new TextView(activity);
                 offsetVal.setText(formatOffsetMs(currentOffset[0]));
                 offsetVal.setTextSize(12);
@@ -548,7 +555,7 @@ public class DanmakuUIHelper {
 
                 Button offsetIncBtn = new Button(activity);
                 offsetIncBtn.setText("＋");
-                offsetIncBtn.setTextSize(16);
+                offsetIncBtn.setTextSize(14);
                 offsetIncBtn.setTextColor(colors.textPrimary);
                 offsetIncBtn.setTypeface(null, android.graphics.Typeface.BOLD);
                 offsetIncBtn.setFocusable(true);
@@ -558,14 +565,21 @@ public class DanmakuUIHelper {
                 offsetIncBtn.setPadding(0, 0, 0, 0);
 
                 GradientDrawable iconBg2 = new GradientDrawable();
-                iconBg2.setShape(GradientDrawable.OVAL);
+                iconBg2.setShape(GradientDrawable.RECTANGLE); // 从OVAL改为RECTANGLE
+                iconBg2.setCornerRadius(dpToPx(activity, 6)); // 添加圆角
                 iconBg2.setColor(colors.bgSecondary);
                 iconBg2.setStroke(dpToPx(activity, 1), colors.divider);
                 offsetIncBtn.setBackground(iconBg2);
 
+                // 包裹加号按钮
+                FrameLayout incWrapper = new FrameLayout(activity);
+                incWrapper.setClipChildren(true); // 改为true
+                incWrapper.addView(offsetIncBtn);
+
                 View.OnFocusChangeListener iconFocus = (v, hasFocus) -> {
                     GradientDrawable circleBg = new GradientDrawable();
-                    circleBg.setShape(GradientDrawable.OVAL);
+                    circleBg.setShape(GradientDrawable.RECTANGLE);
+                    circleBg.setCornerRadius(dpToPx(activity, 6));
                     circleBg.setColor(colors.bgSecondary);
                     if (hasFocus) {
                         v.animate().scaleX(1.1f).scaleY(1.1f).setDuration(150).start();
@@ -589,10 +603,9 @@ public class DanmakuUIHelper {
                     offsetVal.setText(formatOffsetMs(currentOffset[0]));
                 });
 
-                offsetRow.addView(offsetDecBtn);
+                offsetRow.addView(decWrapper);
                 offsetRow.addView(offsetVal);
-                offsetRow.addView(offsetIncBtn);
-                leftArea.addView(offsetRow);
+                offsetRow.addView(incWrapper);
 
                 // 第一行：推送提示开关
                 LinearLayout toastRow = new LinearLayout(activity);
