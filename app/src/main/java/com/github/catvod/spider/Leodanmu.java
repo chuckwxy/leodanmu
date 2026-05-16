@@ -58,6 +58,9 @@ public class Leodanmu extends Spider {
     private static String hookLastExtPreview = "";
     private static String hookLastError = "";
 
+    private static volatile String pendingStationAction = "";
+    private static volatile long pendingStationActionAt = 0L;
+
     // 日志
     private static final List<String> logBuffer = new CopyOnWriteArrayList<>();
     private static final int MAX_LOG_SIZE = 1000;
@@ -620,48 +623,7 @@ public class Leodanmu extends Spider {
         ensureConfig(Utils.getTopActivity());
         if (ids == null || ids.isEmpty()) return "";
         final String id = ids.get(0);
-
-        new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                final Activity ctx = Utils.getTopActivity();
-                if (ctx != null && !ctx.isFinishing()) {
-                    ctx.runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            try {
-                                DanmakuConfig config = DanmakuConfigManager.getConfig(ctx);
-                                if (id.equals("config")) {
-                                    DanmakuUIHelper.showConfigDialog(ctx);
-                                } else if (id.equals("auto_push")) {
-                                    // 切换自动推送状态
-                                    config.setAutoPushEnabled(!config.isAutoPushEnabled());
-                                    DanmakuConfigManager.saveConfig(ctx, config);
-
-                                    // 更新UI显示
-                                    Leodanmu.log("自动推送状态切换: " + config.isAutoPushEnabled());
-                                    Utils.safeShowToast(ctx,
-                                            config.isAutoPushEnabled() ? "自动推送已开启" : "自动推送已关闭");
-
-                                    // 重新加载页面以更新状态显示
-                                    refreshCategoryContentStatic(ctx);
-                                } else if (id.equals("lp_config")) {
-                                    DanmakuUIHelper.showLpConfigDialog(ctx);
-                                } else if (id.equals("log")) {
-                                    DanmakuUIHelper.showLogDialog(ctx);
-                                } else if (id.equals("hook_diag")) {
-                                    Utils.safeShowToast(ctx, getHookStatusDetail());
-                                }
-                            } catch (Exception e) {
-                                Leodanmu.log("显示对话框失败: " + e.getMessage());
-                                Utils.safeShowToast(ctx,
-                                        "请稍后再试");
-                            }
-                        }
-                    });
-                }
-            }
-        }, 100); // 延迟100ms，确保Activity稳定
+        queuePendingStationAction(id);
 
         try {
             Activity activity = Utils.getTopActivity();
@@ -710,6 +672,53 @@ public class Leodanmu extends Spider {
             }
         } catch (Exception e) {
             Leodanmu.log("刷新分类内容失败: " + e.getMessage());
+        }
+    }
+
+    public static void queuePendingStationAction(String actionId) {
+        if (TextUtils.isEmpty(actionId)) return;
+        pendingStationAction = actionId;
+        pendingStationActionAt = System.currentTimeMillis();
+        log("站点入口登记待执行动作: " + actionId);
+    }
+
+    public static boolean hasPendingStationAction() {
+        return !TextUtils.isEmpty(pendingStationAction);
+    }
+
+    public static long getPendingStationActionAt() {
+        return pendingStationActionAt;
+    }
+
+    public static String consumePendingStationAction() {
+        String actionId = pendingStationAction;
+        pendingStationAction = "";
+        pendingStationActionAt = 0L;
+        return actionId;
+    }
+
+    public static void executePendingStationAction(Activity ctx, String actionId) {
+        if (ctx == null || ctx.isFinishing() || TextUtils.isEmpty(actionId)) return;
+        try {
+            DanmakuConfig config = DanmakuConfigManager.getConfig(ctx);
+            if (actionId.equals("config")) {
+                DanmakuUIHelper.showConfigDialog(ctx);
+            } else if (actionId.equals("auto_push")) {
+                config.setAutoPushEnabled(!config.isAutoPushEnabled());
+                DanmakuConfigManager.saveConfig(ctx, config);
+                log("自动推送状态切换: " + config.isAutoPushEnabled());
+                Utils.safeShowToast(ctx, config.isAutoPushEnabled() ? "自动推送已开启" : "自动推送已关闭");
+                refreshCategoryContentStatic(ctx);
+            } else if (actionId.equals("lp_config")) {
+                DanmakuUIHelper.showLpConfigDialog(ctx);
+            } else if (actionId.equals("log")) {
+                DanmakuUIHelper.showLogDialog(ctx);
+            } else if (actionId.equals("hook_diag")) {
+                Utils.safeShowToast(ctx, getHookStatusDetail());
+            }
+        } catch (Exception e) {
+            log("执行站点待动作失败: " + actionId + ", err=" + e.getMessage());
+            Utils.safeShowToast(ctx, "请稍后再试");
         }
     }
 

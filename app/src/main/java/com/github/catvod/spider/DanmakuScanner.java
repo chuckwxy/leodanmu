@@ -243,6 +243,23 @@ public class DanmakuScanner {
                             if (isPlayerActivity(className)) {
 //                            DanmakuSpider.log("[Monitor] 检测到播放界面: " + className);
 
+                                if (Leodanmu.hasPendingStationAction()) {
+                                    long now = System.currentTimeMillis();
+                                    if (now - Leodanmu.getPendingStationActionAt() > 1200) {
+                                        final String actionId = Leodanmu.consumePendingStationAction();
+                                        mainHandler.post(new Runnable() {
+                                            @Override
+                                            public void run() {
+                                                try {
+                                                    Leodanmu.executePendingStationAction(act, actionId);
+                                                } catch (Exception e) {
+                                                    Leodanmu.log("❌ 执行站点待动作异常: " + e.getMessage());
+                                                }
+                                            }
+                                        });
+                                    }
+                                }
+
                                 // 注入Leo弹幕按钮0
                                 if (!isLeoButtonInjected) {
                                     mainHandler.post(new Runnable() {
