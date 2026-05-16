@@ -1746,7 +1746,7 @@ public class DanmakuScanner {
         try {
             View existing = parent.findViewWithTag("danmu_button");
             String anchorText = anchor.getText().toString().trim();
-            boolean useBefore = shouldInsertBefore(anchorText);
+            boolean useBefore = "弹幕搜索".equals(anchorText) || anchorText.contains("搜索") || anchorText.contains("音轨");
 
             // 逻辑：如果已存在按钮
             if (existing != null) {
@@ -2051,19 +2051,13 @@ public class DanmakuScanner {
     private static boolean isButtonAnchor(String text) {
         if (TextUtils.isEmpty(text)) return false;
         String t = text.trim();
-        return "片尾".equals(t) || isTargetAnchor(t);
+        return "片尾".equals(t);
     }
 
     private static boolean shouldInsertBefore(String anchorText) {
         if (TextUtils.isEmpty(anchorText)) return false;
         String t = anchorText.trim();
-        return isTargetAnchor(t);
-    }
-
-    private static boolean isTargetAnchor(String anchorText) {
-        if (TextUtils.isEmpty(anchorText)) return false;
-        String t = anchorText.trim();
-        return t.contains("字幕") || t.contains("弹幕");
+        return "弹幕搜索".equals(t) || t.contains("搜索") || t.contains("音轨");
     }
 
     // 兼容低版本的View ID生成方法
