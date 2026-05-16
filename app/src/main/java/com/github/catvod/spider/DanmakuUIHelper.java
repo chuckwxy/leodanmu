@@ -893,7 +893,16 @@ public class DanmakuUIHelper {
                     latestConfig.setDanmakuTimeOffsetMs(currentOffset[0]);
                     DanmakuConfigManager.saveConfig(activity, latestConfig);
                     Utils.safeShowToast(activity, "配置已保存");
-                    Leodanmu.log("已保存新配置");
+                    Leodanmu.log("已保存新配置，时移偏移: " + currentOffset[0] + "ms");
+                    // 实时重推当前弹幕，使时移即时生效
+                    int lastId = DanmakuManager.lastDanmakuId;
+                    if (lastId > 0) {
+                        DanmakuItem currentItem = DanmakuManager.lastDanmakuItemMap.get(lastId);
+                        if (currentItem != null) {
+                            Leodanmu.log("时移调整，实时重推: " + currentItem.getEpTitle());
+                            LeoDanmakuService.pushDanmakuDirect(currentItem, activity, false);
+                        }
+                    }
                     dialog.dismiss();
                 });
 
