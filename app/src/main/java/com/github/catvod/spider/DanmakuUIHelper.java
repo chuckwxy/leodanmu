@@ -265,7 +265,7 @@ public class DanmakuUIHelper {
         editText.setOnFocusChangeListener((v, hasFocus) -> {
             GradientDrawable drawable = new GradientDrawable();
             if (colors == DARK_THEME) {
-                drawable.setColor(Color.TRANSPARENT);
+                drawable.setColor(colors.bgSecondary);
             } else {
                 drawable.setColor(colors.inputBg);
             }
@@ -277,7 +277,7 @@ public class DanmakuUIHelper {
         });
         GradientDrawable initialDrawable = new GradientDrawable();
         if (colors == DARK_THEME) {
-            initialDrawable.setColor(Color.TRANSPARENT);
+            initialDrawable.setColor(colors.bgSecondary);
         } else {
             initialDrawable.setColor(colors.inputBg);
         }
@@ -472,7 +472,6 @@ public class DanmakuUIHelper {
                 apiInput.setHint("例如: https://example.com/87654321");
                 apiInput.setMinLines(3);
                 apiInput.setMaxLines(5);
-                apiInput.setBackgroundColor(colors.inputBg);
                 apiInput.setTextColor(colors.textPrimary);
                 apiInput.setTextSize(13);
                 apiInput.setPadding(dpToPx(activity, 12), dpToPx(activity, 12),
@@ -485,11 +484,13 @@ public class DanmakuUIHelper {
                 int labelWidth = dpToPx(activity, 104);
                 int sectionGap = dpToPx(activity, 12);
                 int rowGap = dpToPx(activity, 8);
+                int cardHeight = dpToPx(activity, 220);
 
                 LinearLayout cardsRow = new LinearLayout(activity);
                 cardsRow.setOrientation(LinearLayout.HORIZONTAL);
                 cardsRow.setLayoutParams(new LinearLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+                cardsRow.setGravity(Gravity.TOP);
                 cardsRow.setClipChildren(false);
                 cardsRow.setClipToPadding(false);
                 cardsRow.setPadding(0, dpToPx(activity, 16), 0, 0);
@@ -512,7 +513,7 @@ public class DanmakuUIHelper {
                 LinearLayout settingsCard = new LinearLayout(activity);
                 settingsCard.setOrientation(LinearLayout.VERTICAL);
                 settingsCard.setLayoutParams(new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+                        ViewGroup.LayoutParams.MATCH_PARENT, cardHeight));
                 settingsCard.setPadding(dpToPx(activity, 14), dpToPx(activity, 12),
                         dpToPx(activity, 14), dpToPx(activity, 12));
                 GradientDrawable settingsBg = new GradientDrawable();
@@ -818,7 +819,7 @@ public class DanmakuUIHelper {
                 LinearLayout actionCard = new LinearLayout(activity);
                 actionCard.setOrientation(LinearLayout.VERTICAL);
                 actionCard.setLayoutParams(new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+                        ViewGroup.LayoutParams.MATCH_PARENT, cardHeight));
                 actionCard.setPadding(dpToPx(activity, 14), dpToPx(activity, 10),
                         dpToPx(activity, 14), dpToPx(activity, 10));
                 GradientDrawable actionBg = new GradientDrawable();
@@ -885,6 +886,11 @@ public class DanmakuUIHelper {
                     }
                 });
                 actionCard.addView(logBtn);
+
+                View actionFill = new View(activity);
+                actionFill.setLayoutParams(new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+                actionCard.addView(actionFill);
                 actionWrap.addView(actionCard);
 
                 cardsRow.addView(settingsWrap);
