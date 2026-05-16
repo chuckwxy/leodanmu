@@ -92,6 +92,9 @@ public class DanmakuScanner {
     private static boolean isLeoButtonInjected = false;
 
     private static String lastMonitorStateSignature = "";
+    private static String lastPlayerActivitySignature = "";
+    private static long lastPlayerActivityEnterTime = 0L;
+    private static final long PLAYER_UI_STABLE_DELAY_MS = 5000L;
 
     // 跨实例运行令牌：用于新实例接管后让旧实例优雅退出
     private static final String RUNTIME_PREFS = "leo_danmaku_runtime";
@@ -243,6 +246,14 @@ public class DanmakuScanner {
                             if (isPlayerActivity(className)) {
 //                            DanmakuSpider.log("[Monitor] 检测到播放界面: " + className);
 
+                                String playerActivitySignature = className + "@" + System.identityHashCode(act);
+                                if (!TextUtils.equals(playerActivitySignature, lastPlayerActivitySignature)) {
+                                    lastPlayerActivitySignature = playerActivitySignature;
+                                    lastPlayerActivityEnterTime = System.currentTimeMillis();
+                                    isLeoButtonInjected = false;
+                                    Leodanmu.log("🎬 播放器页面切换，进入稳定等待期: " + playerActivitySignature);
+                                }
+
                                 if (Leodanmu.hasPendingStationAction()) {
                                     long now = System.currentTimeMillis();
                                     if (now - Leodanmu.getPendingStationActionAt() > 1200) {
@@ -257,11 +268,14 @@ public class DanmakuScanner {
                                                 }
                                             }
                                         });
+                                        return;
                                     }
                                 }
 
                                 // 注入Leo弹幕按钮0
-                                if (!isLeoButtonInjected) {
+                                long now = System.currentTimeMillis();
+                                boolean playerUiStable = now - lastPlayerActivityEnterTime >= PLAYER_UI_STABLE_DELAY_MS;
+                                if (!isLeoButtonInjected && playerUiStable) {
                                     mainHandler.post(new Runnable() {
                                         @Override
                                         public void run() {
@@ -332,6 +346,8 @@ public class DanmakuScanner {
                             } else {
                                 // 不在播放界面，重置播放状态
                                 resetPlaybackStatus();
+                                lastPlayerActivitySignature = "";
+                                lastPlayerActivityEnterTime = 0L;
 
 //                            DanmakuSpider.log("不在播放界面，重置播放状态");
                             }
