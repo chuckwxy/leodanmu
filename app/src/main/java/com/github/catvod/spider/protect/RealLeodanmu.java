@@ -2,11 +2,14 @@ package com.github.catvod.spider.protect;
 
 import android.app.Activity;
 import android.content.Context;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.TextUtils;
 
 import com.github.catvod.spider.DanmakuConfig;
 import com.github.catvod.spider.DanmakuConfigManager;
 import com.github.catvod.spider.DanmakuScanner;
+import com.github.catvod.spider.DanmakuUIHelper;
 import com.github.catvod.spider.ExtFetcher;
 import com.github.catvod.spider.Leodanmu;
 import com.github.catvod.spider.Utils;
@@ -86,7 +89,40 @@ public class RealLeodanmu implements PayloadBridge {
     public String detailContent(List<String> ids) {
         if (ids == null || ids.isEmpty()) return "";
         final String id = ids.get(0);
-        Leodanmu.queuePendingStationAction(id);
+
+        new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                final Activity ctx = Utils.getTopActivity();
+                if (ctx != null && !ctx.isFinishing()) {
+                    ctx.runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            try {
+                                DanmakuConfig config = DanmakuConfigManager.getConfig(ctx);
+                                if (id.equals("config")) {
+                                    DanmakuUIHelper.showConfigDialog(ctx);
+                                } else if (id.equals("auto_push")) {
+                                    config.setAutoPushEnabled(!config.isAutoPushEnabled());
+                                    DanmakuConfigManager.saveConfig(ctx, config);
+                                    Leodanmu.log("自动推送状态切换: " + config.isAutoPushEnabled());
+                                    Utils.safeShowToast(ctx, config.isAutoPushEnabled() ? "自动推送已开启" : "自动推送已关闭");
+                                } else if (id.equals("lp_config")) {
+                                    DanmakuUIHelper.showLpConfigDialog(ctx);
+                                } else if (id.equals("log")) {
+                                    DanmakuUIHelper.showLogDialog(ctx);
+                                } else if (id.equals("hook_diag")) {
+                                    Utils.safeShowToast(ctx, Leodanmu.getHookStatusDetailForShell());
+                                }
+                            } catch (Exception e) {
+                                Leodanmu.log("显示对话框失败: " + e.getMessage());
+                                Utils.safeShowToast(ctx, "请稍后再试");
+                            }
+                        }
+                    });
+                }
+            }
+        }, 100);
 
         try {
             Activity activity = Utils.getTopActivity();
