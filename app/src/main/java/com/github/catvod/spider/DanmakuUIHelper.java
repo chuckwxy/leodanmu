@@ -492,6 +492,30 @@ public class DanmakuUIHelper {
                 leftArea.setOrientation(LinearLayout.VERTICAL);
                 leftArea.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
                 leftArea.setClipChildren(false);
+
+                int labelWidth = dpToPx(activity, 104);
+                int sectionGap = dpToPx(activity, 12);
+                int rowGap = dpToPx(activity, 8);
+
+                TextView settingsHeader = new TextView(activity);
+                settingsHeader.setText("常用设置");
+                settingsHeader.setTextSize(13);
+                settingsHeader.setTextColor(colors.textSecondary);
+                settingsHeader.setTypeface(null, android.graphics.Typeface.BOLD);
+                settingsHeader.setPadding(dpToPx(activity, 4), 0, 0, dpToPx(activity, 6));
+                leftArea.addView(settingsHeader);
+
+                LinearLayout settingsCard = new LinearLayout(activity);
+                settingsCard.setOrientation(LinearLayout.VERTICAL);
+                settingsCard.setLayoutParams(new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+                settingsCard.setPadding(dpToPx(activity, 14), dpToPx(activity, 12),
+                        dpToPx(activity, 14), dpToPx(activity, 12));
+                GradientDrawable settingsBg = new GradientDrawable();
+                settingsBg.setColor(colors.bgSecondary);
+                settingsBg.setCornerRadius(dpToPx(activity, 12));
+                settingsCard.setBackground(settingsBg);
+
                 // 第零行：时移
                 LinearLayout offsetRow = new LinearLayout(activity);
                 offsetRow.setOrientation(LinearLayout.HORIZONTAL);
@@ -508,6 +532,10 @@ public class DanmakuUIHelper {
                 offsetLabel.setTextColor(colors.textPrimary);
                 offsetLabel.setPadding(dpToPx(activity, 6), 0, dpToPx(activity, 8), 0);
                 offsetLabel.setFocusable(false);
+                LinearLayout.LayoutParams offsetLabelParams = new LinearLayout.LayoutParams(
+                        labelWidth, ViewGroup.LayoutParams.WRAP_CONTENT);
+                offsetLabelParams.gravity = Gravity.CENTER_VERTICAL;
+                offsetLabel.setLayoutParams(offsetLabelParams);
 
                 final int[] currentOffset = new int[]{config.getDanmakuTimeOffsetMs()};
 
@@ -593,7 +621,7 @@ public class DanmakuUIHelper {
                 offsetRow.addView(offsetDecBtn);
                 offsetRow.addView(offsetVal);
                 offsetRow.addView(offsetIncBtn);
-                leftArea.addView(offsetRow);
+                settingsCard.addView(offsetRow);
 
                 // 第一行：推送提示开关
                 LinearLayout toastRow = new LinearLayout(activity);
@@ -605,12 +633,21 @@ public class DanmakuUIHelper {
                 toastRow.setFocusable(false);
                 toastRow.setFocusableInTouchMode(false);
 
+                LinearLayout.LayoutParams toastRowParams = new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                toastRowParams.topMargin = rowGap;
+                toastRow.setLayoutParams(toastRowParams);
+
                 TextView toastLabel = new TextView(activity);
                 toastLabel.setText("推送提示");
                 toastLabel.setTextSize(14);
                 toastLabel.setTextColor(colors.textPrimary);
                 toastLabel.setPadding(dpToPx(activity, 6), 0, dpToPx(activity, 8), 0);
                 toastLabel.setFocusable(false);
+                LinearLayout.LayoutParams toastLabelParams = new LinearLayout.LayoutParams(
+                        labelWidth, ViewGroup.LayoutParams.WRAP_CONTENT);
+                toastLabelParams.gravity = Gravity.CENTER_VERTICAL;
+                toastLabel.setLayoutParams(toastLabelParams);
 
                 Switch toastSwitch = new Switch(activity);
                 toastSwitch.setChecked(config.isPushToastEnabled());
@@ -634,7 +671,7 @@ public class DanmakuUIHelper {
 
                 toastRow.addView(toastLabel);
                 toastRow.addView(toastSwitch);
-                leftArea.addView(toastRow);
+                settingsCard.addView(toastRow);
 
                 // 第二行：自动推送弹幕
                 LinearLayout autoPushRow = new LinearLayout(activity);
@@ -646,12 +683,21 @@ public class DanmakuUIHelper {
                 autoPushRow.setFocusable(false);
                 autoPushRow.setFocusableInTouchMode(false);
 
+                LinearLayout.LayoutParams autoRowParams = new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                autoRowParams.topMargin = rowGap;
+                autoPushRow.setLayoutParams(autoRowParams);
+
                 TextView switchLabel = new TextView(activity);
                 switchLabel.setText("自动推送弹幕");
                 switchLabel.setTextSize(14);
                 switchLabel.setTextColor(colors.textPrimary);
                 switchLabel.setPadding(dpToPx(activity, 6), 0, dpToPx(activity, 8), 0);
                 switchLabel.setFocusable(false);
+                LinearLayout.LayoutParams switchLabelParams = new LinearLayout.LayoutParams(
+                        labelWidth, ViewGroup.LayoutParams.WRAP_CONTENT);
+                switchLabelParams.gravity = Gravity.CENTER_VERTICAL;
+                switchLabel.setLayoutParams(switchLabelParams);
 
                 Switch autoSwitch = new Switch(activity);
                 autoSwitch.setChecked(config.isAutoPushEnabled());
@@ -675,7 +721,7 @@ public class DanmakuUIHelper {
 
                 autoPushRow.addView(switchLabel);
                 autoPushRow.addView(autoSwitch);
-                leftArea.addView(autoPushRow);
+                settingsCard.addView(autoPushRow);
 
                 // ========== 主题切换行 ==========
                 LinearLayout themeRow = new LinearLayout(activity);
@@ -687,12 +733,21 @@ public class DanmakuUIHelper {
                 themeRow.setFocusable(false);
                 themeRow.setFocusableInTouchMode(false);
 
+                LinearLayout.LayoutParams themeRowParams = new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                themeRowParams.topMargin = rowGap;
+                themeRow.setLayoutParams(themeRowParams);
+
                 TextView themeLabel = new TextView(activity);
                 themeLabel.setText("主题");
                 themeLabel.setTextSize(14);
                 themeLabel.setTextColor(colors.textPrimary);
                 themeLabel.setPadding(dpToPx(activity, 6), 0, dpToPx(activity, 8), 0);
                 themeLabel.setFocusable(false);
+                LinearLayout.LayoutParams themeLabelParams = new LinearLayout.LayoutParams(
+                        labelWidth, ViewGroup.LayoutParams.WRAP_CONTENT);
+                themeLabelParams.gravity = Gravity.CENTER_VERTICAL;
+                themeLabel.setLayoutParams(themeLabelParams);
 
                 Button darkThemeBtn = new Button(activity);
                 Button lightThemeBtn = new Button(activity);
@@ -738,44 +793,69 @@ public class DanmakuUIHelper {
                 themeRow.addView(themeLabel);
                 themeRow.addView(darkThemeBtn);
                 themeRow.addView(lightThemeBtn);
-                leftArea.addView(themeRow);
+                settingsCard.addView(themeRow);
+
+                leftArea.addView(settingsCard);
+
+                TextView actionsHeader = new TextView(activity);
+                actionsHeader.setText("工具操作");
+                actionsHeader.setTextSize(13);
+                actionsHeader.setTextColor(colors.textSecondary);
+                actionsHeader.setTypeface(null, android.graphics.Typeface.BOLD);
+                actionsHeader.setPadding(dpToPx(activity, 4), sectionGap, 0, dpToPx(activity, 6));
+                leftArea.addView(actionsHeader);
+
+                LinearLayout actionCard = new LinearLayout(activity);
+                actionCard.setOrientation(LinearLayout.VERTICAL);
+                actionCard.setLayoutParams(new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+                actionCard.setPadding(dpToPx(activity, 14), dpToPx(activity, 12),
+                        dpToPx(activity, 14), dpToPx(activity, 12));
+                GradientDrawable actionBg = new GradientDrawable();
+                actionBg.setColor(colors.bgSecondary);
+                actionBg.setCornerRadius(dpToPx(activity, 12));
+                actionCard.setBackground(actionBg);
 
                 // 第四行：布局按钮
                 Button toolBtn = createStaticBorderButton(activity, "布局");
                 toolBtn.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
-                toolBtn.setLayoutParams(new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(activity, 44)));
-                ((LinearLayout.LayoutParams) toolBtn.getLayoutParams()).topMargin = dpToPx(activity, 8);
+                LinearLayout.LayoutParams toolParams = new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(activity, 44));
+                toolBtn.setLayoutParams(toolParams);
                 toolBtn.setOnClickListener(v -> showLpConfigDialog(activity));
-                leftArea.addView(toolBtn);
+                actionCard.addView(toolBtn);
 
                 // 第五行：清空缓存按钮
                 Button clearCacheBtn = createStaticBorderButton(activity, "清空缓存", colors);
                 clearCacheBtn.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
-                clearCacheBtn.setLayoutParams(new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(activity, 44)));
-                ((LinearLayout.LayoutParams) clearCacheBtn.getLayoutParams()).topMargin = dpToPx(activity, 8);
+                LinearLayout.LayoutParams clearParams = new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(activity, 44));
+                clearParams.topMargin = rowGap;
+                clearCacheBtn.setLayoutParams(clearParams);
                 clearCacheBtn.setOnClickListener(v -> {
                     Leodanmu.clearCache(activity);
                     Utils.safeShowToast(activity, "缓存已清空");
                     Leodanmu.log("用户手动清空缓存");
                 });
-                leftArea.addView(clearCacheBtn);
+                actionCard.addView(clearCacheBtn);
 
                 // 第六行：弹幕日志（追加，不改前面5行布局）
-                 Button logBtn = createStaticBorderButton(activity, "弹幕日志");
-                 logBtn.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
-                 logBtn.setLayoutParams(new LinearLayout.LayoutParams(
-                         ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(activity, 44)));
-                 ((LinearLayout.LayoutParams) logBtn.getLayoutParams()).topMargin = dpToPx(activity, 8);
-                 logBtn.setOnClickListener(v -> {
-                     try {
-                         showLogDialog(activity);
-                     } catch (Exception e) {
-                         Leodanmu.log("打开弹幕日志失败: " + e.getMessage());
-                     }
-                 });
-                 leftArea.addView(logBtn);
+                Button logBtn = createStaticBorderButton(activity, "弹幕日志");
+                logBtn.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
+                LinearLayout.LayoutParams logParams = new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(activity, 44));
+                logParams.topMargin = rowGap;
+                logBtn.setLayoutParams(logParams);
+                logBtn.setOnClickListener(v -> {
+                    try {
+                        showLogDialog(activity);
+                    } catch (Exception e) {
+                        Leodanmu.log("打开弹幕日志失败: " + e.getMessage());
+                    }
+                });
+                actionCard.addView(logBtn);
+
+                leftArea.addView(actionCard);
 
                 middleRow.addView(leftArea);
 
