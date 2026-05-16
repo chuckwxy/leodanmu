@@ -683,7 +683,7 @@ public class DanmakuUIHelper {
                         GradientDrawable border = new GradientDrawable();
                         border.setShape(GradientDrawable.RECTANGLE);
                         border.setCornerRadius(dpToPx(activity, 16));
-                        border.setStroke(dpToPx(activity, 2), 0x80FFFFFF);
+                        border.setStroke(dpToPx(activity, 2), colors.focusBorder);
                         v.setBackground(border);
                     } else {
                         v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start();
@@ -733,7 +733,7 @@ public class DanmakuUIHelper {
                         GradientDrawable border = new GradientDrawable();
                         border.setShape(GradientDrawable.RECTANGLE);
                         border.setCornerRadius(dpToPx(activity, 16));
-                        border.setStroke(dpToPx(activity, 2), 0x80FFFFFF);
+                        border.setStroke(dpToPx(activity, 2), colors.focusBorder);
                         v.setBackground(border);
                     } else {
                         v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start();
@@ -759,6 +759,7 @@ public class DanmakuUIHelper {
                         ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
                 themeRowParams.topMargin = rowGap;
                 themeRow.setLayoutParams(themeRowParams);
+                themeRow.setPadding(0, dpToPx(activity, 2), 0, dpToPx(activity, 2));
 
                 TextView themeLabel = new TextView(activity);
                 themeLabel.setText("主题");
@@ -779,13 +780,13 @@ public class DanmakuUIHelper {
                 lightThemeBtn.setTextSize(13);
                 darkThemeBtn.setTypeface(null, android.graphics.Typeface.BOLD);
                 lightThemeBtn.setTypeface(null, android.graphics.Typeface.BOLD);
-                darkThemeBtn.setPadding(dpToPx(activity, 6), dpToPx(activity, 1),
-                        dpToPx(activity, 6), dpToPx(activity, 1));
-                lightThemeBtn.setPadding(dpToPx(activity, 6), dpToPx(activity, 1),
-                        dpToPx(activity, 6), dpToPx(activity, 1));
+                darkThemeBtn.setPadding(dpToPx(activity, 6), 0,
+                        dpToPx(activity, 6), 0);
+                lightThemeBtn.setPadding(dpToPx(activity, 6), 0,
+                        dpToPx(activity, 6), 0);
 
                 LinearLayout.LayoutParams themeBtnParams = new LinearLayout.LayoutParams(
-                        0, dpToPx(activity, 38), 1);
+                        0, dpToPx(activity, 36), 1);
                 themeBtnParams.setMargins(dpToPx(activity, 4), 0, dpToPx(activity, 4), 0);
                 darkThemeBtn.setLayoutParams(themeBtnParams);
                 lightThemeBtn.setLayoutParams(themeBtnParams);
