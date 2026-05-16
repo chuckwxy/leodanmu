@@ -481,21 +481,25 @@ public class DanmakuUIHelper {
                 setupEditTextBorder(apiInput, activity, colors);
                 mainLayout.addView(apiInput);
 
-                // 水平布局：左侧自动推送，右侧二维码
-                LinearLayout middleRow = new LinearLayout(activity);
-                middleRow.setOrientation(LinearLayout.HORIZONTAL);
-                middleRow.setPadding(0, dpToPx(activity, 16), 0, dpToPx(activity, 16));
-                middleRow.setClipChildren(false);
-
-                // 左侧区域垂直布局
-                LinearLayout leftArea = new LinearLayout(activity);
-                leftArea.setOrientation(LinearLayout.VERTICAL);
-                leftArea.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
-                leftArea.setClipChildren(false);
-
+                // 主内容区：左侧两张卡片并排，底部二维码单独放置
                 int labelWidth = dpToPx(activity, 104);
                 int sectionGap = dpToPx(activity, 12);
                 int rowGap = dpToPx(activity, 8);
+
+                LinearLayout cardsRow = new LinearLayout(activity);
+                cardsRow.setOrientation(LinearLayout.HORIZONTAL);
+                cardsRow.setLayoutParams(new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+                cardsRow.setClipChildren(false);
+                cardsRow.setClipToPadding(false);
+                cardsRow.setPadding(0, dpToPx(activity, 16), 0, 0);
+
+                LinearLayout settingsWrap = new LinearLayout(activity);
+                settingsWrap.setOrientation(LinearLayout.VERTICAL);
+                LinearLayout.LayoutParams settingsWrapParams = new LinearLayout.LayoutParams(
+                        0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
+                settingsWrapParams.rightMargin = dpToPx(activity, 8);
+                settingsWrap.setLayoutParams(settingsWrapParams);
 
                 TextView settingsHeader = new TextView(activity);
                 settingsHeader.setText("常用设置");
@@ -503,7 +507,7 @@ public class DanmakuUIHelper {
                 settingsHeader.setTextColor(colors.textSecondary);
                 settingsHeader.setTypeface(null, android.graphics.Typeface.BOLD);
                 settingsHeader.setPadding(dpToPx(activity, 4), 0, 0, dpToPx(activity, 6));
-                leftArea.addView(settingsHeader);
+                settingsWrap.addView(settingsHeader);
 
                 LinearLayout settingsCard = new LinearLayout(activity);
                 settingsCard.setOrientation(LinearLayout.VERTICAL);
@@ -794,16 +798,22 @@ public class DanmakuUIHelper {
                 themeRow.addView(darkThemeBtn);
                 themeRow.addView(lightThemeBtn);
                 settingsCard.addView(themeRow);
+                settingsWrap.addView(settingsCard);
 
-                leftArea.addView(settingsCard);
+                LinearLayout actionWrap = new LinearLayout(activity);
+                actionWrap.setOrientation(LinearLayout.VERTICAL);
+                LinearLayout.LayoutParams actionWrapParams = new LinearLayout.LayoutParams(
+                        0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
+                actionWrapParams.leftMargin = dpToPx(activity, 8);
+                actionWrap.setLayoutParams(actionWrapParams);
 
                 TextView actionsHeader = new TextView(activity);
                 actionsHeader.setText("工具操作");
                 actionsHeader.setTextSize(13);
                 actionsHeader.setTextColor(colors.textSecondary);
                 actionsHeader.setTypeface(null, android.graphics.Typeface.BOLD);
-                actionsHeader.setPadding(dpToPx(activity, 4), sectionGap, 0, dpToPx(activity, 6));
-                leftArea.addView(actionsHeader);
+                actionsHeader.setPadding(dpToPx(activity, 4), 0, 0, dpToPx(activity, 6));
+                actionWrap.addView(actionsHeader);
 
                 LinearLayout actionCard = new LinearLayout(activity);
                 actionCard.setOrientation(LinearLayout.VERTICAL);
@@ -854,34 +864,33 @@ public class DanmakuUIHelper {
                     }
                 });
                 actionCard.addView(logBtn);
+                actionWrap.addView(actionCard);
 
-                leftArea.addView(actionCard);
+                cardsRow.addView(settingsWrap);
+                cardsRow.addView(actionWrap);
+                mainLayout.addView(cardsRow);
 
-                middleRow.addView(leftArea);
-
-                // 右侧二维码区域
-                LinearLayout rightArea = new LinearLayout(activity);
-                rightArea.setOrientation(LinearLayout.VERTICAL);
-                rightArea.setGravity(Gravity.CENTER);
-                rightArea.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+                // 二维码区域：放到最底部，居中显示
+                LinearLayout qrSection = new LinearLayout(activity);
+                qrSection.setOrientation(LinearLayout.VERTICAL);
+                qrSection.setGravity(Gravity.CENTER_HORIZONTAL);
+                qrSection.setPadding(0, dpToPx(activity, 16), 0, 0);
 
                 ImageView qrCodeView = new ImageView(activity);
                 qrCodeView.setScaleType(ImageView.ScaleType.FIT_CENTER);
                 LinearLayout.LayoutParams qrParams = new LinearLayout.LayoutParams(
                         dpToPx(activity, 100), dpToPx(activity, 100));
-                qrParams.gravity = Gravity.CENTER;
+                qrParams.gravity = Gravity.CENTER_HORIZONTAL;
                 qrCodeView.setLayoutParams(qrParams);
-                rightArea.addView(qrCodeView);
+                qrSection.addView(qrCodeView);
 
                 TextView qrHint = new TextView(activity);
                 qrHint.setText("Leo远程web推送");
                 qrHint.setTextSize(10);
                 qrHint.setTextColor(colors.textSecondary);
                 qrHint.setGravity(Gravity.CENTER);
-                rightArea.addView(qrHint);
-
-                middleRow.addView(rightArea);
-                mainLayout.addView(middleRow);
+                qrHint.setPadding(0, dpToPx(activity, 4), 0, 0);
+                qrSection.addView(qrHint);
 
                 // 底部按钮
                 LinearLayout btnLayout = new LinearLayout(activity);
@@ -900,6 +909,8 @@ public class DanmakuUIHelper {
                 btnLayout.addView(resetBtn);
                 btnLayout.addView(saveBtn);
                 mainLayout.addView(btnLayout);
+
+                mainLayout.addView(qrSection);
 
                 // 将主布局放入 ScrollView
                 rootScroll.addView(mainLayout);
