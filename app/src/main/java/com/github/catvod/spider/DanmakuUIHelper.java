@@ -840,7 +840,7 @@ public class DanmakuUIHelper {
                     try {
                         String localIp = NetworkUtils.getLocalIpAddress();
                         String remoteInputUrl = "http://" + localIp + ":9888";
-                        showFloatingQRCodeDialog(activity, remoteInputUrl, "Leo远程web推送");
+                        showFloatingQRCodeDialog(activity, remoteInputUrl, "");
                     } catch (Exception e) {
                         Leodanmu.log("打开Leo远程推送二维码失败: " + e.getMessage());
                     }
@@ -2013,42 +2013,25 @@ public class DanmakuUIHelper {
                 outer.setOrientation(LinearLayout.VERTICAL);
                 outer.setGravity(Gravity.CENTER);
                 outer.setBackgroundColor(0x66000000);
-                outer.setPadding(dpToPx(activity, 18), dpToPx(activity, 18), dpToPx(activity, 18), dpToPx(activity, 18));
+                outer.setPadding(dpToPx(activity, 10), dpToPx(activity, 10), dpToPx(activity, 10), dpToPx(activity, 10));
 
                 LinearLayout card = new LinearLayout(activity);
                 card.setOrientation(LinearLayout.VERTICAL);
                 card.setGravity(Gravity.CENTER);
-                card.setPadding(dpToPx(activity, 12), dpToPx(activity, 12), dpToPx(activity, 12), dpToPx(activity, 12));
+                card.setPadding(dpToPx(activity, 8), dpToPx(activity, 8), dpToPx(activity, 8), dpToPx(activity, 8));
 
                 GradientDrawable bg = new GradientDrawable();
                 bg.setColor(colors.bgPrimary);
                 bg.setCornerRadius(dpToPx(activity, 14));
                 card.setBackground(bg);
 
-                TextView titleView = new TextView(activity);
-                titleView.setText(title);
-                titleView.setTextSize(15);
-                titleView.setTextColor(colors.textPrimary);
-                titleView.setGravity(Gravity.CENTER);
-                titleView.setTypeface(null, android.graphics.Typeface.BOLD);
-                titleView.setPadding(0, 0, 0, dpToPx(activity, 8));
-                card.addView(titleView);
-
                 ImageView qrCodeView = new ImageView(activity);
                 qrCodeView.setScaleType(ImageView.ScaleType.FIT_CENTER);
                 LinearLayout.LayoutParams qrParams = new LinearLayout.LayoutParams(
-                        dpToPx(activity, 160), dpToPx(activity, 160));
+                        dpToPx(activity, 164), dpToPx(activity, 164));
                 qrParams.gravity = Gravity.CENTER;
                 qrCodeView.setLayoutParams(qrParams);
                 card.addView(qrCodeView);
-
-                TextView hintView = new TextView(activity);
-                hintView.setText("点击空白或按返回键关闭");
-                hintView.setTextSize(12);
-                hintView.setTextColor(colors.textTertiary);
-                hintView.setGravity(Gravity.CENTER);
-                hintView.setPadding(0, dpToPx(activity, 8), 0, 0);
-                card.addView(hintView);
 
                 outer.addView(card);
                 builder.setView(outer);
@@ -2091,8 +2074,9 @@ public class DanmakuUIHelper {
 
                 android.view.WindowManager.LayoutParams lp = new android.view.WindowManager.LayoutParams();
                 lp.copyFrom(dialog.getWindow().getAttributes());
-                lp.width = (int) (activity.getResources().getDisplayMetrics().widthPixels * 0.78);
+                lp.width = android.view.WindowManager.LayoutParams.WRAP_CONTENT;
                 lp.height = android.view.WindowManager.LayoutParams.WRAP_CONTENT;
+                lp.gravity = Gravity.CENTER;
                 dialog.getWindow().setAttributes(lp);
 
             } catch (Exception e) {
