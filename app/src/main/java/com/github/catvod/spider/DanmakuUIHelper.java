@@ -827,6 +827,23 @@ public class DanmakuUIHelper {
                 actionCard.setBackground(actionBg);
 
                 // 第四行：布局按钮
+                Button remotePushBtn = createStaticBorderButton(activity, "Leo远程推送", colors);
+                remotePushBtn.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
+                LinearLayout.LayoutParams remotePushParams = new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(activity, 44));
+                remotePushBtn.setLayoutParams(remotePushParams);
+                remotePushBtn.setOnClickListener(v -> {
+                    try {
+                        String localIp = NetworkUtils.getLocalIpAddress();
+                        String remoteInputUrl = "http://" + localIp + ":9888";
+                        showQRCodeDialog(activity, remoteInputUrl, "Leo远程web推送");
+                    } catch (Exception e) {
+                        Leodanmu.log("打开Leo远程推送二维码失败: " + e.getMessage());
+                    }
+                });
+                actionCard.addView(remotePushBtn);
+
+                // 第四行：布局按钮
                 Button toolBtn = createStaticBorderButton(activity, "布局");
                 toolBtn.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
                 LinearLayout.LayoutParams toolParams = new LinearLayout.LayoutParams(
@@ -870,28 +887,6 @@ public class DanmakuUIHelper {
                 cardsRow.addView(actionWrap);
                 mainLayout.addView(cardsRow);
 
-                // 二维码区域：放到最底部，居中显示
-                LinearLayout qrSection = new LinearLayout(activity);
-                qrSection.setOrientation(LinearLayout.VERTICAL);
-                qrSection.setGravity(Gravity.CENTER_HORIZONTAL);
-                qrSection.setPadding(0, dpToPx(activity, 16), 0, 0);
-
-                ImageView qrCodeView = new ImageView(activity);
-                qrCodeView.setScaleType(ImageView.ScaleType.FIT_CENTER);
-                LinearLayout.LayoutParams qrParams = new LinearLayout.LayoutParams(
-                        dpToPx(activity, 100), dpToPx(activity, 100));
-                qrParams.gravity = Gravity.CENTER_HORIZONTAL;
-                qrCodeView.setLayoutParams(qrParams);
-                qrSection.addView(qrCodeView);
-
-                TextView qrHint = new TextView(activity);
-                qrHint.setText("Leo远程web推送");
-                qrHint.setTextSize(10);
-                qrHint.setTextColor(colors.textSecondary);
-                qrHint.setGravity(Gravity.CENTER);
-                qrHint.setPadding(0, dpToPx(activity, 4), 0, 0);
-                qrSection.addView(qrHint);
-
                 // 底部按钮
                 LinearLayout btnLayout = new LinearLayout(activity);
                 btnLayout.setOrientation(LinearLayout.HORIZONTAL);
@@ -909,8 +904,6 @@ public class DanmakuUIHelper {
                 btnLayout.addView(resetBtn);
                 btnLayout.addView(saveBtn);
                 mainLayout.addView(btnLayout);
-
-                mainLayout.addView(qrSection);
 
                 // 将主布局放入 ScrollView
                 rootScroll.addView(mainLayout);
@@ -935,29 +928,6 @@ public class DanmakuUIHelper {
                         showCombinedConfigDialog(activity);
                     }
                 });
-
-                // 异步生成二维码
-                new Thread(() -> {
-                    try {
-                        String localIp = NetworkUtils.getLocalIpAddress();
-                        String remoteInputUrl = "http://" + localIp + ":9888";
-                        String encodedUrl = URLEncoder.encode(remoteInputUrl, "UTF-8");
-                        String qrCodeUrl = "https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=" + encodedUrl;
-                        try (Response response = OkHttp.newCall(qrCodeUrl, "qrcode_config")) {
-                            if (response.body() != null) {
-                                InputStream in = response.body().byteStream();
-                                Bitmap bitmap = BitmapFactory.decodeStream(in);
-                                activity.runOnUiThread(() -> {
-                                    if (dialog.isShowing()) {
-                                        qrCodeView.setImageBitmap(bitmap);
-                                    }
-                                });
-                            }
-                        }
-                    } catch (Exception e) {
-                        Leodanmu.log("生成配置二维码失败: " + e.getMessage());
-                    }
-                }).start();
 
                 resetBtn.setOnClickListener(v -> {
                     apiInput.setText("");
