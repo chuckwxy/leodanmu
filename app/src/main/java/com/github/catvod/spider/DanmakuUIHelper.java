@@ -492,7 +492,6 @@ public class DanmakuUIHelper {
                 leftArea.setOrientation(LinearLayout.VERTICAL);
                 leftArea.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
                 leftArea.setClipChildren(false);
-
                 // 第零行：时移
                 LinearLayout offsetRow = new LinearLayout(activity);
                 offsetRow.setOrientation(LinearLayout.HORIZONTAL);
@@ -529,7 +528,7 @@ public class DanmakuUIHelper {
 
                 int iconSize = dpToPx(activity, 30);
                 LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(iconSize, iconSize);
-                iconParams.setMargins(dpToPx(activity, 2), 0, dpToPx(activity, 2), 0);
+                iconParams.setMargins(dpToPx(activity, 2), dpToPx(activity, 6), dpToPx(activity, 2), dpToPx(activity, 6));
                 offsetDecBtn.setLayoutParams(iconParams);
                 offsetDecBtn.setPadding(0, 0, 0, 0);
 
@@ -556,6 +555,8 @@ public class DanmakuUIHelper {
                 offsetIncBtn.setClickable(true);
                 offsetIncBtn.setLayoutParams(new LinearLayout.LayoutParams(iconSize, iconSize));
                 offsetIncBtn.setPadding(0, 0, 0, 0);
+                ((ViewGroup.MarginLayoutParams) offsetIncBtn.getLayoutParams()).setMargins(
+                        dpToPx(activity, 2), dpToPx(activity, 6), dpToPx(activity, 2), dpToPx(activity, 6));
 
                 GradientDrawable iconBg2 = new GradientDrawable();
                 iconBg2.setShape(GradientDrawable.OVAL);
