@@ -164,7 +164,6 @@ public class RealLeodanmu implements PayloadBridge {
                 Leodanmu.tryApplyEntryExtIfLocalEmpty(context, Leodanmu.getCachedExtForShell(), "liveContent-entry-ext");
             }
             DanmakuConfig freshConfig = DanmakuConfigManager.loadConfig(context);
-            DanmakuConfigManager.saveConfig(context, freshConfig);
             Leodanmu.log("liveContent: 配置已刷新，当前 apiUrls=" + freshConfig.getApiUrls());
         }
         return new Leodanmu().superLiveContent(url);

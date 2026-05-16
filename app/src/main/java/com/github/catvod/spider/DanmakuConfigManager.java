@@ -71,6 +71,12 @@ public class DanmakuConfigManager {
                 return;
             }
         }
+        DanmakuConfig existing = loadConfig(context);
+        if (config == null) config = new DanmakuConfig();
+        if ((config.getApiUrls() == null || config.getApiUrls().isEmpty())
+                && existing != null && existing.getApiUrls() != null && !existing.getApiUrls().isEmpty()) {
+            config.setApiUrls(existing.getApiUrls());
+        }
         sDanmakuConfig = config;
         Leodanmu.log("DanmakuConfigManager.saveConfig: prefsName=" + PREFS_NAME
                 + ", ctx=" + context.getClass().getName()

@@ -27,6 +27,7 @@ public class DanmakuManager {
         }
         lastDanmakuUrl = danmakuItem.getDanmakuUrl();
         lastDanmakuId = danmakuItem.getEpId();
+        lastDanmakuItemMap.put(lastDanmakuId, danmakuItem);
 
         // 记录视频检测时间
         lastVideoDetectedTime = System.currentTimeMillis();

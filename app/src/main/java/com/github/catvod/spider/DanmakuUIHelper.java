@@ -502,9 +502,12 @@ public class DanmakuUIHelper {
                 int sectionGap = dpToPx(activity, 12);
                 int rowGap = dpToPx(activity, 8);
                 int cardHeight = dpToPx(activity, 220);
+                DisplayMetrics screenDm = activity.getResources().getDisplayMetrics();
+                int screenWidthDp = (int) (screenDm.widthPixels / screenDm.density);
+                boolean isCompactWidth = screenWidthDp < 500;
 
                 LinearLayout cardsRow = new LinearLayout(activity);
-                cardsRow.setOrientation(LinearLayout.HORIZONTAL);
+                cardsRow.setOrientation(isCompactWidth ? LinearLayout.VERTICAL : LinearLayout.HORIZONTAL);
                 cardsRow.setLayoutParams(new LinearLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
                 cardsRow.setGravity(Gravity.TOP);
@@ -516,7 +519,14 @@ public class DanmakuUIHelper {
                 settingsWrap.setOrientation(LinearLayout.VERTICAL);
                 LinearLayout.LayoutParams settingsWrapParams = new LinearLayout.LayoutParams(
                         0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
-                settingsWrapParams.rightMargin = dpToPx(activity, 8);
+                if (isCompactWidth) {
+                    settingsWrapParams.width = ViewGroup.LayoutParams.MATCH_PARENT;
+                    settingsWrapParams.weight = 0;
+                    settingsWrapParams.rightMargin = 0;
+                    settingsWrapParams.bottomMargin = dpToPx(activity, 8);
+                } else {
+                    settingsWrapParams.rightMargin = dpToPx(activity, 8);
+                }
                 settingsWrap.setLayoutParams(settingsWrapParams);
 
                 TextView settingsHeader = new TextView(activity);
@@ -823,7 +833,13 @@ public class DanmakuUIHelper {
                 actionWrap.setOrientation(LinearLayout.VERTICAL);
                 LinearLayout.LayoutParams actionWrapParams = new LinearLayout.LayoutParams(
                         0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
-                actionWrapParams.leftMargin = dpToPx(activity, 8);
+                if (isCompactWidth) {
+                    actionWrapParams.width = ViewGroup.LayoutParams.MATCH_PARENT;
+                    actionWrapParams.weight = 0;
+                    actionWrapParams.leftMargin = 0;
+                } else {
+                    actionWrapParams.leftMargin = dpToPx(activity, 8);
+                }
                 actionWrap.setLayoutParams(actionWrapParams);
 
                 TextView actionsHeader = new TextView(activity);
