@@ -286,6 +286,23 @@ public class DanmakuUIHelper {
         editText.setBackground(initialDrawable);
     }
 
+    private static void setupTransparentEditTextBorder(EditText editText, Activity activity, ThemeColors colors) {
+        editText.setOnFocusChangeListener((v, hasFocus) -> {
+            GradientDrawable drawable = new GradientDrawable();
+            drawable.setColor(Color.TRANSPARENT);
+            drawable.setCornerRadius(dpToPx(activity, 6));
+            int borderWidth = hasFocus ? dpToPx(activity, 2) : 0;
+            int borderColor = hasFocus ? colors.focusBorder : Color.TRANSPARENT;
+            drawable.setStroke(borderWidth, borderColor);
+            editText.setBackground(drawable);
+        });
+        GradientDrawable initialDrawable = new GradientDrawable();
+        initialDrawable.setColor(Color.TRANSPARENT);
+        initialDrawable.setCornerRadius(dpToPx(activity, 6));
+        initialDrawable.setStroke(0, Color.TRANSPARENT);
+        editText.setBackground(initialDrawable);
+    }
+
     private static Button createGridResultButton(Activity activity, DanmakuItem item, AlertDialog dialog) {
         ThemeColors colors = getThemeColors(activity);
         Button button = new Button(activity);
@@ -1318,7 +1335,11 @@ public class DanmakuUIHelper {
                         dpToPx(activity, 300), dpToPx(activity, 44));
                 inputParams.setMargins(0, 0, dpToPx(activity, 8), 0);
                 searchInput.setLayoutParams(inputParams);
-                setupEditTextBorder(searchInput, activity, colors);
+                if (config.getTheme() == 1) {
+                    setupEditTextBorder(searchInput, activity, colors);
+                } else {
+                    setupTransparentEditTextBorder(searchInput, activity, colors);
+                }
 
                 Button searchBtn = createBorderButton(activity, "搜索", colors);
                 searchBtn.setLayoutParams(new LinearLayout.LayoutParams(
