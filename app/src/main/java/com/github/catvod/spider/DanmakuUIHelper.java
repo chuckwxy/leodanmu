@@ -819,24 +819,27 @@ public class DanmakuUIHelper {
                 actionCard.setOrientation(LinearLayout.VERTICAL);
                 actionCard.setLayoutParams(new LinearLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-                actionCard.setPadding(dpToPx(activity, 14), dpToPx(activity, 12),
-                        dpToPx(activity, 14), dpToPx(activity, 12));
+                actionCard.setPadding(dpToPx(activity, 14), dpToPx(activity, 10),
+                        dpToPx(activity, 14), dpToPx(activity, 10));
                 GradientDrawable actionBg = new GradientDrawable();
                 actionBg.setColor(colors.bgSecondary);
                 actionBg.setCornerRadius(dpToPx(activity, 12));
                 actionCard.setBackground(actionBg);
 
+                int actionButtonHeight = dpToPx(activity, 40);
+                int actionButtonGap = dpToPx(activity, 6);
+
                 // 第四行：布局按钮
                 Button remotePushBtn = createStaticBorderButton(activity, "Leo远程推送", colors);
                 remotePushBtn.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
                 LinearLayout.LayoutParams remotePushParams = new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(activity, 44));
+                        ViewGroup.LayoutParams.MATCH_PARENT, actionButtonHeight);
                 remotePushBtn.setLayoutParams(remotePushParams);
                 remotePushBtn.setOnClickListener(v -> {
                     try {
                         String localIp = NetworkUtils.getLocalIpAddress();
                         String remoteInputUrl = "http://" + localIp + ":9888";
-                        showQRCodeDialog(activity, remoteInputUrl, "Leo远程web推送");
+                        showFloatingQRCodeDialog(activity, remoteInputUrl, "Leo远程web推送");
                     } catch (Exception e) {
                         Leodanmu.log("打开Leo远程推送二维码失败: " + e.getMessage());
                     }
@@ -847,7 +850,8 @@ public class DanmakuUIHelper {
                 Button toolBtn = createStaticBorderButton(activity, "布局");
                 toolBtn.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
                 LinearLayout.LayoutParams toolParams = new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(activity, 44));
+                        ViewGroup.LayoutParams.MATCH_PARENT, actionButtonHeight);
+                toolParams.topMargin = actionButtonGap;
                 toolBtn.setLayoutParams(toolParams);
                 toolBtn.setOnClickListener(v -> showLpConfigDialog(activity));
                 actionCard.addView(toolBtn);
@@ -856,8 +860,8 @@ public class DanmakuUIHelper {
                 Button clearCacheBtn = createStaticBorderButton(activity, "清空缓存", colors);
                 clearCacheBtn.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
                 LinearLayout.LayoutParams clearParams = new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(activity, 44));
-                clearParams.topMargin = rowGap;
+                        ViewGroup.LayoutParams.MATCH_PARENT, actionButtonHeight);
+                clearParams.topMargin = actionButtonGap;
                 clearCacheBtn.setLayoutParams(clearParams);
                 clearCacheBtn.setOnClickListener(v -> {
                     Leodanmu.clearCache(activity);
@@ -870,8 +874,8 @@ public class DanmakuUIHelper {
                 Button logBtn = createStaticBorderButton(activity, "弹幕日志");
                 logBtn.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
                 LinearLayout.LayoutParams logParams = new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(activity, 44));
-                logParams.topMargin = rowGap;
+                        ViewGroup.LayoutParams.MATCH_PARENT, actionButtonHeight);
+                logParams.topMargin = actionButtonGap;
                 logBtn.setLayoutParams(logParams);
                 logBtn.setOnClickListener(v -> {
                     try {
@@ -1987,6 +1991,106 @@ public class DanmakuUIHelper {
 
             } catch (Exception e) {
                 e.printStackTrace();
+            }
+        });
+    }
+
+    public static void showFloatingQRCodeDialog(Activity activity, String url, String title) {
+        if (activity == null || activity.isFinishing() || activity.isDestroyed()) return;
+
+        activity.runOnUiThread(() -> {
+            try {
+                ThemeColors colors = getThemeColors(activity);
+                AlertDialog.Builder builder = new AlertDialog.Builder(activity);
+
+                LinearLayout outer = new LinearLayout(activity);
+                outer.setOrientation(LinearLayout.VERTICAL);
+                outer.setGravity(Gravity.CENTER);
+                outer.setBackgroundColor(0x66000000);
+                outer.setPadding(dpToPx(activity, 18), dpToPx(activity, 18), dpToPx(activity, 18), dpToPx(activity, 18));
+
+                LinearLayout card = new LinearLayout(activity);
+                card.setOrientation(LinearLayout.VERTICAL);
+                card.setGravity(Gravity.CENTER);
+                card.setPadding(dpToPx(activity, 12), dpToPx(activity, 12), dpToPx(activity, 12), dpToPx(activity, 12));
+
+                GradientDrawable bg = new GradientDrawable();
+                bg.setColor(colors.bgPrimary);
+                bg.setCornerRadius(dpToPx(activity, 14));
+                card.setBackground(bg);
+
+                TextView titleView = new TextView(activity);
+                titleView.setText(title);
+                titleView.setTextSize(15);
+                titleView.setTextColor(colors.textPrimary);
+                titleView.setGravity(Gravity.CENTER);
+                titleView.setTypeface(null, android.graphics.Typeface.BOLD);
+                titleView.setPadding(0, 0, 0, dpToPx(activity, 8));
+                card.addView(titleView);
+
+                ImageView qrCodeView = new ImageView(activity);
+                qrCodeView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+                LinearLayout.LayoutParams qrParams = new LinearLayout.LayoutParams(
+                        dpToPx(activity, 160), dpToPx(activity, 160));
+                qrParams.gravity = Gravity.CENTER;
+                qrCodeView.setLayoutParams(qrParams);
+                card.addView(qrCodeView);
+
+                TextView hintView = new TextView(activity);
+                hintView.setText("点击空白或按返回键关闭");
+                hintView.setTextSize(12);
+                hintView.setTextColor(colors.textTertiary);
+                hintView.setGravity(Gravity.CENTER);
+                hintView.setPadding(0, dpToPx(activity, 8), 0, 0);
+                card.addView(hintView);
+
+                outer.addView(card);
+                builder.setView(outer);
+
+                final AlertDialog dialog = builder.create();
+                dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));
+                dialog.setCancelable(true);
+                dialog.setCanceledOnTouchOutside(true);
+
+                outer.setOnClickListener(v -> dialog.dismiss());
+                card.setOnClickListener(v -> { });
+                dialog.setOnKeyListener((d, keyCode, event) -> {
+                    if (keyCode == KeyEvent.KEYCODE_BACK && event.getAction() == KeyEvent.ACTION_UP) {
+                        dialog.dismiss();
+                        return true;
+                    }
+                    return false;
+                });
+
+                new Thread(() -> {
+                    try {
+                        String qrCodeUrl = "https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=" + URLEncoder.encode(url, "UTF-8");
+                        try (Response response = OkHttp.newCall(qrCodeUrl, "qrcode_floating")) {
+                            if (response.body() != null) {
+                                InputStream in = response.body().byteStream();
+                                Bitmap bitmap = BitmapFactory.decodeStream(in);
+                                activity.runOnUiThread(() -> {
+                                    if (dialog.isShowing()) {
+                                        qrCodeView.setImageBitmap(bitmap);
+                                    }
+                                });
+                            }
+                        }
+                    } catch (Exception e) {
+                        Leodanmu.log("生成悬浮二维码失败: " + e.getMessage());
+                    }
+                }).start();
+
+                safeShowDialog(activity, dialog);
+
+                android.view.WindowManager.LayoutParams lp = new android.view.WindowManager.LayoutParams();
+                lp.copyFrom(dialog.getWindow().getAttributes());
+                lp.width = (int) (activity.getResources().getDisplayMetrics().widthPixels * 0.78);
+                lp.height = android.view.WindowManager.LayoutParams.WRAP_CONTENT;
+                dialog.getWindow().setAttributes(lp);
+
+            } catch (Exception e) {
+                Leodanmu.log("显示悬浮二维码失败: " + e.getMessage());
             }
         });
     }
