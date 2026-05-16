@@ -736,7 +736,6 @@ public class Leodanmu extends Spider {
         Activity context = Utils.getTopActivity();
         if (context != null) {
             DanmakuConfig freshConfig = DanmakuConfigManager.loadConfig(context);
-            DanmakuConfigManager.saveConfig(context, freshConfig);
             log("liveContent: 配置已刷新，当前 apiUrls=" + freshConfig.getApiUrls());
         }
         return new Leodanmu().superLiveContent(url);

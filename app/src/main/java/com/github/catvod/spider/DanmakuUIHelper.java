@@ -975,7 +975,9 @@ public class DanmakuUIHelper {
                     }
                     DanmakuConfig latestConfig = DanmakuConfigManager.loadConfig(activity);
                     if (latestConfig == null) latestConfig = new DanmakuConfig();
-                    latestConfig.setApiUrls(newUrls);
+                    if (!newUrls.isEmpty()) {
+                        latestConfig.setApiUrls(newUrls);
+                    }
                     latestConfig.setAutoPushEnabled(autoSwitch.isChecked());
                     latestConfig.setPushToastEnabled(toastSwitch.isChecked());
                     latestConfig.setTheme(config.getTheme());
