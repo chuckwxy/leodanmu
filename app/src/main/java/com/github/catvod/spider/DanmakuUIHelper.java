@@ -775,17 +775,17 @@ public class DanmakuUIHelper {
                 Button lightThemeBtn = new Button(activity);
                 darkThemeBtn.setText("深色");
                 lightThemeBtn.setText("浅色");
-                darkThemeBtn.setTextSize(14);
-                lightThemeBtn.setTextSize(14);
+                darkThemeBtn.setTextSize(13);
+                lightThemeBtn.setTextSize(13);
                 darkThemeBtn.setTypeface(null, android.graphics.Typeface.BOLD);
                 lightThemeBtn.setTypeface(null, android.graphics.Typeface.BOLD);
-                darkThemeBtn.setPadding(dpToPx(activity, 6), dpToPx(activity, 4),
-                        dpToPx(activity, 6), dpToPx(activity, 4));
-                lightThemeBtn.setPadding(dpToPx(activity, 6), dpToPx(activity, 4),
-                        dpToPx(activity, 6), dpToPx(activity, 4));
+                darkThemeBtn.setPadding(dpToPx(activity, 6), dpToPx(activity, 1),
+                        dpToPx(activity, 6), dpToPx(activity, 1));
+                lightThemeBtn.setPadding(dpToPx(activity, 6), dpToPx(activity, 1),
+                        dpToPx(activity, 6), dpToPx(activity, 1));
 
                 LinearLayout.LayoutParams themeBtnParams = new LinearLayout.LayoutParams(
-                        0, dpToPx(activity, 44), 1);
+                        0, dpToPx(activity, 38), 1);
                 themeBtnParams.setMargins(dpToPx(activity, 4), 0, dpToPx(activity, 4), 0);
                 darkThemeBtn.setLayoutParams(themeBtnParams);
                 lightThemeBtn.setLayoutParams(themeBtnParams);
@@ -837,15 +837,15 @@ public class DanmakuUIHelper {
                 actionCard.setOrientation(LinearLayout.VERTICAL);
                 actionCard.setLayoutParams(new LinearLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT, cardHeight));
-                actionCard.setPadding(dpToPx(activity, 14), dpToPx(activity, 10),
-                        dpToPx(activity, 14), dpToPx(activity, 10));
+                actionCard.setPadding(dpToPx(activity, 14), dpToPx(activity, 8),
+                        dpToPx(activity, 14), dpToPx(activity, 8));
                 GradientDrawable actionBg = new GradientDrawable();
                 actionBg.setColor(colors.bgSecondary);
                 actionBg.setCornerRadius(dpToPx(activity, 12));
                 actionCard.setBackground(actionBg);
 
                 int actionButtonHeight = dpToPx(activity, 40);
-                int actionButtonGap = dpToPx(activity, 6);
+                int actionButtonGap = dpToPx(activity, 4);
 
                 // 第四行：布局按钮
                 Button remotePushBtn = createStaticBorderButton(activity, "Leo远程推送", colors);
@@ -2033,17 +2033,17 @@ public class DanmakuUIHelper {
                 LinearLayout outer = new LinearLayout(activity);
                 outer.setOrientation(LinearLayout.VERTICAL);
                 outer.setGravity(Gravity.CENTER);
-                outer.setBackgroundColor(0x66000000);
-                outer.setPadding(dpToPx(activity, 10), dpToPx(activity, 10), dpToPx(activity, 10), dpToPx(activity, 10));
+                outer.setBackgroundColor(Color.TRANSPARENT);
+                outer.setPadding(dpToPx(activity, 2), dpToPx(activity, 2), dpToPx(activity, 2), dpToPx(activity, 2));
 
                 LinearLayout card = new LinearLayout(activity);
                 card.setOrientation(LinearLayout.VERTICAL);
                 card.setGravity(Gravity.CENTER);
-                card.setPadding(dpToPx(activity, 8), dpToPx(activity, 8), dpToPx(activity, 8), dpToPx(activity, 8));
+                card.setPadding(0, 0, 0, 0);
 
                 GradientDrawable bg = new GradientDrawable();
-                bg.setColor(colors.bgPrimary);
-                bg.setCornerRadius(dpToPx(activity, 14));
+                bg.setColor(Color.TRANSPARENT);
+                bg.setCornerRadius(dpToPx(activity, 4));
                 card.setBackground(bg);
 
                 ImageView qrCodeView = new ImageView(activity);
@@ -2098,6 +2098,7 @@ public class DanmakuUIHelper {
                 lp.width = android.view.WindowManager.LayoutParams.WRAP_CONTENT;
                 lp.height = android.view.WindowManager.LayoutParams.WRAP_CONTENT;
                 lp.gravity = Gravity.CENTER;
+                lp.dimAmount = 0.15f;
                 dialog.getWindow().setAttributes(lp);
 
             } catch (Exception e) {
