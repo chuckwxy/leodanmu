@@ -721,12 +721,12 @@ public class LeoDanmakuService {
             new Thread(new Runnable() {
                 @Override
                 public void run() {
-                    pushDanmakuInThread(danmakuItem, activity, fastPushThenVerify);
+                    pushDanmakuInThread(danmakuItem, activity, fastPushThenVerify, isAuto);
                 }
             }).start();
         } else {
             Leodanmu.log("已经在子线程，直接执行弹幕推送");
-            pushDanmakuInThread(danmakuItem, activity, fastPushThenVerify);
+            pushDanmakuInThread(danmakuItem, activity, fastPushThenVerify, isAuto);
         }
     }
 
@@ -742,6 +742,10 @@ public class LeoDanmakuService {
     }
 
     private static void pushDanmakuInThread(DanmakuItem danmakuItem, Activity activity, boolean fastPushThenVerify) {
+        pushDanmakuInThread(danmakuItem, activity, fastPushThenVerify, true);
+    }
+
+    private static void pushDanmakuInThread(DanmakuItem danmakuItem, Activity activity, boolean fastPushThenVerify, boolean isAuto) {
         try {
             if (TextUtils.isEmpty(danmakuItem.getDanmakuUrl())) {
                 Leodanmu.log("推送弹幕URL为空");
@@ -757,8 +761,8 @@ public class LeoDanmakuService {
                 Integer preCachedEpId = danmakuItem.getEpId();
                 String cachedXml = preCachedEpId != null ? DanmakuManager.getCachedXml(preCachedEpId) : null;
                 boolean isUsingPreCache = DanmakuManager.isUsingPreCache();
-                Leodanmu.log("🔍 预缓存诊断: epId=" + preCachedEpId + " hasCachedXml=" + (cachedXml != null) + " isUsingPreCache=" + isUsingPreCache);
-                if (cachedXml != null) {
+                Leodanmu.log("🔍 预缓存诊断: epId=" + preCachedEpId + " hasCachedXml=" + (cachedXml != null) + " isUsingPreCache=" + isUsingPreCache + " isAuto=" + isAuto);
+                if (isAuto && cachedXml != null) {
                     refreshPath = "http://" + localIp + ":" + getWebServerPort() + "/danmaku-cache?epId=" + preCachedEpId + "&t=" + System.currentTimeMillis();
                     Leodanmu.log("⚡ 预缓存命中，使用本地缓存URL: " + refreshPath);
                 } else {
@@ -825,8 +829,8 @@ public class LeoDanmakuService {
             Integer preCachedEpId = danmakuItem.getEpId();
             String cachedXml = preCachedEpId != null ? DanmakuManager.getCachedXml(preCachedEpId) : null;
             boolean isUsingPreCache = DanmakuManager.isUsingPreCache();
-            Leodanmu.log("🔍 预缓存诊断: epId=" + preCachedEpId + " hasCachedXml=" + (cachedXml != null) + " isUsingPreCache=" + isUsingPreCache);
-            if (cachedXml != null) {
+            Leodanmu.log("🔍 预缓存诊断: epId=" + preCachedEpId + " hasCachedXml=" + (cachedXml != null) + " isUsingPreCache=" + isUsingPreCache + " isAuto=" + isAuto);
+            if (isAuto && cachedXml != null) {
                 refreshPath = "http://" + localIp + ":" + getWebServerPort() + "/danmaku-cache?epId=" + preCachedEpId + "&t=" + System.currentTimeMillis();
                 Leodanmu.log("⚡ 预缓存命中，使用本地缓存URL: " + refreshPath);
             } else {
