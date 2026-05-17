@@ -760,7 +760,9 @@ public class LeoDanmakuService {
                 Leodanmu.log("🔍 预缓存诊断: epId=" + preCachedEpId + " hasCachedXml=" + hasCachedXml + " isUsingPreCache=" + isUsingPreCache);
                 if (preCachedEpId != null && (hasCachedXml || isUsingPreCache)) {
                     refreshPath = "http://" + localIp + ":" + getWebServerPort() + "/danmaku-cache?epId=" + preCachedEpId + "&t=" + System.currentTimeMillis();
-                    Leodanmu.log("⚡ 预缓存命中，使用本地缓存: epId=" + preCachedEpId);
+                    Leodanmu.log("⚡ 预缓存命中，使用本地缓存URL: " + refreshPath);
+                } else {
+                    Leodanmu.log("📡 推送原始代理URL: " + refreshPath);
                 }
                 if (offsetMs != 0) {
                     Leodanmu.log("启用弹幕时间偏移: " + DanmakuUtils.formatOffsetLabel(offsetMs) + "，通过本地代理推送");
@@ -817,9 +819,14 @@ public class LeoDanmakuService {
             int offsetMs = config != null ? config.getDanmakuTimeOffsetMs() : 0;
             String refreshPath = buildDanmakuRefreshPath(danmakuItem, localIp, offsetMs);
             Integer preCachedEpId = danmakuItem.getEpId();
-            if (preCachedEpId != null && (DanmakuManager.getCachedXml(preCachedEpId) != null || DanmakuManager.isUsingPreCache())) {
+            boolean hasCachedXml = preCachedEpId != null && DanmakuManager.getCachedXml(preCachedEpId) != null;
+            boolean isUsingPreCache = DanmakuManager.isUsingPreCache();
+            Leodanmu.log("🔍 预缓存诊断: epId=" + preCachedEpId + " hasCachedXml=" + hasCachedXml + " isUsingPreCache=" + isUsingPreCache);
+            if (preCachedEpId != null && (hasCachedXml || isUsingPreCache)) {
                 refreshPath = "http://" + localIp + ":" + getWebServerPort() + "/danmaku-cache?epId=" + preCachedEpId + "&t=" + System.currentTimeMillis();
-                Leodanmu.log("⚡ 预缓存命中，使用本地缓存: epId=" + preCachedEpId);
+                Leodanmu.log("⚡ 预缓存命中，使用本地缓存URL: " + refreshPath);
+            } else {
+                Leodanmu.log("📡 推送原始代理URL: " + refreshPath);
             }
 
             if (offsetMs != 0) {
