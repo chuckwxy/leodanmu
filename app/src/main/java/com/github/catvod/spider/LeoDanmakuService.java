@@ -932,6 +932,8 @@ public class LeoDanmakuService {
                                     finalDanmakuCount);
                             Utils.safeShowToast(activity, message);
                             Leodanmu.log(message);
+                            // 推送成功后预缓存下一集
+                            triggerPreCacheNextEpisode(danmakuItem, activity);
                         } else {
                             Utils.safeShowToast(activity, "推送失败: 无响应或响应异常");
                             Leodanmu.log("❌ 推送失败，响应: " + finalPushResp);
@@ -942,6 +944,8 @@ public class LeoDanmakuService {
                                     danmakuItem.getTitle(),
                                     danmakuItem.getEpTitle(),
                                     finalDanmakuCount));
+                            // 静默模式下也触发预缓存
+                            triggerPreCacheNextEpisode(danmakuItem, activity);
                         } else {
                             Leodanmu.log("❌ 推送失败，响应: " + finalPushResp);
                         }
@@ -949,6 +953,48 @@ public class LeoDanmakuService {
                 }
             });
         }
+    }
+
+    private static void triggerPreCacheNextEpisode(DanmakuItem currentItem, Activity activity) {
+        if (currentItem == null || currentItem.getEpId() == null || currentItem.getEpId() <= 0) return;
+        if (TextUtils.isEmpty(currentItem.getApiBase())) return;
+        // 已经缓存了该 id 则跳过
+        if (DanmakuManager.getPreCachedEpId() == currentItem.getEpId() + 1) return;
+
+        final int nextEpId = currentItem.getEpId() + 1;
+        final String apiBase = currentItem.getApiBase();
+        final String from = currentItem.getFrom();
+        final String title = currentItem.getTitle();
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    DanmakuItem candidate = new DanmakuItem();
+                    candidate.setEpId(nextEpId);
+                    candidate.setApiBase(apiBase);
+                    candidate.setFrom(from);
+                    candidate.setTitle(title);
+                    candidate.setEpTitle("预缓存#" + nextEpId);
+
+                    String xml = NetworkUtils.robustHttpGet(candidate.getDanmakuUrl());
+                    if (TextUtils.isEmpty(xml)) {
+                        Leodanmu.log("⏭️ 预缓存跳过: epId=" + nextEpId + " 无数据");
+                        return;
+                    }
+                    int count = countDanmakuItems(xml);
+                    if (count <= 0) {
+                        Leodanmu.log("⏭️ 预缓存跳过: epId=" + nextEpId + " 弹幕为空");
+                        return;
+                    }
+
+                    DanmakuManager.cachePreCachedItem(nextEpId, candidate);
+                    Leodanmu.log("⚡ 预缓存下一集成功: epId=" + nextEpId + " (" + count + "条)");
+                } catch (Exception e) {
+                    Leodanmu.log("⏭️ 预缓存异常: " + e.getMessage());
+                }
+            }
+        }).start();
     }
 
     // ========== 新增：构建弹幕刷新路径（支持时间偏移本地代理）==========

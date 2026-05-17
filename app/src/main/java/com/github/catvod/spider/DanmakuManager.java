@@ -17,6 +17,10 @@ public class DanmakuManager {
     public static String currentVideoSignature = "";  // 当前视频的唯一标识（基于标题提取）
     public static long lastVideoDetectedTime = 0;     // 上次检测到视频的时间
 
+    // 预缓存：推送成功后提前抓取下集弹幕，换集时可直接提取
+    private static DanmakuItem sPreCachedDanmakuItem = null;
+    private static int sPreCachedEpId = -1;
+
     public static void recordDanmakuUrl(DanmakuItem danmakuItem, boolean isAuto) {
         if (isAuto) {
             lastAutoDanmakuUrl = danmakuItem.getDanmakuUrl();
@@ -54,7 +58,31 @@ public class DanmakuManager {
             return nextDanmakuItem;
         }
 
+        // 检查预缓存是否有命中
+        if (nextId == sPreCachedEpId && sPreCachedDanmakuItem != null) {
+            Leodanmu.log("⚡ 预缓存命中: epId=" + nextId);
+            lastDanmakuItemMap.put(nextId, sPreCachedDanmakuItem);
+            sPreCachedDanmakuItem = null;
+            sPreCachedEpId = -1;
+            return lastDanmakuItemMap.get(nextId);
+        }
+
         return null;
+    }
+
+    public static void cachePreCachedItem(int epId, DanmakuItem item) {
+        sPreCachedEpId = epId;
+        sPreCachedDanmakuItem = item;
+        Leodanmu.log("💾 预缓存已保存: epId=" + epId);
+    }
+
+    public static int getPreCachedEpId() {
+        return sPreCachedEpId;
+    }
+
+    public static void clearPreCache() {
+        sPreCachedDanmakuItem = null;
+        sPreCachedEpId = -1;
     }
 
     public static void resetAutoSearch() {
@@ -67,5 +95,6 @@ public class DanmakuManager {
         lastManualDanmakuUrl = "";
         lastDanmakuUrl = "";
         lastDanmakuItemMap.clear();
+        clearPreCache();
     }
 }
