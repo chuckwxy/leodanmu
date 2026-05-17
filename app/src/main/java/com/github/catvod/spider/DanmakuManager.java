@@ -93,7 +93,12 @@ public class DanmakuManager {
             return lastDanmakuItemMap.get(nextId);
         }
 
-        // 3. 兜底：Map 和预缓存都无数据，用最近条目构造
+        // 3. 兜底构造（仅当 nextId 合理时）
+        // nextId < 100000 通常说明 lastDanmakuId 已被重置或异常
+        if (nextId < 100000) {
+            Leodanmu.log("⚠️ ID递增结果异常，跳过构造: nextId=" + nextId + " (lastDanmakuId=" + lastDanmakuId + ")");
+            return null;
+        }
         DanmakuItem currentItem = lastDanmakuItemMap.get(lastDanmakuId);
         if (currentItem != null && currentItem.getApiBase() != null) {
             DanmakuItem constructed = new DanmakuItem();
@@ -101,13 +106,12 @@ public class DanmakuManager {
             constructed.setApiBase(currentItem.getApiBase());
             constructed.setFrom(currentItem.getFrom());
             constructed.setTitle(currentItem.getTitle());
-            constructed.setEpTitle(currentItem.getEpTitle());
+            constructed.setEpTitle("切换至#" + nextId);
             constructed.setAnimeTitle(currentItem.getAnimeTitle());
             if (currentItem.getShortTitle() != null) constructed.setShortTitle(currentItem.getShortTitle());
             sPreCachedXmlForPush = null;
             sUsingPreCache = false;
             Leodanmu.log("🛠️ 构造 ID 递增条目: epId=" + nextId + " apiBase=" + currentItem.getApiBase());
-            // 存入 Map 供后续直接使用
             lastDanmakuItemMap.put(nextId, constructed);
             return constructed;
         }
