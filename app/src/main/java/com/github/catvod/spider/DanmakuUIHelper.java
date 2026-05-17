@@ -1007,7 +1007,7 @@ public class DanmakuUIHelper {
                         DanmakuItem currentItem = DanmakuManager.lastDanmakuItemMap.get(lastId);
                         if (currentItem != null) {
                             Leodanmu.log("时移调整，实时重推: " + currentItem.getEpTitle());
-                            LeoDanmakuService.pushDanmakuDirect(currentItem, activity, false);
+                            LeoDanmakuService.pushDanmakuDirect(currentItem, activity, false, false, true);
                         }
                     }
                     dialog.dismiss();

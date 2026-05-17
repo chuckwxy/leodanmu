@@ -9,6 +9,7 @@ import com.github.catvod.spider.entity.DanmakuItem;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.lang.ref.WeakReference;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -29,6 +30,29 @@ public class LeoDanmakuService {
 
     // 在 LeoDanmakuService 类中添加缓存相关字段
     private static final long CACHE_EXPIRE_TIME = 30 * 60 * 1000; // 30分钟
+
+    // 反射绑定缓存
+    private static volatile ReflectionBinding reflectionBindingCache;
+    private static volatile long lastReflectionResolveFailureAtMs = 0;
+    private static volatile String lastReflectionResolveFailureKey = "";
+    private static volatile String lastReflectionResolveFailureReason = "";
+    private static final long REFLECTION_RESOLVE_FAILURE_COOLDOWN_MS = 5000;
+
+    private static class ReflectionBinding {
+        String cacheKey;
+        Method setDanmakuMethod;
+        Class<?> danmakuClass;
+        WeakReference<Object> playerRef;
+        long resolvedAtMs;
+
+        ReflectionBinding(String cacheKey, Object player, Class<?> danmakuClass, Method setDanmakuMethod, long resolvedAtMs) {
+            this.cacheKey = cacheKey;
+            this.playerRef = new WeakReference<>(player);
+            this.danmakuClass = danmakuClass;
+            this.setDanmakuMethod = setDanmakuMethod;
+            this.resolvedAtMs = resolvedAtMs;
+        }
+    }
 
     private static final AtomicInteger searchSeq = new AtomicInteger(1);
 
@@ -658,10 +682,14 @@ public class LeoDanmakuService {
 
     // ========== 修改：直接推送弹幕URL，使用动态端口和防重复推送 ==========
     public static void pushDanmakuDirect(DanmakuItem danmakuItem, Activity activity, boolean isAuto) {
-        pushDanmakuDirect(danmakuItem, activity, isAuto, false);
+        pushDanmakuDirect(danmakuItem, activity, isAuto, false, false);
     }
 
     public static void pushDanmakuDirect(DanmakuItem danmakuItem, Activity activity, boolean isAuto, boolean fastPushThenVerify) {
+        pushDanmakuDirect(danmakuItem, activity, isAuto, fastPushThenVerify, false);
+    }
+
+    public static void pushDanmakuDirect(DanmakuItem danmakuItem, Activity activity, boolean isAuto, boolean fastPushThenVerify, boolean forceRefresh) {
         String danmakuUrl = danmakuItem.getDanmakuUrl();
         if (TextUtils.isEmpty(danmakuUrl)) {
             Leodanmu.log("⚠️ 推送弹幕URL为空，跳过");
@@ -674,7 +702,7 @@ public class LeoDanmakuService {
 
         long currentTime = System.currentTimeMillis();
         Long lastPush = lastPushTimes.get(pushKey);
-        if (lastPush != null && (currentTime - lastPush < PUSH_MIN_INTERVAL)) {
+        if (!forceRefresh && lastPush != null && (currentTime - lastPush < PUSH_MIN_INTERVAL)) {
             Leodanmu.log("⚠️ 推送过于频繁 (同一URL和偏移)，跳过: " + pushKey);
             return;
         }
@@ -940,85 +968,142 @@ public class LeoDanmakuService {
     private static boolean tryPushDanmakuByReflection(final DanmakuItem danmakuItem, final Activity activity, final String danmakuPath) {
         if (activity == null || TextUtils.isEmpty(danmakuPath)) return false;
 
-        final int maxAttempts = 4;
-        String lastError = null;
-        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
-            final CountDownLatch latch = new CountDownLatch(1);
-            final boolean[] success = new boolean[]{false};
-            final String[] error = new String[]{null};
+        final ReflectionBinding binding = resolveReflectionBinding(activity);
+        if (binding == null) return false;
 
-            Runnable task = new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        Class<?> danmakuClass = resolveHostDanmakuClass(activity);
-                        if (danmakuClass == null) {
-                            error[0] = "未找到宿主Danmaku类";
-                            return;
-                        }
-                        Object player = resolveFongMiPlayer(activity, danmakuClass);
-                        if (player == null) {
-                            error[0] = "未找到宿主播放器实例";
-                            return;
-                        }
-                        Object danmaku = createFongMiDanmaku(activity, danmakuItem, danmakuPath, danmakuClass);
-                        if (danmaku == null) {
-                            error[0] = "未能构造宿主弹幕对象";
-                            return;
-                        }
-                        Method setDanmaku = findDanmakuMethod(player.getClass(), danmakuClass);
-                        if (setDanmaku == null) {
-                            error[0] = "宿主目标缺少setDanmaku/o方法: " + player.getClass().getName();
-                            return;
-                        }
-                        setDanmaku.setAccessible(true);
-                        setDanmaku.invoke(player, danmaku);
-                        success[0] = true;
-                    } catch (Throwable e) {
-                        error[0] = e.getClass().getSimpleName() + ": " + e.getMessage();
-                    } finally {
-                        latch.countDown();
+        final CountDownLatch latch = new CountDownLatch(1);
+        final boolean[] success = new boolean[]{false};
+        final String[] error = new String[]{null};
+
+        Runnable task = new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Object player = binding.playerRef.get();
+                    if (player == null) {
+                        clearReflectionBindingCache();
+                        error[0] = "宿主播放器缓存已失效";
+                        return;
                     }
-                }
-            };
-
-            if (Looper.myLooper() == Looper.getMainLooper()) {
-                task.run();
-            } else {
-                activity.runOnUiThread(task);
-                try {
-                    latch.await(3, TimeUnit.SECONDS);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    error[0] = "等待主线程反射推送被中断";
+                    Object danmaku = createFongMiDanmaku(activity, danmakuItem, danmakuPath, binding.danmakuClass);
+                    if (danmaku == null) {
+                        error[0] = "未能构造宿主弹幕对象";
+                        return;
+                    }
+                    binding.setDanmakuMethod.setAccessible(true);
+                    binding.setDanmakuMethod.invoke(player, danmaku);
+                    success[0] = true;
+                } catch (Throwable e) {
+                    clearReflectionBindingCache();
+                    error[0] = e.getClass().getSimpleName() + ": " + e.getMessage();
+                } finally {
+                    latch.countDown();
                 }
             }
+        };
 
-            if (success[0]) {
-                if (attempt > 1) Leodanmu.log("反射推送重试命中，第 " + attempt + " 次成功");
-                return true;
-            }
-
-            lastError = error[0];
-            if (!TextUtils.isEmpty(lastError)) {
-                Leodanmu.log("反射推送尝试 " + attempt + "/" + maxAttempts + " 失败: " + lastError);
-            }
-
-            if (attempt < maxAttempts) {
-                try {
-                    Thread.sleep(350L * attempt);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    lastError = "等待反射重试被中断";
-                    break;
-                }
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            task.run();
+        } else {
+            activity.runOnUiThread(task);
+            try {
+                latch.await(3, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                error[0] = "等待主线程反射推送被中断";
             }
         }
 
-        if (!TextUtils.isEmpty(lastError)) {
-            Leodanmu.log("反射推送失败: " + lastError);
+        if (success[0]) {
+            return true;
+        }
+
+        if (!TextUtils.isEmpty(error[0])) {
+            Leodanmu.log("反射推送失败: " + error[0]);
         }
         return false;
+    }
+
+    public static boolean canPushDanmakuByReflection(Activity activity) {
+        if (activity == null || activity.isFinishing()) return false;
+        try {
+            return resolveReflectionBinding(activity) != null;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private static ReflectionBinding resolveReflectionBinding(Activity activity) {
+        if (activity == null || activity.isFinishing()) return null;
+        ReflectionBinding cached = getCachedReflectionBinding(activity);
+        if (cached != null) {
+            return cached;
+        }
+
+        String cacheKey = buildReflectionCacheKey(activity);
+        long now = System.currentTimeMillis();
+        if (cacheKey.equals(lastReflectionResolveFailureKey)
+                && now - lastReflectionResolveFailureAtMs < REFLECTION_RESOLVE_FAILURE_COOLDOWN_MS) {
+            return null;
+        }
+
+        try {
+            Class<?> danmakuClass = resolveHostDanmakuClass(activity);
+            if (danmakuClass == null) {
+                markReflectionResolveFailure(cacheKey, "未找到宿主Danmaku类");
+                return null;
+            }
+            Object player = resolveFongMiPlayer(activity, danmakuClass);
+            if (player == null) {
+                markReflectionResolveFailure(cacheKey, "未找到宿主播放器实例");
+                return null;
+            }
+            Method setDanmakuMethod = findDanmakuMethod(player.getClass(), danmakuClass);
+            if (setDanmakuMethod == null) {
+                markReflectionResolveFailure(cacheKey, "宿主目标缺少setDanmaku/o方法: " + player.getClass().getName());
+                return null;
+            }
+            setDanmakuMethod.setAccessible(true);
+            ReflectionBinding binding = new ReflectionBinding(cacheKey, player, danmakuClass, setDanmakuMethod, now);
+            reflectionBindingCache = binding;
+            lastReflectionResolveFailureAtMs = 0;
+            lastReflectionResolveFailureKey = "";
+            lastReflectionResolveFailureReason = "";
+            return binding;
+        } catch (Throwable e) {
+            markReflectionResolveFailure(cacheKey, e.getClass().getSimpleName() + ": " + e.getMessage());
+            return null;
+        }
+    }
+
+    private static ReflectionBinding getCachedReflectionBinding(Activity activity) {
+        ReflectionBinding binding = reflectionBindingCache;
+        if (binding == null || activity == null) return null;
+        if (!buildReflectionCacheKey(activity).equals(binding.cacheKey)) return null;
+        if (binding.danmakuClass == null || binding.setDanmakuMethod == null) return null;
+        Object player = binding.playerRef != null ? binding.playerRef.get() : null;
+        if (player == null) return null;
+        if (!binding.setDanmakuMethod.getDeclaringClass().isAssignableFrom(player.getClass())) return null;
+        return binding;
+    }
+
+    private static void clearReflectionBindingCache() {
+        reflectionBindingCache = null;
+    }
+
+    private static void markReflectionResolveFailure(String cacheKey, String reason) {
+        clearReflectionBindingCache();
+        lastReflectionResolveFailureKey = cacheKey == null ? "" : cacheKey;
+        lastReflectionResolveFailureAtMs = System.currentTimeMillis();
+        lastReflectionResolveFailureReason = reason == null ? "" : reason;
+    }
+
+    private static String buildReflectionCacheKey(Activity activity) {
+        if (activity == null) return "";
+        String packageName = "";
+        Package pkg = activity.getClass().getPackage();
+        if (pkg != null && pkg.getName() != null) packageName = pkg.getName();
+        return activity.getClass().getName() + "#" + packageName;
     }
 
     private static Object resolveFongMiPlayer(Activity activity, Class<?> danmakuClass) throws Exception {
