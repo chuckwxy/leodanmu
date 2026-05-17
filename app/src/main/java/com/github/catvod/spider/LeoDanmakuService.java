@@ -755,13 +755,17 @@ public class LeoDanmakuService {
                 int offsetMs = config != null ? config.getDanmakuTimeOffsetMs() : 0;
                 String refreshPath = buildDanmakuRefreshPath(danmakuItem, localIp, offsetMs);
                 Integer preCachedEpId = danmakuItem.getEpId();
-                boolean hasCachedXml = preCachedEpId != null && DanmakuManager.getCachedXml(preCachedEpId) != null;
+                String cachedXml = preCachedEpId != null ? DanmakuManager.getCachedXml(preCachedEpId) : null;
                 boolean isUsingPreCache = DanmakuManager.isUsingPreCache();
-                Leodanmu.log("🔍 预缓存诊断: epId=" + preCachedEpId + " hasCachedXml=" + hasCachedXml + " isUsingPreCache=" + isUsingPreCache);
-                if (preCachedEpId != null && (hasCachedXml || isUsingPreCache)) {
+                Leodanmu.log("🔍 预缓存诊断: epId=" + preCachedEpId + " hasCachedXml=" + (cachedXml != null) + " isUsingPreCache=" + isUsingPreCache);
+                if (cachedXml != null) {
                     refreshPath = "http://" + localIp + ":" + getWebServerPort() + "/danmaku-cache?epId=" + preCachedEpId + "&t=" + System.currentTimeMillis();
                     Leodanmu.log("⚡ 预缓存命中，使用本地缓存URL: " + refreshPath);
                 } else {
+                    if (isUsingPreCache) {
+                        Leodanmu.log("⚠️ 预缓存标志残留但XML已丢失，回退原始代理URL");
+                        DanmakuManager.clearPreCache();
+                    }
                     Leodanmu.log("📡 推送原始代理URL: " + refreshPath);
                 }
                 if (offsetMs != 0) {
@@ -819,13 +823,17 @@ public class LeoDanmakuService {
             int offsetMs = config != null ? config.getDanmakuTimeOffsetMs() : 0;
             String refreshPath = buildDanmakuRefreshPath(danmakuItem, localIp, offsetMs);
             Integer preCachedEpId = danmakuItem.getEpId();
-            boolean hasCachedXml = preCachedEpId != null && DanmakuManager.getCachedXml(preCachedEpId) != null;
+            String cachedXml = preCachedEpId != null ? DanmakuManager.getCachedXml(preCachedEpId) : null;
             boolean isUsingPreCache = DanmakuManager.isUsingPreCache();
-            Leodanmu.log("🔍 预缓存诊断: epId=" + preCachedEpId + " hasCachedXml=" + hasCachedXml + " isUsingPreCache=" + isUsingPreCache);
-            if (preCachedEpId != null && (hasCachedXml || isUsingPreCache)) {
+            Leodanmu.log("🔍 预缓存诊断: epId=" + preCachedEpId + " hasCachedXml=" + (cachedXml != null) + " isUsingPreCache=" + isUsingPreCache);
+            if (cachedXml != null) {
                 refreshPath = "http://" + localIp + ":" + getWebServerPort() + "/danmaku-cache?epId=" + preCachedEpId + "&t=" + System.currentTimeMillis();
                 Leodanmu.log("⚡ 预缓存命中，使用本地缓存URL: " + refreshPath);
             } else {
+                if (isUsingPreCache) {
+                    Leodanmu.log("⚠️ 预缓存标志残留但XML已丢失，回退原始代理URL");
+                    DanmakuManager.clearPreCache();
+                }
                 Leodanmu.log("📡 推送原始代理URL: " + refreshPath);
             }
 
