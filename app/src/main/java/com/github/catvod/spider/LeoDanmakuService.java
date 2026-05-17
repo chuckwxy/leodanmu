@@ -754,9 +754,10 @@ public class LeoDanmakuService {
                 DanmakuConfig config = DanmakuConfigManager.getConfig(activity);
                 int offsetMs = config != null ? config.getDanmakuTimeOffsetMs() : 0;
                 String refreshPath = buildDanmakuRefreshPath(danmakuItem, localIp, offsetMs);
-                if (danmakuItem.getEpId() != null && DanmakuManager.getCachedXml(danmakuItem.getEpId()) != null) {
-                    refreshPath = "http://" + localIp + ":" + getWebServerPort() + "/danmaku-cache?epId=" + danmakuItem.getEpId() + "&t=" + System.currentTimeMillis();
-                    Leodanmu.log("⚡ 预缓存命中，使用本地缓存: epId=" + danmakuItem.getEpId());
+                Integer preCachedEpId = danmakuItem.getEpId();
+                if (preCachedEpId != null && (DanmakuManager.getCachedXml(preCachedEpId) != null || DanmakuManager.isUsingPreCache())) {
+                    refreshPath = "http://" + localIp + ":" + getWebServerPort() + "/danmaku-cache?epId=" + preCachedEpId + "&t=" + System.currentTimeMillis();
+                    Leodanmu.log("⚡ 预缓存命中，使用本地缓存: epId=" + preCachedEpId);
                 }
                 if (offsetMs != 0) {
                     Leodanmu.log("启用弹幕时间偏移: " + DanmakuUtils.formatOffsetLabel(offsetMs) + "，通过本地代理推送");
@@ -812,9 +813,10 @@ public class LeoDanmakuService {
             DanmakuConfig config = DanmakuConfigManager.getConfig(activity);
             int offsetMs = config != null ? config.getDanmakuTimeOffsetMs() : 0;
             String refreshPath = buildDanmakuRefreshPath(danmakuItem, localIp, offsetMs);
-            if (danmakuItem.getEpId() != null && DanmakuManager.getCachedXml(danmakuItem.getEpId()) != null) {
-                refreshPath = "http://" + localIp + ":" + getWebServerPort() + "/danmaku-cache?epId=" + danmakuItem.getEpId() + "&t=" + System.currentTimeMillis();
-                Leodanmu.log("⚡ 预缓存命中，使用本地缓存: epId=" + danmakuItem.getEpId());
+            Integer preCachedEpId = danmakuItem.getEpId();
+            if (preCachedEpId != null && (DanmakuManager.getCachedXml(preCachedEpId) != null || DanmakuManager.isUsingPreCache())) {
+                refreshPath = "http://" + localIp + ":" + getWebServerPort() + "/danmaku-cache?epId=" + preCachedEpId + "&t=" + System.currentTimeMillis();
+                Leodanmu.log("⚡ 预缓存命中，使用本地缓存: epId=" + preCachedEpId);
             }
 
             if (offsetMs != 0) {

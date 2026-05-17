@@ -129,6 +129,6 @@ public class DanmakuManager {
         lastManualDanmakuUrl = "";
         lastDanmakuUrl = "";
         lastDanmakuItemMap.clear();
-        clearPreCache();
+        // 不清理预缓存: 预缓存由 consume 或 stopHookMonitor 清理
     }
 }
