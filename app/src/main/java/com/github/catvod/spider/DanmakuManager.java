@@ -17,13 +17,13 @@ public class DanmakuManager {
     public static String currentVideoSignature = "";  // 当前视频的唯一标识（基于标题提取）
     public static long lastVideoDetectedTime = 0;     // 上次检测到视频的时间
 
-    // 预缓存：推送成功后提前抓取下集弹幕和 XML，换集时直接推送
+    // 预缓存：推送成功后提前抓取下集弹幕 XML，换集时直接使用本地缓存
     private static DanmakuItem sPreCachedDanmakuItem = null;
     private static int sPreCachedEpId = -1;
     private static String sPreCachedXml = null;
-    private static boolean sPreCachedValid = false;
-
-    // 正在使用预缓存推送的标志（pushDanmakuInThread 检测此标志跳过网络 fetch）
+    // 持久 XML 缓存，WebServer /danmaku-cache 端点可查，clearPreCache 时清理
+    private static final ConcurrentMap<Integer, String> sCachedXmlMap = new ConcurrentHashMap<>();
+    // 正在使用预缓存推送的标志
     private static volatile boolean sUsingPreCache = false;
     private static volatile String sPreCachedXmlForPush = null;
 
@@ -85,12 +85,19 @@ public class DanmakuManager {
         sPreCachedEpId = epId;
         sPreCachedDanmakuItem = item;
         sPreCachedXml = xmlData;
-        sPreCachedValid = !TextUtils.isEmpty(xmlData);
+        if (!TextUtils.isEmpty(xmlData)) {
+            sCachedXmlMap.put(epId, xmlData);
+        }
         Leodanmu.log("💾 预缓存已保存: epId=" + epId + ", xmlLen=" + (xmlData == null ? 0 : xmlData.length()));
     }
 
     public static int getPreCachedEpId() {
         return sPreCachedEpId;
+    }
+
+    /** WebServer /danmaku-cache 查询接口 */
+    public static String getCachedXml(int epId) {
+        return sCachedXmlMap.get(epId);
     }
 
     public static boolean isUsingPreCache() {
@@ -108,9 +115,9 @@ public class DanmakuManager {
         sPreCachedDanmakuItem = null;
         sPreCachedEpId = -1;
         sPreCachedXml = null;
-        sPreCachedValid = false;
         sPreCachedXmlForPush = null;
         sUsingPreCache = false;
+        sCachedXmlMap.clear();
     }
 
     public static void resetAutoSearch() {
