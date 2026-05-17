@@ -61,6 +61,15 @@ public class DanmakuManager {
         DanmakuItem nextDanmakuItem = lastDanmakuItemMap.get(nextId);
         if (nextDanmakuItem != null) {
             Leodanmu.log("✅ 获取到下一个弹幕弹幕信息: " + nextDanmakuItem.toString());
+            // 即使从已缓存 Map 找到，也检查是否有预缓存 XML
+            String cachedXml = sCachedXmlMap.get(nextId);
+            if (cachedXml != null) {
+                sPreCachedXmlForPush = cachedXml;
+                sUsingPreCache = true;
+                Leodanmu.log("⚡ 预缓存有效(来自持久Map): epId=" + nextId);
+            } else {
+                Leodanmu.log("📋 预缓存不可用(持久Map无数据): epId=" + nextId);
+            }
             return nextDanmakuItem;
         }
 
