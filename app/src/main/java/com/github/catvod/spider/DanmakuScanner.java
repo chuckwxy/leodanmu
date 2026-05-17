@@ -1760,21 +1760,8 @@ public class DanmakuScanner {
     private static void injectButton(ViewGroup parent, TextView anchor) {
         try {
             View existing = parent.findViewWithTag("danmu_button");
-            String anchorText = anchor.getText().toString().trim();
-            boolean useBefore = "弹幕搜索".equals(anchorText) || anchorText.contains("搜索") || anchorText.contains("音轨");
-
-            // 逻辑：如果已存在按钮
             if (existing != null) {
-                if (useBefore) {
-                    ViewParent existingParent = existing.getParent();
-                    if (existingParent instanceof ViewGroup) {
-                        ((ViewGroup) existingParent).removeView(existing);
-                        Leodanmu.log("[按钮注入] 移除旧按钮，准备重新注入");
-                    }
-                } else {
-//                    DanmakuSpider.log("[按钮注入] 按钮已存在，跳过");
-                    return; // 否则不重复添加
-                }
+                return;
             }
 
             if (isInRecyclerView(parent)) {
@@ -1782,108 +1769,99 @@ public class DanmakuScanner {
                 return;
             }
 
+            String anchorText = anchor.getText().toString().trim();
+            boolean useBefore = "弹幕搜索".equals(anchorText) || anchorText.contains("搜索") || anchorText.contains("音轨");
+
             TextView btn;
-            if (existing != null && useBefore) {
-                btn = (TextView) existing; // 复用
+            // 创建新的Leo弹幕按钮
+            btn = new TextView(parent.getContext());
+            btn.setText("Leo弹幕");
+            btn.setTag("danmu_button");
+            btn.setTextColor(anchor.getTextColors());
+            btn.setTextSize(0, anchor.getTextSize());
+            btn.setGravity(Gravity.CENTER);
+            btn.setPadding(20, 10, 20, 10);
+            btn.setSingleLine(true);
+
+            // 修复焦点问题 - 添加必要的焦点设置
+            btn.setFocusable(true);
+            btn.setFocusableInTouchMode(true);
+            btn.setClickable(true);
+
+            // 设置背景（使用锚点的背景）
+            if (anchor.getBackground() != null && anchor.getBackground().getConstantState() != null) {
+                btn.setBackground(anchor.getBackground().getConstantState().newDrawable());
             } else {
-                // 创建新的Leo弹幕按钮
-                btn = new TextView(parent.getContext());
-                btn.setText("Leo弹幕");
-                btn.setTag("danmu_button");
-                btn.setTextColor(anchor.getTextColors());
-                btn.setTextSize(0, anchor.getTextSize());
-                btn.setGravity(Gravity.CENTER);
-                btn.setPadding(20, 10, 20, 10);
-                btn.setSingleLine(true);
+                btn.setBackgroundColor(Color.parseColor("#4CAF50"));
+            }
 
-                // 修复焦点问题 - 添加必要的焦点设置
-                btn.setFocusable(true);
-                btn.setFocusableInTouchMode(true);
-                btn.setClickable(true);
+            // 按钮点击事件
+            btn.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (parent.getContext() instanceof Activity) {
+                        Activity activity = (Activity) parent.getContext();
+                        // 添加防抖动检查
+                        long currentTime = System.currentTimeMillis();
+                        if (currentTime - Leodanmu.lastButtonClickTime < 500) {
+                            Leodanmu.log("[按钮点击] 防抖动：点击过于频繁");
+                            return;
+                        }
+                        Leodanmu.lastButtonClickTime = currentTime;
 
-                // 设置背景（使用锚点的背景）
-                if (anchor.getBackground() != null && anchor.getBackground().getConstantState() != null) {
-                    btn.setBackground(anchor.getBackground().getConstantState().newDrawable());
-                } else {
-                    btn.setBackgroundColor(Color.parseColor("#4CAF50"));
-                }
+                        Leodanmu.log("[按钮点击] 打开搜索对话框");
+                        try {
+                            DanmakuConfig localConfig = DanmakuConfigManager.getConfig(activity);
+                            boolean hasLocalApiUrls = localConfig != null
+                                    && localConfig.getApiUrls() != null
+                                    && !localConfig.getApiUrls().isEmpty();
 
-                // 按钮点击事件
-                btn.setOnClickListener(new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        if (parent.getContext() instanceof Activity) {
-                            Activity activity = (Activity) parent.getContext();
-                            // 添加防抖动检查
-                            long currentTime = System.currentTimeMillis();
-                            if (currentTime - Leodanmu.lastButtonClickTime < 500) {
-                                Leodanmu.log("[按钮点击] 防抖动：点击过于频繁");
+                            if (!hasLocalApiUrls) {
+                                Leodanmu.updateHookStatus("searchButton", "local-config", "DanmakuConfigManager", "loadConfig", "", "请先在前台保存API地址");
+                            } else {
+                                Leodanmu.updateHookStatus("searchButton", "local-config", "DanmakuConfigManager", "loadConfig", "", "");
+                            }
+
+                            DanmakuConfig verifyConfig = DanmakuConfigManager.loadConfig(activity);
+                            if (verifyConfig == null || verifyConfig.getApiUrls() == null || verifyConfig.getApiUrls().isEmpty()) {
+                                Utils.safeShowToast(activity, "本地弹幕接口为空，请先保存配置");
                                 return;
                             }
-                            Leodanmu.lastButtonClickTime = currentTime;
-
-                            Leodanmu.log("[按钮点击] 打开搜索对话框");
-                            try {
-                                DanmakuConfig localConfig = DanmakuConfigManager.getConfig(activity);
-                                // Leodanmu.log("[按钮点击] 本地配置快照 apiUrls=" + (localConfig == null ? "null" : localConfig.getApiUrls()));
-                                boolean hasLocalApiUrls = localConfig != null
-                                        && localConfig.getApiUrls() != null
-                                        && !localConfig.getApiUrls().isEmpty();
-
-                                if (!hasLocalApiUrls) {
-                                    Leodanmu.updateHookStatus("searchButton", "local-config", "DanmakuConfigManager", "loadConfig", "", "请先在前台保存API地址");
-                                } else {
-                                    Leodanmu.updateHookStatus("searchButton", "local-config", "DanmakuConfigManager", "loadConfig", "", "");
-                                }
-
-                                DanmakuConfig verifyConfig = DanmakuConfigManager.loadConfig(activity);
-                                // Leodanmu.log("[按钮点击] 打开搜索框前 reload apiUrls=" + (verifyConfig == null ? "null" : verifyConfig.getApiUrls()));
-                                if (verifyConfig == null || verifyConfig.getApiUrls() == null || verifyConfig.getApiUrls().isEmpty()) {
-                                    Utils.safeShowToast(activity, "本地弹幕接口为空，请先保存配置");
-                                    // Leodanmu.log("[按钮点击] 本地 apiUrls 仍为空，取消打开搜索框");
-                                    return;
-                                }
-                            } catch (Exception e) {
-                                Leodanmu.updateHookStatus("searchButton", "exception", "", "", "", e.getMessage());
-                                // Leodanmu.log("[按钮点击] 搜索前主动hook异常: " + e.getMessage());
-                            }
-
-                            String title = "";
-                            if (lastEpisodeInfo != null) {
-                                if (lastEpisodeInfo.getEpisodeNames() != null && !lastEpisodeInfo.getEpisodeNames().isEmpty()) {
-                                    title = lastEpisodeInfo.getEpisodeNames().get(0);
-                                } else {
-                                    title = lastEpisodeInfo.getEpisodeName();
-                                }
-                            }
-                            DanmakuUIHelper.showSearchDialog(activity, title);
+                        } catch (Exception e) {
+                            Leodanmu.updateHookStatus("searchButton", "exception", "", "", "", e.getMessage());
                         }
-                    }
-                });
 
-                // 设置长按事件 - 弹出菜单
-                btn.setOnLongClickListener(new View.OnLongClickListener() {
-                    @Override
-                    public boolean onLongClick(View v) {
-                        if (parent.getContext() instanceof Activity) {
-                            Activity activity = (Activity) parent.getContext();
-                            // 添加防抖动检查
-                            long currentTime = System.currentTimeMillis();
-                            if (currentTime - Leodanmu.lastButtonClickTime < 500) {
-                                Leodanmu.log("[按钮长按] 防抖动：操作过于频繁");
-                                return true;
+                        String title = "";
+                        if (lastEpisodeInfo != null) {
+                            if (lastEpisodeInfo.getEpisodeNames() != null && !lastEpisodeInfo.getEpisodeNames().isEmpty()) {
+                                title = lastEpisodeInfo.getEpisodeNames().get(0);
+                            } else {
+                                title = lastEpisodeInfo.getEpisodeName();
                             }
-                            Leodanmu.lastButtonClickTime = currentTime;
-
-                            // 显示菜单
-                            //showLeoButtonMenu(activity);//leo原菜单选项
-                            DanmakuUIHelper.showCombinedConfigDialog(activity);
-
                         }
-                        return true;
+                        DanmakuUIHelper.showSearchDialog(activity, title);
                     }
-                });
-            }
+                }
+            });
+
+            // 设置长按事件 - 弹出菜单
+            btn.setOnLongClickListener(new View.OnLongClickListener() {
+                @Override
+                public boolean onLongClick(View v) {
+                    if (parent.getContext() instanceof Activity) {
+                        Activity activity = (Activity) parent.getContext();
+                        long currentTime = System.currentTimeMillis();
+                        if (currentTime - Leodanmu.lastButtonClickTime < 500) {
+                            Leodanmu.log("[按钮长按] 防抖动：操作过于频繁");
+                            return true;
+                        }
+                        Leodanmu.lastButtonClickTime = currentTime;
+                        DanmakuUIHelper.showCombinedConfigDialog(activity);
+
+                    }
+                    return true;
+                }
+            });
 
             // 布局参数设置
             ViewGroup.LayoutParams anchorLp = anchor.getLayoutParams();
