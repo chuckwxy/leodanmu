@@ -1072,40 +1072,61 @@ public class LeoDanmakuService {
             if (player != null) return player;
         }
 
+        for (Activity candidate : getAliveActivities()) {
+            if (candidate == null || candidate == activity || candidate == topActivity) continue;
+            player = tryResolveExactFongMiDanmakuTarget(candidate, danmakuClass);
+            if (player != null) return player;
+            player = tryResolveDanmakuTargetFromActivityDirect(candidate, danmakuClass);
+            if (player != null) return player;
+            player = tryResolveDanmakuTargetFromObject(candidate, "candidate-root", 4, visited, false, danmakuClass);
+            if (player != null) return player;
+            player = tryResolvePlayerFromActivity(candidate, danmakuClass);
+            if (player != null) return player;
+            player = tryResolvePlayerFromActivityFields(candidate, danmakuClass);
+            if (player != null) return player;
+        }
+
         return null;
     }
 
     private static Object tryResolveExactFongMiDanmakuTarget(Activity activity, Class<?> danmakuClass) {
         if (activity == null) return null;
         try {
-            Field videoField = findField(activity.getClass(), "F");
-            if (videoField == null) {
-                Leodanmu.log("精确链路失败: VideoActivity.F 不存在");
+            if (!"com.fongmi.android.tv.ui.activity.VideoActivity".equals(activity.getClass().getName())) {
                 return null;
             }
-            videoField.setAccessible(true);
-            Object service = videoField.get(activity);
+            Field serviceField = findField(activity.getClass(), "F");
+            if (serviceField == null) {
+                Leodanmu.log("精确链路失败: VideoActivity 缺少字段 F");
+                return null;
+            }
+            serviceField.setAccessible(true);
+            Object service = serviceField.get(activity);
             if (service == null) {
                 Leodanmu.log("精确链路失败: VideoActivity.F 为空");
                 return null;
             }
             if (!"com.fongmi.android.tv.service.PlaybackService".equals(service.getClass().getName())) {
                 Leodanmu.log("精确链路失败: VideoActivity.F 类型异常 -> " + service.getClass().getName());
+                logObjectShape("VideoActivity.F", service, danmakuClass, 2);
                 return null;
             }
             Field danmakuField = findField(service.getClass(), "u");
             if (danmakuField == null) {
                 Leodanmu.log("精确链路失败: PlaybackService 缺少字段 u");
+                logObjectShape("PlaybackService", service, danmakuClass, 2);
                 return null;
             }
             danmakuField.setAccessible(true);
             Object target = danmakuField.get(service);
             if (target == null) {
                 Leodanmu.log("精确链路失败: PlaybackService.u 为空");
+                logObjectShape("PlaybackService", service, danmakuClass, 2);
                 return null;
             }
             if (findDanmakuMethod(target.getClass(), danmakuClass) == null) {
                 Leodanmu.log("精确链路失败: PlaybackService.u 不含 Danmaku 方法 -> " + target.getClass().getName());
+                logObjectShape("PlaybackService.u", target, danmakuClass, 2);
                 return null;
             }
             Leodanmu.log("精确链路命中: VideoActivity.F.u -> " + target.getClass().getName());
@@ -1118,7 +1139,102 @@ public class LeoDanmakuService {
 
     private static Object tryResolveKnownHostControllerTarget(Activity activity, Class<?> danmakuClass) {
         if (activity == null) return null;
+
+        Object target = tryResolveKnownControllerType(activity, danmakuClass,
+                "F3.f",
+                "com.fongmi.android.tv.ui.activity.VideoActivity",
+                "k0",
+                "OK影视Mobile/F3.f.k0");
+        if (target != null) return target;
+
+        target = tryResolveKnownControllerType(activity, danmakuClass,
+                "C3.e",
+                "com.fongmi.android.tv.ui.activity.VideoActivity",
+                "i0",
+                "OK影视TV/C3.e.i0");
+        if (target != null) return target;
+
+        target = tryResolveKnownControllerField(activity, danmakuClass, "Z", "l0", "影视+/Z.l0");
+        if (target != null) return target;
+
+        target = tryResolveKnownControllerByMethodSignatures(activity, danmakuClass);
+        if (target != null) return target;
+
+        target = tryResolveKnownPlaybackServiceStaticByMethodSignatures(activity, danmakuClass);
+        if (target != null) return target;
+
+        return null;
+    }
+
+    private static Object tryResolveKnownControllerField(Activity activity, Class<?> danmakuClass, String fieldName, String methodName, String label) {
         try {
+            Field field = findField(activity.getClass(), fieldName);
+            if (field == null) {
+                Leodanmu.log("宿主链路未命中: " + label + " 缺少字段 " + fieldName);
+                return null;
+            }
+            field.setAccessible(true);
+            Object controller = field.get(activity);
+            if (controller == null) {
+                Leodanmu.log("宿主链路未命中: " + label + " 字段为空");
+                return null;
+            }
+            Method method = findCompatibleMethod(controller.getClass(), methodName, danmakuClass);
+            if (method == null) {
+                Leodanmu.log("宿主链路未命中: " + label + " 缺少方法 " + methodName + "(" + danmakuClass.getSimpleName() + ")");
+                return null;
+            }
+            Leodanmu.log("宿主链路命中: " + label + " -> " + controller.getClass().getName() + "#" + method.getName());
+            return controller;
+        } catch (Throwable e) {
+            Leodanmu.log("宿主链路异常: " + label + " - " + e.getMessage());
+            return null;
+        }
+    }
+
+    private static Object tryResolveKnownControllerType(Activity activity,
+                                                        Class<?> danmakuClass,
+                                                        String simpleTypeName,
+                                                        String ownerClassName,
+                                                        String methodName,
+                                                        String label) {
+        try {
+            if (!ownerClassName.equals(activity.getClass().getName())) {
+                return null;
+            }
+            Class<?> current = activity.getClass();
+            while (current != null) {
+                for (Field field : current.getDeclaredFields()) {
+                    Class<?> fieldType = field.getType();
+                    if (fieldType == null) continue;
+                    if (!simpleTypeName.equals(fieldType.getName()) && !simpleTypeName.equals(fieldType.getSimpleName())) continue;
+                    field.setAccessible(true);
+                    Object controller = field.get(activity);
+                    if (controller == null) {
+                        Leodanmu.log("宿主链路未命中: " + label + " 字段为空(" + current.getName() + "#" + field.getName() + ")");
+                        return null;
+                    }
+                    Method method = findCompatibleMethod(controller.getClass(), methodName, danmakuClass);
+                    if (method == null) {
+                        Leodanmu.log("宿主链路未命中: " + label + " 缺少方法 " + methodName + "(" + danmakuClass.getSimpleName() + ")");
+                        return null;
+                    }
+                    Leodanmu.log("宿主链路命中: " + label + " -> " + current.getName() + "#" + field.getName() + " / " + controller.getClass().getName() + "#" + method.getName());
+                    return controller;
+                }
+                current = current.getSuperclass();
+            }
+            Leodanmu.log("宿主链路未命中: " + label + " 缺少类型字段 " + simpleTypeName);
+            return null;
+        } catch (Throwable e) {
+            Leodanmu.log("宿主链路异常: " + label + " - " + e.getMessage());
+            return null;
+        }
+    }
+
+    private static Object tryResolveKnownControllerByMethodSignatures(Activity activity, Class<?> danmakuClass) {
+        try {
+            String[] methodNames = new String[]{"k0", "i0", "l0", "o"};
             Class<?> current = activity.getClass();
             while (current != null) {
                 for (Field field : current.getDeclaredFields()) {
@@ -1126,18 +1242,53 @@ public class LeoDanmakuService {
                     Object value = field.get(activity);
                     if (value == null) continue;
                     Class<?> valueClass = value.getClass();
-                    String typeName = valueClass.getName();
-                    if (typeName.startsWith("defpackage.") && findDanmakuMethod(valueClass, danmakuClass) != null) {
-                        Leodanmu.log("已知Host控制器命中: " + current.getName() + "#" + field.getName() + " -> " + typeName);
+                    if (isSimpleValueType(valueClass) || isViewOnlyDanmakuTarget(valueClass) || isWrapperOrAsyncTarget(valueClass)) continue;
+                    for (String methodName : methodNames) {
+                        Method method = findCompatibleMethod(valueClass, methodName, danmakuClass);
+                        if (method == null) continue;
+                        Leodanmu.log("宿主链路命中: 方法签名字段 -> " + current.getName() + "#" + field.getName() + " / " + valueClass.getName() + "#" + method.getName());
                         return value;
                     }
                 }
                 current = current.getSuperclass();
             }
+            Leodanmu.log("宿主链路未命中: 方法签名字段扫描未找到 k0/i0/l0/o(" + danmakuClass.getSimpleName() + ")");
+            return null;
         } catch (Throwable e) {
-            Leodanmu.log("已知Host控制器反射失败: " + e.getMessage());
+            Leodanmu.log("宿主链路异常: 方法签名字段扫描 - " + e.getMessage());
+            return null;
         }
-        return null;
+    }
+
+    private static Object tryResolveKnownPlaybackServiceStaticByMethodSignatures(Activity activity, Class<?> danmakuClass) {
+        try {
+            ClassLoader loader = activity.getClassLoader() != null ? activity.getClassLoader() : LeoDanmakuService.class.getClassLoader();
+            Class<?> serviceClass = Class.forName("com.fongmi.android.tv.service.PlaybackService", false, loader);
+            String[] methodNames = new String[]{"k0", "i0", "l0", "o"};
+            Class<?> current = serviceClass;
+            while (current != null) {
+                for (Field field : current.getDeclaredFields()) {
+                    if ((field.getModifiers() & java.lang.reflect.Modifier.STATIC) == 0) continue;
+                    field.setAccessible(true);
+                    Object value = field.get(null);
+                    if (value == null) continue;
+                    Class<?> valueClass = value.getClass();
+                    if (isSimpleValueType(valueClass) || isViewOnlyDanmakuTarget(valueClass) || isWrapperOrAsyncTarget(valueClass)) continue;
+                    for (String methodName : methodNames) {
+                        Method method = findCompatibleMethod(valueClass, methodName, danmakuClass);
+                        if (method == null) continue;
+                        Leodanmu.log("宿主链路命中: PlaybackService静态控制器 -> " + current.getName() + "#" + field.getName() + " / " + valueClass.getName() + "#" + method.getName());
+                        return value;
+                    }
+                }
+                current = current.getSuperclass();
+            }
+            Leodanmu.log("宿主链路未命中: PlaybackService静态控制器扫描未找到 k0/i0/l0/o(" + danmakuClass.getSimpleName() + ")");
+            return null;
+        } catch (Throwable e) {
+            Leodanmu.log("宿主链路异常: PlaybackService静态控制器扫描 - " + e.getMessage());
+            return null;
+        }
     }
 
     private static Class<?> resolveHostDanmakuClass(Activity activity) throws Exception {
@@ -1925,5 +2076,38 @@ public class LeoDanmakuService {
             if (i > 0) costs[s2.length()] = lastValue;
         }
         return costs[s2.length()];
+    }
+
+    private static void logObjectShape(String label, Object target, Class<?> danmakuClass, int depth) {
+        Set<Object> visited = Collections.newSetFromMap(new IdentityHashMap<Object, Boolean>());
+        logObjectShapeInternal(label, target, danmakuClass, depth, visited);
+    }
+
+    private static void logObjectShapeInternal(String label, Object target, Class<?> danmakuClass, int depth, Set<Object> visited) {
+        if (target == null || depth <= 0 || visited.contains(target)) return;
+        visited.add(target);
+        try {
+            Class<?> current = target.getClass();
+            StringBuilder sb = new StringBuilder();
+            sb.append("对象形状: ").append(label).append(" (").append(current.getName()).append(")");
+            Leodanmu.log(sb.toString());
+            while (current != null) {
+                for (Field field : current.getDeclaredFields()) {
+                    if (isSimpleValueType(field.getType())) continue;
+                    field.setAccessible(true);
+                    Object value = field.get(target);
+                    if (value == null) continue;
+                    String typeName = value.getClass().getName();
+                    String fieldName = field.getName();
+                    boolean hasMethod = findDanmakuMethod(value.getClass(), danmakuClass) != null;
+                    Leodanmu.log("  字段: " + current.getSimpleName() + "#" + fieldName + " -> " + typeName + (hasMethod ? " [含Danmaku方法]" : ""));
+                    if (depth > 1) {
+                        logObjectShapeInternal(label + "." + fieldName, value, danmakuClass, depth - 1, visited);
+                    }
+                }
+                current = current.getSuperclass();
+            }
+        } catch (Throwable ignored) {
+        }
     }
 }
