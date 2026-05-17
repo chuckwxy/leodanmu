@@ -790,7 +790,14 @@ public class LeoDanmakuService {
                 return;
             }
 
-            int danmakuCount = fetchValidDanmakuCount(danmakuItem, 3);
+            int danmakuCount;
+            String preCachedXml = DanmakuManager.consumePreCachedXmlForPush();
+            if (preCachedXml != null) {
+                danmakuCount = countDanmakuItems(preCachedXml);
+                Leodanmu.log("⚡ 预缓存弹幕数据直接使用: " + danmakuCount + " 条");
+            } else {
+                danmakuCount = fetchValidDanmakuCount(danmakuItem, 3);
+            }
             if (danmakuCount <= 0) {
                 Leodanmu.log("❌ 无法获取有效的弹幕数据（或弹幕为空），取消推送");
                 return;
@@ -988,7 +995,7 @@ public class LeoDanmakuService {
                         return;
                     }
 
-                    DanmakuManager.cachePreCachedItem(nextEpId, candidate);
+                    DanmakuManager.cachePreCachedItem(nextEpId, candidate, xml);
                     Leodanmu.log("⚡ 预缓存下一集成功: epId=" + nextEpId + " (" + count + "条)");
                 } catch (Exception e) {
                     Leodanmu.log("⏭️ 预缓存异常: " + e.getMessage());

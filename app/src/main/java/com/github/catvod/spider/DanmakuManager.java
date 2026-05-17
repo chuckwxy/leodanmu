@@ -17,9 +17,15 @@ public class DanmakuManager {
     public static String currentVideoSignature = "";  // 当前视频的唯一标识（基于标题提取）
     public static long lastVideoDetectedTime = 0;     // 上次检测到视频的时间
 
-    // 预缓存：推送成功后提前抓取下集弹幕，换集时可直接提取
+    // 预缓存：推送成功后提前抓取下集弹幕和 XML，换集时直接推送
     private static DanmakuItem sPreCachedDanmakuItem = null;
     private static int sPreCachedEpId = -1;
+    private static String sPreCachedXml = null;
+    private static boolean sPreCachedValid = false;
+
+    // 正在使用预缓存推送的标志（pushDanmakuInThread 检测此标志跳过网络 fetch）
+    private static volatile boolean sUsingPreCache = false;
+    private static volatile String sPreCachedXmlForPush = null;
 
     public static void recordDanmakuUrl(DanmakuItem danmakuItem, boolean isAuto) {
         if (isAuto) {
@@ -61,28 +67,50 @@ public class DanmakuManager {
         // 检查预缓存是否有命中
         if (nextId == sPreCachedEpId && sPreCachedDanmakuItem != null) {
             Leodanmu.log("⚡ 预缓存命中: epId=" + nextId);
+            // 把预缓存的 XML 置入推送使用位
+            sPreCachedXmlForPush = sPreCachedXml;
+            sUsingPreCache = true;
             lastDanmakuItemMap.put(nextId, sPreCachedDanmakuItem);
             sPreCachedDanmakuItem = null;
             sPreCachedEpId = -1;
+            sPreCachedXml = null;
+            sPreCachedValid = false;
             return lastDanmakuItemMap.get(nextId);
         }
 
         return null;
     }
 
-    public static void cachePreCachedItem(int epId, DanmakuItem item) {
+    public static void cachePreCachedItem(int epId, DanmakuItem item, String xmlData) {
         sPreCachedEpId = epId;
         sPreCachedDanmakuItem = item;
-        Leodanmu.log("💾 预缓存已保存: epId=" + epId);
+        sPreCachedXml = xmlData;
+        sPreCachedValid = !TextUtils.isEmpty(xmlData);
+        Leodanmu.log("💾 预缓存已保存: epId=" + epId + ", xmlLen=" + (xmlData == null ? 0 : xmlData.length()));
     }
 
     public static int getPreCachedEpId() {
         return sPreCachedEpId;
     }
 
+    public static boolean isUsingPreCache() {
+        return sUsingPreCache;
+    }
+
+    public static String consumePreCachedXmlForPush() {
+        String xml = sPreCachedXmlForPush;
+        sPreCachedXmlForPush = null;
+        sUsingPreCache = false;
+        return xml;
+    }
+
     public static void clearPreCache() {
         sPreCachedDanmakuItem = null;
         sPreCachedEpId = -1;
+        sPreCachedXml = null;
+        sPreCachedValid = false;
+        sPreCachedXmlForPush = null;
+        sUsingPreCache = false;
     }
 
     public static void resetAutoSearch() {
