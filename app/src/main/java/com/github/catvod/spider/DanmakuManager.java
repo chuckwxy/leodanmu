@@ -74,7 +74,6 @@ public class DanmakuManager {
             sPreCachedDanmakuItem = null;
             sPreCachedEpId = -1;
             sPreCachedXml = null;
-            sPreCachedValid = false;
             return lastDanmakuItemMap.get(nextId);
         }
 
@@ -85,7 +84,7 @@ public class DanmakuManager {
         sPreCachedEpId = epId;
         sPreCachedDanmakuItem = item;
         sPreCachedXml = xmlData;
-        if (!TextUtils.isEmpty(xmlData)) {
+        if (xmlData != null && !xmlData.isEmpty()) {
             sCachedXmlMap.put(epId, xmlData);
         }
         Leodanmu.log("💾 预缓存已保存: epId=" + epId + ", xmlLen=" + (xmlData == null ? 0 : xmlData.length()));
