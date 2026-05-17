@@ -61,7 +61,11 @@ public class DanmakuManager {
         DanmakuItem nextDanmakuItem = lastDanmakuItemMap.get(nextId);
         if (nextDanmakuItem != null) {
             Leodanmu.log("✅ 获取到下一个弹幕弹幕信息: " + nextDanmakuItem.toString());
-            // 即使从已缓存 Map 找到，也检查是否有预缓存 XML
+            // 清除预缓存可能留下的临时标签
+            if (nextDanmakuItem.getEpTitle() != null && nextDanmakuItem.getEpTitle().startsWith("预缓存#")) {
+                nextDanmakuItem.setEpTitle(nextDanmakuItem.getEpTitle().replace("预缓存#", ""));
+            }
+            // 检查是否有预缓存 XML
             String cachedXml = sCachedXmlMap.get(nextId);
             if (cachedXml != null) {
                 sPreCachedXmlForPush = cachedXml;
@@ -85,7 +89,12 @@ public class DanmakuManager {
             sPreCachedDanmakuItem = null;
             sPreCachedEpId = -1;
             sPreCachedXml = null;
-            return lastDanmakuItemMap.get(nextId);
+            DanmakuItem result = lastDanmakuItemMap.get(nextId);
+            // 清除预缓存可能留下的临时标签
+            if (result != null && result.getEpTitle() != null && result.getEpTitle().startsWith("预缓存#")) {
+                result.setEpTitle(result.getEpTitle().replace("预缓存#", ""));
+            }
+            return result;
         }
 
         return null;

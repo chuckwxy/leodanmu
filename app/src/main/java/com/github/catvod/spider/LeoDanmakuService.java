@@ -1002,7 +1002,7 @@ public class LeoDanmakuService {
                     candidate.setApiBase(apiBase);
                     candidate.setFrom(from);
                     candidate.setTitle(title);
-                    candidate.setEpTitle("预缓存#" + nextEpId);
+                    candidate.setEpTitle("第" + nextEpId + "集");
 
                     String xml = NetworkUtils.robustHttpGet(candidate.getDanmakuUrl());
                     if (TextUtils.isEmpty(xml)) {
