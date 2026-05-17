@@ -68,6 +68,8 @@ public class DanmakuManager {
                 sUsingPreCache = true;
                 Leodanmu.log("⚡ 预缓存有效(来自持久Map): epId=" + nextId);
             } else {
+                sPreCachedXmlForPush = null;
+                sUsingPreCache = false;
                 Leodanmu.log("📋 预缓存不可用(持久Map无数据): epId=" + nextId);
             }
             return nextDanmakuItem;
