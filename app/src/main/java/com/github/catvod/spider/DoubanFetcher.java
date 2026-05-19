@@ -528,6 +528,8 @@ public class DoubanFetcher {
         }
         return sb.toString();
     }
+
+    private static String extractImage(JSONObject obj, String field) {
         Object val = obj.opt(field);
         if (val instanceof String) return (String) val;
         if (val instanceof JSONObject) {
