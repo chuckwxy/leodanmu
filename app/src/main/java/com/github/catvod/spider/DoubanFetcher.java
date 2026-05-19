@@ -404,22 +404,11 @@ public class DoubanFetcher {
             try {
                 JSONObject raw = items.getJSONObject(i);
                 if (!sDebugLogged) {
-                    StringBuilder keys = new StringBuilder();
-                    String[] names = JSONObject.getNames(raw);
-                    if (names != null) {
-                        for (String n : names) {
-                            if (keys.length() > 0) keys.append(",");
-                            keys.append(n).append("=").append(raw.opt(n) != null ? raw.opt(n).getClass().getSimpleName() : "null");
-                        }
-                    }
-                    Leodanmu.log("豆瓣item结构: " + keys);
+                    Leodanmu.log("豆瓣item结构: " + getJsonKeys(raw));
                     Object coverObj = raw.opt("cover");
                     if (coverObj instanceof JSONObject) {
                         JSONObject cover = (JSONObject) coverObj;
-                        StringBuilder ckeys = new StringBuilder();
-                        String[] cnames = JSONObject.getNames(cover);
-                        if (cnames != null) for (String n : cnames) { if (ckeys.length() > 0) ckeys.append(","); ckeys.append(n); }
-                        Leodanmu.log("豆瓣cover字段: " + ckeys + " url空=" + TextUtils.isEmpty(cover.optString("url", "")) + " normal空=" + TextUtils.isEmpty(cover.optString("normal", "")) + " large空=" + TextUtils.isEmpty(cover.optString("large", "")));
+                        Leodanmu.log("豆瓣cover字段: " + getJsonKeys(cover) + " url空=" + TextUtils.isEmpty(cover.optString("url", "")) + " normal空=" + TextUtils.isEmpty(cover.optString("normal", "")) + " large空=" + TextUtils.isEmpty(cover.optString("large", "")));
                     } else {
                         Leodanmu.log("豆瓣cover类型: " + (coverObj != null ? coverObj.getClass().getSimpleName() : "null"));
                     }
@@ -428,11 +417,7 @@ public class DoubanFetcher {
                         Object subPic = sub.opt("pic");
                         Leodanmu.log("豆瓣subject.pic类型: " + (subPic != null ? subPic.getClass().getSimpleName() : "null"));
                         if (subPic instanceof JSONObject) {
-                            JSONObject sp = (JSONObject) subPic;
-                            StringBuilder skeys = new StringBuilder();
-                            String[] snames = JSONObject.getNames(sp);
-                            if (snames != null) for (String n : snames) { if (skeys.length() > 0) skeys.append(","); skeys.append(n); }
-                            Leodanmu.log("豆瓣subject.pic字段: " + skeys);
+                            Leodanmu.log("豆瓣subject.pic字段: " + getJsonKeys((JSONObject) subPic));
                         }
                     }
                     sDebugLogged = true;
@@ -532,7 +517,17 @@ public class DoubanFetcher {
         return obj;
     }
 
-    private static String extractImage(JSONObject obj, String field) {
+    private static String getJsonKeys(JSONObject obj) {
+        if (obj == null) return "null";
+        StringBuilder sb = new StringBuilder();
+        java.util.Iterator<String> it = obj.keys();
+        while (it.hasNext()) {
+            String key = it.next();
+            if (sb.length() > 0) sb.append(",");
+            sb.append(key).append("=").append(obj.opt(key) != null ? obj.opt(key).getClass().getSimpleName() : "null");
+        }
+        return sb.toString();
+    }
         Object val = obj.opt(field);
         if (val instanceof String) return (String) val;
         if (val instanceof JSONObject) {
