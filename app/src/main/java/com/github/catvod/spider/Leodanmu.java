@@ -572,13 +572,23 @@ public class Leodanmu extends Spider {
         ensureConfig(Utils.getTopActivity());
         try {
             JSONObject result = new JSONObject();
-            JSONArray classes = new JSONArray();
+            JSONArray classes = DoubanFetcher.getCategories();
             classes.put(createClassStatic("leo_danmaku_config", "Leo弹幕设置"));
             result.put("class", classes);
-            result.put("list", new JSONArray());
+            result.put("list", DoubanFetcher.fetchHomeList());
+            result.put("filters", DoubanFetcher.getFilterConfig());
             return result.toString();
         } catch (Exception e) {
-            return "";
+            try {
+                JSONObject result = new JSONObject();
+                JSONArray classes = new JSONArray();
+                classes.put(createClassStatic("leo_danmaku_config", "Leo弹幕设置"));
+                result.put("class", classes);
+                result.put("list", new JSONArray());
+                return result.toString();
+            } catch (Exception e2) {
+                return "";
+            }
         }
     }
 
@@ -588,6 +598,17 @@ public class Leodanmu extends Spider {
     }
 
     public static String categoryContentShellFallback(String tid, String pg, boolean filter, HashMap<String, String> extend) {
+        if (DoubanFetcher.isDouban(tid)) {
+            try {
+                int page = 1;
+                try { page = Integer.parseInt(pg); } catch (Exception ignored) {}
+                JSONObject result = DoubanFetcher.fetchCategory(tid, page, extend);
+                return result != null ? result.toString() : "";
+            } catch (Exception e) {
+                log("categoryContent douban error: " + e.getMessage());
+                return "";
+            }
+        }
         ensureConfig(Utils.getTopActivity());
         try {
             Activity activity = Utils.getTopActivity();
@@ -595,24 +616,19 @@ public class Leodanmu extends Spider {
             JSONObject result = new JSONObject();
             JSONArray list = new JSONArray();
 
-            // 创建弹幕配置按钮
             JSONObject configVod = createVodStatic("config", "弹幕配置", "", "配置弹幕API");
             list.put(configVod);
 
-            // 创建自动推送弹幕按钮（保持开启状态）
             JSONObject autoPushVod = createVodStatic("auto_push", "自动推送弹幕", "",
                     config.isAutoPushEnabled() ? "已开启" : "已关闭");
             list.put(autoPushVod);
 
-            // 创建查看日志按钮
             JSONObject logVod = createVodStatic("log", "查看日志", "", "调试信息");
             list.put(logVod);
 
-            // 创建 Hook 诊断按钮
             JSONObject hookDiagVod = createVodStatic("hook_diag", "Hook诊断", "", getHookStatusSummary());
             list.put(hookDiagVod);
 
-            // 创建布局配置按钮
             JSONObject lpConfigVod = createVodStatic("lp_config", "布局配置", "", "调整弹窗大小和透明度");
             list.put(lpConfigVod);
 

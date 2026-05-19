@@ -10,6 +10,7 @@ import com.github.catvod.spider.DanmakuConfig;
 import com.github.catvod.spider.DanmakuConfigManager;
 import com.github.catvod.spider.DanmakuScanner;
 import com.github.catvod.spider.DanmakuUIHelper;
+import com.github.catvod.spider.DoubanFetcher;
 import com.github.catvod.spider.ExtFetcher;
 import com.github.catvod.spider.Leodanmu;
 import com.github.catvod.spider.Utils;
@@ -50,18 +51,40 @@ public class RealLeodanmu implements PayloadBridge {
     public String homeContent(boolean filter) {
         try {
             JSONObject result = new JSONObject();
-            JSONArray classes = new JSONArray();
+            JSONArray classes = DoubanFetcher.getCategories();
             classes.put(createClass("leo_danmaku_config", "Leo弹幕设置"));
             result.put("class", classes);
-            result.put("list", new JSONArray());
+            result.put("list", DoubanFetcher.fetchHomeList());
+            result.put("filters", DoubanFetcher.getFilterConfig());
             return result.toString();
         } catch (Exception e) {
-            return "";
+            Leodanmu.log("homeContent error: " + e.getMessage());
+            try {
+                JSONObject result = new JSONObject();
+                JSONArray classes = new JSONArray();
+                classes.put(createClass("leo_danmaku_config", "Leo弹幕设置"));
+                result.put("class", classes);
+                result.put("list", new JSONArray());
+                return result.toString();
+            } catch (Exception e2) {
+                return "";
+            }
         }
     }
 
     @Override
     public String categoryContent(String tid, String pg, boolean filter, HashMap<String, String> extend) {
+        if (DoubanFetcher.isDouban(tid)) {
+            try {
+                int page = 1;
+                try { page = Integer.parseInt(pg); } catch (Exception ignored) {}
+                JSONObject result = DoubanFetcher.fetchCategory(tid, page, extend);
+                return result != null ? result.toString() : "";
+            } catch (Exception e) {
+                Leodanmu.log("categoryContent douban error: " + e.getMessage());
+                return "";
+            }
+        }
         try {
             Activity activity = Utils.getTopActivity();
             DanmakuConfig config = DanmakuConfigManager.getConfig(activity);
