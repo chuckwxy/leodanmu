@@ -491,6 +491,7 @@ public class DoubanFetcher {
                 vod.put("vod_pic", pic);
                 vod.put("vod_remarks", remarks);
                 if (list.length() == 0) Leodanmu.log("豆瓣第一个vod: " + vod.toString());
+                vod.put("goSearch", true);
                 list.put(vod);
             } catch (Exception ignored) {
             }
@@ -544,14 +545,18 @@ public class DoubanFetcher {
         if (val instanceof String) return (String) val;
         if (val instanceof JSONObject) {
             JSONObject jo = (JSONObject) val;
-            String[] keys = {"url", "large", "normal", "medium", "small", "original"};
-            for (String key : keys) {
-                Object v = jo.opt(key);
-                if (v instanceof String) return (String) v;
-                if (v instanceof JSONObject) {
-                    String u = ((JSONObject) v).optString("url", "");
-                    if (!TextUtils.isEmpty(u)) return u;
-                }
+            String v = jo.optString("url", "");
+            if (!TextUtils.isEmpty(v)) return v;
+            v = jo.optString("normal", "");
+            if (!TextUtils.isEmpty(v)) return v;
+            for (String key : new String[]{"large", "medium", "small", "original"}) {
+                v = jo.optString(key, "");
+                if (!TextUtils.isEmpty(v)) return v;
+            }
+            Object any = jo.opt("large");
+            if (any instanceof JSONObject) {
+                v = ((JSONObject) any).optString("url", "");
+                if (!TextUtils.isEmpty(v)) return v;
             }
         }
         return "";
