@@ -80,6 +80,23 @@ public class Leodanmu extends Spider {
         getPayloadBridge(context).init(context, extend);
     }
 
+    @Override
+    public void destroy() {
+        // 插件退出时清理所有缓存
+        try {
+            DanmakuScanner.stopHookMonitor();
+            DanmakuManager.clearPreCache();
+            if (sCacheDir != null && sCacheDir.exists()) {
+                File[] files = sCacheDir.listFiles();
+                if (files != null) {
+                    for (File f : files) f.delete();
+                }
+            }
+            log("🧹 插件退出，所有缓存已清理");
+        } catch (Exception ignored) {
+        }
+    }
+
     public static void initShellFallback(Context context, String extend) throws Exception {
         // log("init enter: ctx=" + (context == null ? "null" : context.getClass().getName())
         //         + ", extendEmpty=" + TextUtils.isEmpty(extend)

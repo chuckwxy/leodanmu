@@ -498,4 +498,12 @@ public class WebServer extends NanoHTTPD {
                 "</script>" +
                 "</body></html>";
     }
+
+    /** 被 DanmakuUIHelper.cleanupAllResources() 通过反射调用 */
+    public static void cleanupResources() {
+        synchronized (remoteInputMap) {
+            remoteInputMap.clear();
+        }
+        Leodanmu.log("🛑 WebServer资源已清理");
+    }
 }

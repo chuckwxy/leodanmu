@@ -824,6 +824,9 @@ public class DanmakuScanner {
         // 【新增】清理UIHelper的资源
         DanmakuUIHelper.cleanupAllResources();
 
+        // 清空预缓存
+        DanmakuManager.clearPreCache();
+
         Leodanmu.log("🛑 Hook监控已停止");
     }
 
@@ -1606,7 +1609,8 @@ public class DanmakuScanner {
                 LeoDanmakuService.autoSearch(lastEpisodeInfo, activity);
             }
         } else {
-            // 不同的剧集系列，更新记录
+            // 不同的剧集系列，清空旧缓存并更新记录
+            DanmakuManager.clearPreCache();
             String episodeName = lastEpisodeInfo.getEpisodeNames() != null && !lastEpisodeInfo.getEpisodeNames().isEmpty() ?
                     lastEpisodeInfo.getEpisodeNames().get(0) : lastEpisodeInfo.getEpisodeName();
             Leodanmu.log("🎬 剧集名: " + episodeName +

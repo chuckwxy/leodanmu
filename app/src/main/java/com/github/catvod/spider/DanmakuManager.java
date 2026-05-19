@@ -7,6 +7,9 @@ import java.util.concurrent.ConcurrentMap;
 
 public class DanmakuManager {
 
+    // 缓存过期时间：30分钟
+    private static final long CACHE_EXPIRE_TIME = 30 * 60 * 1000;
+
     public static String lastAutoDanmakuUrl = "";  // 上次自动推送的弹幕URL
     public static String lastManualDanmakuUrl = ""; // 上次手动选择的弹幕URL
     public static String lastDanmakuUrl = ""; // 上次弹幕URL
@@ -23,6 +26,8 @@ public class DanmakuManager {
     private static String sPreCachedXml = null;
     // 持久 XML 缓存，WebServer /danmaku-cache 端点可查，clearPreCache 时清理
     private static final ConcurrentMap<Integer, String> sCachedXmlMap = new ConcurrentHashMap<>();
+    // 缓存时间戳，用于判断缓存是否过期
+    private static final ConcurrentMap<Integer, Long> sCachedXmlTimestamps = new ConcurrentHashMap<>();
     // 正在使用预缓存推送的标志
     private static volatile boolean sUsingPreCache = false;
     private static volatile String sPreCachedXmlForPush = null;
@@ -62,8 +67,8 @@ public class DanmakuManager {
         DanmakuItem nextDanmakuItem = lastDanmakuItemMap.get(nextId);
         if (nextDanmakuItem != null) {
             Leodanmu.log("✅ 获取到下一个弹幕弹幕信息: " + nextDanmakuItem.toString());
-            // 检查是否有预缓存 XML
-            String cachedXml = sCachedXmlMap.get(nextId);
+            // 检查是否有预缓存 XML（含过期检查）
+            String cachedXml = getCachedXml(nextId);
             if (cachedXml != null) {
                 sPreCachedXmlForPush = cachedXml;
                 sUsingPreCache = true;
@@ -125,6 +130,7 @@ public class DanmakuManager {
         sPreCachedXml = xmlData;
         if (xmlData != null && !xmlData.isEmpty()) {
             sCachedXmlMap.put(epId, xmlData);
+            sCachedXmlTimestamps.put(epId, System.currentTimeMillis());
         }
         Leodanmu.log("💾 预缓存已保存: epId=" + epId + ", xmlLen=" + (xmlData == null ? 0 : xmlData.length()));
     }
@@ -133,8 +139,15 @@ public class DanmakuManager {
         return sPreCachedEpId;
     }
 
-    /** WebServer /danmaku-cache 查询接口 */
+    /** WebServer /danmaku-cache 查询接口（含过期检查） */
     public static String getCachedXml(int epId) {
+        Long cachedAt = sCachedXmlTimestamps.get(epId);
+        if (cachedAt != null && System.currentTimeMillis() - cachedAt > CACHE_EXPIRE_TIME) {
+            sCachedXmlMap.remove(epId);
+            sCachedXmlTimestamps.remove(epId);
+            Leodanmu.log("⏰ 缓存已过期: epId=" + epId + " (cacheAge=" + (System.currentTimeMillis() - cachedAt) / 1000 + "s)");
+            return null;
+        }
         return sCachedXmlMap.get(epId);
     }
 
@@ -156,6 +169,7 @@ public class DanmakuManager {
         sPreCachedXmlForPush = null;
         sUsingPreCache = false;
         sCachedXmlMap.clear();
+        sCachedXmlTimestamps.clear();
     }
 
     public static void resetAutoSearch() {
