@@ -490,6 +490,7 @@ public class DoubanFetcher {
                 vod.put("vod_name", title);
                 vod.put("vod_pic", pic);
                 vod.put("vod_remarks", remarks);
+                if (list.length() == 0) Leodanmu.log("豆瓣第一个vod: " + vod.toString());
                 list.put(vod);
             } catch (Exception ignored) {
             }
