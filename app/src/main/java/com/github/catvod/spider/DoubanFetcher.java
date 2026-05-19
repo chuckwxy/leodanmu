@@ -490,7 +490,6 @@ public class DoubanFetcher {
                 vod.put("vod_name", title);
                 vod.put("vod_pic", pic);
                 vod.put("vod_remarks", remarks);
-                vod.put("goSearch", true);
                 list.put(vod);
             } catch (Exception ignored) {
             }

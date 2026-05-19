@@ -774,6 +774,57 @@ public class Leodanmu extends Spider {
         return new Leodanmu().superLiveContent(url);
     }
 
+    @Override
+    public String searchContent(String key, boolean quick) throws Exception {
+        return searchContentShellFallback(key);
+    }
+
+    @Override
+    public String searchContent(String key, boolean quick, String pg) throws Exception {
+        return searchContentShellFallback(key);
+    }
+
+    public static String searchContentShellFallback(String key) {
+        ensureConfig(Utils.getTopActivity());
+        if (TextUtils.isEmpty(key)) return "";
+        try {
+            String[] settingIds = {"config", "auto_push", "log", "hook_diag", "lp_config"};
+            String[] settingNames = {"弹幕配置", "自动推送弹幕", "查看日志", "Hook诊断", "布局配置"};
+            for (int i = 0; i < settingIds.length; i++) {
+                if (!key.equals(settingNames[i])) continue;
+                JSONObject vod = new JSONObject();
+                vod.put("vod_id", settingIds[i]);
+                vod.put("vod_name", settingNames[i]);
+                vod.put("vod_pic", "");
+                String remark = "";
+                Activity activity = Utils.getTopActivity();
+                if ("auto_push".equals(settingIds[i]) && activity != null) {
+                    DanmakuConfig config = DanmakuConfigManager.getConfig(activity);
+                    remark = config.isAutoPushEnabled() ? "已开启" : "已关闭";
+                } else if ("hook_diag".equals(settingIds[i])) {
+                    remark = getHookStatusSummary();
+                } else if ("config".equals(settingIds[i])) {
+                    remark = "配置弹幕API";
+                } else if ("log".equals(settingIds[i])) {
+                    remark = "查看运行日志";
+                } else {
+                    remark = "调整弹窗大小和透明度";
+                }
+                vod.put("vod_remarks", remark);
+                JSONArray list = new JSONArray();
+                list.put(vod);
+                JSONObject result = new JSONObject();
+                result.put("list", list);
+                log("searchContent: 设置项 '" + key + "' → vod_id=" + settingIds[i]);
+                return result.toString();
+            }
+        } catch (Exception e) {
+            log("searchContent error: " + e.getMessage());
+        }
+        log("searchContent: '" + key + "' → 转发到外部搜索");
+        return "";
+    }
+
     private static String getHookStatusSummary() {
         String source = TextUtils.isEmpty(hookLastSource) ? "none" : hookLastSource;
         String stage = TextUtils.isEmpty(hookLastStage) ? "idle" : hookLastStage;
