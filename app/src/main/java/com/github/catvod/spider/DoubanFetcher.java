@@ -22,8 +22,10 @@ public class DoubanFetcher {
 
     private static final String HOST = "https://frodo.douban.com/api/v2";
     private static final String API_KEY = "0ac44ae016490db2204ce0a042db2916";
-    private static final String UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36";
-    private static final String REFERER = "https://m.douban.com/";
+    private static final String API_UA = "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/53.0.2785.143 Safari/537.36 MicroMessenger/7.0.9.501 NetType/WIFI MiniProgramEnv/Windows WindowsWechat";
+    private static final String API_REFERER = "https://servicewechat.com/wx2f9b06c1de1ccfca/84/page-frame.html";
+    private static final String IMG_REFERER = "https://m.douban.com/";
+    private static final String IMG_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36";
     private static final String[] IMG_DOMAINS = {"img1.doubanio.com", "img2.doubanio.com", "img9.doubanio.com"};
     private static final Random RANDOM = new Random();
     private static final Pattern DOUBAN_IMG_PATTERN = Pattern.compile("https://img\\d*\\.doubanio\\.com");
@@ -595,7 +597,7 @@ public class DoubanFetcher {
                 int idx = randomInt(0, 2);
                 url = url.replaceAll("https://img\\d*\\.doubanio\\.com", "https://" + IMG_DOMAINS[idx]);
             }
-            url += "@Referer=" + REFERER + "@User-Agent=" + UA;
+            url += "@Referer=" + IMG_REFERER + "@User-Agent=" + IMG_UA;
         }
         return url;
     }
@@ -605,8 +607,8 @@ public class DoubanFetcher {
             String separator = url.contains("?") ? "&" : "?";
             String finalUrl = url + separator + "apikey=" + API_KEY;
             Map<String, String> headers = new HashMap<>();
-            headers.put("User-Agent", UA);
-            headers.put("Referer", REFERER);
+            headers.put("User-Agent", API_UA);
+            headers.put("Referer", API_REFERER);
             String body = OkHttp.string(finalUrl, headers);
             if (TextUtils.isEmpty(body)) return null;
             return new JSONObject(body);
