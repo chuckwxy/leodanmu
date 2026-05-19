@@ -7,8 +7,8 @@ import java.util.concurrent.ConcurrentMap;
 
 public class DanmakuManager {
 
-    // 缓存过期时间：30分钟
-    private static final long CACHE_EXPIRE_TIME = 30 * 60 * 1000;
+    // 缓存过期时间：24小时（兜底安全网，主要靠换系列/退出时清理）
+    private static final long CACHE_EXPIRE_TIME = 24 * 60 * 60 * 1000L;
 
     public static String lastAutoDanmakuUrl = "";  // 上次自动推送的弹幕URL
     public static String lastManualDanmakuUrl = ""; // 上次手动选择的弹幕URL
