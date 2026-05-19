@@ -24,6 +24,7 @@ public class DoubanFetcher {
     private static final String UA = "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/53.0.2785.143 Safari/537.36 MicroMessenger/7.0.9.501 NetType/WIFI MiniProgramEnv/Windows WindowsWechat";
     private static final String REFERER = "https://servicewechat.com/wx2f9b06c1de1ccfca/84/page-frame.html";
     private static final int COUNT = 40;
+    private static boolean sDebugLogged = false;
 
     private static final Set<String> CATEGORIES = new HashSet<>(Arrays.asList(
             "latest", "movie", "tv", "show", "anime", "hot_movie", "hot_tv", "hot_show", "top_250"
@@ -402,6 +403,41 @@ public class DoubanFetcher {
         for (int i = 0; i < items.length(); i++) {
             try {
                 JSONObject raw = items.getJSONObject(i);
+                if (!sDebugLogged) {
+                    StringBuilder keys = new StringBuilder();
+                    String[] names = JSONObject.getNames(raw);
+                    if (names != null) {
+                        for (String n : names) {
+                            if (keys.length() > 0) keys.append(",");
+                            keys.append(n).append("=").append(raw.opt(n) != null ? raw.opt(n).getClass().getSimpleName() : "null");
+                        }
+                    }
+                    Leodanmu.log("豆瓣item结构: " + keys);
+                    Object coverObj = raw.opt("cover");
+                    if (coverObj instanceof JSONObject) {
+                        JSONObject cover = (JSONObject) coverObj;
+                        StringBuilder ckeys = new StringBuilder();
+                        String[] cnames = JSONObject.getNames(cover);
+                        if (cnames != null) for (String n : cnames) { if (ckeys.length() > 0) ckeys.append(","); ckeys.append(n); }
+                        Leodanmu.log("豆瓣cover字段: " + ckeys + " url空=" + TextUtils.isEmpty(cover.optString("url", "")) + " normal空=" + TextUtils.isEmpty(cover.optString("normal", "")) + " large空=" + TextUtils.isEmpty(cover.optString("large", "")));
+                    } else {
+                        Leodanmu.log("豆瓣cover类型: " + (coverObj != null ? coverObj.getClass().getSimpleName() : "null"));
+                    }
+                    JSONObject sub = raw.optJSONObject("subject");
+                    if (sub != null) {
+                        Object subPic = sub.opt("pic");
+                        Leodanmu.log("豆瓣subject.pic类型: " + (subPic != null ? subPic.getClass().getSimpleName() : "null"));
+                        if (subPic instanceof JSONObject) {
+                            JSONObject sp = (JSONObject) subPic;
+                            StringBuilder skeys = new StringBuilder();
+                            String[] snames = JSONObject.getNames(sp);
+                            if (snames != null) for (String n : snames) { if (skeys.length() > 0) skeys.append(","); skeys.append(n); }
+                            Leodanmu.log("豆瓣subject.pic字段: " + skeys);
+                        }
+                    }
+                    sDebugLogged = true;
+                }
+
                 JSONObject sub = raw.optJSONObject("subject");
                 String title = raw.optString("title", "");
                 if (TextUtils.isEmpty(title) && sub != null) title = sub.optString("title", "未知");
@@ -500,9 +536,13 @@ public class DoubanFetcher {
         Object val = obj.opt(field);
         if (val instanceof String) return (String) val;
         if (val instanceof JSONObject) {
-            String url = ((JSONObject) val).optString("url", "");
-            if (TextUtils.isEmpty(url)) url = ((JSONObject) val).optString("normal", "");
-            return url;
+            JSONObject jo = (JSONObject) val;
+            String[] keys = {"url", "normal", "large", "medium", "small", "original"};
+            for (String key : keys) {
+                String url = jo.optString(key, "");
+                if (!TextUtils.isEmpty(url)) return url;
+            }
+            return jo.optString("url", "");
         }
         return "";
     }
