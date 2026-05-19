@@ -444,10 +444,12 @@ public class DoubanFetcher {
 
     private static JSONObject requestDouban(String url) {
         try {
+            String separator = url.contains("?") ? "&" : "?";
+            String finalUrl = url + separator + "apikey=" + API_KEY;
             Map<String, String> headers = new HashMap<>();
             headers.put("User-Agent", UA);
             headers.put("Referer", REFERER);
-            String body = OkHttp.string(url, headers);
+            String body = OkHttp.string(finalUrl, headers);
             if (TextUtils.isEmpty(body)) return null;
             return new JSONObject(body);
         } catch (Exception e) {
