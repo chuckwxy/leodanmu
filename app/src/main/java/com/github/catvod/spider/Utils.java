@@ -1,8 +1,10 @@
 package com.github.catvod.spider;
 
 import android.app.Activity;
+import android.app.Application;
 import android.content.Context;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.widget.Toast;
@@ -14,12 +16,40 @@ import java.util.Map;
 public class Utils {
 
     private static WeakReference<Activity> cachedActivity;
-    private static Context appContext;  // 新增：全局 Application Context
+    private static WeakReference<Activity> sLifecycleActivity;
+    private static Context appContext;
 
-    // 新增：初始化全局 Context，在 Leodanmu.init() 中调用
     public static void initAppContext(Context context) {
         if (context != null) {
             appContext = context.getApplicationContext();
+            if (appContext instanceof Application) {
+                ((Application) appContext).registerActivityLifecycleCallbacks(new Application.ActivityLifecycleCallbacks() {
+                    @Override
+                    public void onActivityCreated(Activity activity, Bundle savedInstanceState) {
+                        sLifecycleActivity = new WeakReference<>(activity);
+                    }
+                    @Override
+                    public void onActivityStarted(Activity activity) {
+                        sLifecycleActivity = new WeakReference<>(activity);
+                    }
+                    @Override
+                    public void onActivityResumed(Activity activity) {
+                        sLifecycleActivity = new WeakReference<>(activity);
+                    }
+                    @Override
+                    public void onActivityPaused(Activity activity) {}
+                    @Override
+                    public void onActivityStopped(Activity activity) {}
+                    @Override
+                    public void onActivitySaveInstanceState(Activity activity, Bundle outState) {}
+                    @Override
+                    public void onActivityDestroyed(Activity activity) {
+                        if (sLifecycleActivity != null && sLifecycleActivity.get() == activity) {
+                            sLifecycleActivity = null;
+                        }
+                    }
+                });
+            }
             Leodanmu.log("Utils: appContext initialized");
         }
     }
@@ -30,6 +60,17 @@ public class Utils {
     }
 
     public static Activity getTopActivity() {
+        if (sLifecycleActivity != null) {
+            Activity activity = sLifecycleActivity.get();
+            if (activity != null && !activity.isFinishing()) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 && activity.isDestroyed()) {
+                    return null;
+                }
+                return activity;
+            }
+            sLifecycleActivity = null;
+        }
+
         try {
             Class<?> activityThreadClass = Class.forName("android.app.ActivityThread");
             Object activityThread = activityThreadClass.getMethod("currentActivityThread").invoke(null);
@@ -59,7 +100,6 @@ public class Utils {
             Leodanmu.log("获取TopActivity失败: " + e.getMessage());
         }
 
-        // 如果反射获取失败，尝试从缓存返回
         if (cachedActivity != null) {
             Activity activity = cachedActivity.get();
             if (activity != null && !activity.isFinishing()) {

@@ -1,5 +1,7 @@
 package com.github.catvod.utils;
 
+import android.content.Context;
+import android.os.Build;
 import android.os.Environment;
 
 import androidx.annotation.Nullable;
@@ -19,6 +21,8 @@ import java.util.List;
 
 public class Path {
 
+    private static Context sContext;
+
     private static final String TAG = Path.class.getSimpleName();
 
     private static File mkdir(File file) {
@@ -26,11 +30,22 @@ public class Path {
         return file;
     }
 
+    public static void init(Context context) {
+        sContext = context.getApplicationContext();
+    }
+
     public static File download() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && sContext != null) {
+            return sContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+        }
         return Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
     }
 
     public static File root() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && sContext != null) {
+            File dir = sContext.getExternalFilesDir(null);
+            return dir != null ? dir : sContext.getFilesDir();
+        }
         return Environment.getExternalStorageDirectory();
     }
 
@@ -142,7 +157,9 @@ public class Path {
             if (file.getParentFile() != null) mkdir(file.getParentFile());
             if (!file.canWrite()) file.setWritable(true);
             if (!file.exists()) file.createNewFile();
-            Shell.exec("chmod 777 " + file);
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+                Shell.exec("chmod 777 " + file);
+            }
             return file;
         } catch (IOException e) {
             e.printStackTrace();

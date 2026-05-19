@@ -185,29 +185,8 @@ public class GoProxySpider extends Spider {
     }
 
 
-    // 获取Top Activity
     public static Activity getTopActivity() {
-        try {
-            Class<?> activityThreadClass = Class.forName("android.app.ActivityThread");
-            Object activityThread = activityThreadClass.getMethod("currentActivityThread").invoke(null);
-            java.lang.reflect.Field activitiesField = activityThreadClass.getDeclaredField("mActivities");
-            activitiesField.setAccessible(true);
-            Map<Object, Object> activities = (Map<Object, Object>) activitiesField.get(activityThread);
-
-            for (Object activityRecord : activities.values()) {
-                Class<?> activityRecordClass = activityRecord.getClass();
-                java.lang.reflect.Field pausedField = activityRecordClass.getDeclaredField("paused");
-                pausedField.setAccessible(true);
-                if (!pausedField.getBoolean(activityRecord)) {
-                    java.lang.reflect.Field activityField = activityRecordClass.getDeclaredField("activity");
-                    activityField.setAccessible(true);
-                    return (Activity) activityField.get(activityRecord);
-                }
-            }
-        } catch (Exception e) {
-            SpiderDebug.log("获取TopActivity失败: " + e.getMessage());
-        }
-        return null;
+        return Utils.getTopActivity();
     }
 
     // 安全运行UI线程

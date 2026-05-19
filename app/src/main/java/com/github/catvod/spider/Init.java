@@ -40,6 +40,7 @@ public class Init {
     public static void init(Context context) {
         get().app = ((Application) context);
         Proxy.init();
+        com.github.catvod.utils.Path.init(context);
 
         // 启动GoProxy
         //GoProxySpider.initGoProxy(context);
@@ -82,6 +83,8 @@ public class Init {
     }
 
     public static Activity getActivity() throws Exception {
+        Activity activity = Utils.getTopActivity();
+        if (activity != null) return activity;
         Class<?> activityThreadClass = Class.forName("android.app.ActivityThread");
         Object activityThread = activityThreadClass.getMethod("currentActivityThread").invoke(null);
         Field activitiesField = activityThreadClass.getDeclaredField("mActivities");
