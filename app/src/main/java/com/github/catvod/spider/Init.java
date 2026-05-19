@@ -40,7 +40,6 @@ public class Init {
     public static void init(Context context) {
         get().app = ((Application) context);
         Proxy.init();
-        com.github.catvod.utils.Path.init(context);
 
         // 启动GoProxy
         //GoProxySpider.initGoProxy(context);
