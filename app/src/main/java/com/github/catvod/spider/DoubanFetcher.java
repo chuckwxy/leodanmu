@@ -26,7 +26,7 @@ public class DoubanFetcher {
     private static final int COUNT = 40;
 
     private static final Set<String> CATEGORIES = new HashSet<>(Arrays.asList(
-            "movie", "tv", "show", "hot_movie", "hot_tv", "hot_show", "top_250"
+            "latest", "movie", "tv", "show", "anime", "hot_movie", "hot_tv", "hot_show", "top_250"
     ));
 
     public static boolean isDouban(String tid) {
@@ -35,9 +35,11 @@ public class DoubanFetcher {
 
     public static JSONArray getCategories() throws Exception {
         JSONArray arr = new JSONArray();
+        arr.put(classObj("latest", "\u6700\u8fd1\u66f4\u65b0"));
         arr.put(classObj("movie", "\u8c46\u74e3\u7535\u5f71"));
         arr.put(classObj("tv", "\u8c46\u74e3\u5267\u96c6"));
         arr.put(classObj("show", "\u8c46\u74e3\u7efc\u827a"));
+        arr.put(classObj("anime", "\u70ed\u64ad\u52a8\u6f2b"));
         arr.put(classObj("hot_movie", "\u7535\u5f71\u699c\u5355"));
         arr.put(classObj("hot_tv", "\u5267\u96c6\u699c\u5355"));
         arr.put(classObj("hot_show", "\u7efc\u827a\u699c\u5355"));
@@ -134,6 +136,21 @@ public class DoubanFetcher {
                 })
         ));
 
+        root.put("latest", buildFilters(
+                filter("sort", "排序", "R", new String[][]{
+                        {"最近上映", "R"}, {"近期热度", "U"}, {"综合排序", "T"}, {"高分优先", "S"}
+                })
+        ));
+
+        root.put("anime", buildFilters(
+                filter("类型", "类型", "", new String[][]{
+                        {"全部类型", ""}, {"动画电影", "动画"}, {"日本动漫", "日本动漫"}, {"国产动漫", "国产动漫"}
+                }),
+                filter("sort", "排序", "U", new String[][]{
+                        {"近期热度", "U"}, {"综合排序", "T"}, {"首映时间", "R"}, {"高分优先", "S"}
+                })
+        ));
+
         return root;
     }
 
@@ -141,7 +158,7 @@ public class DoubanFetcher {
         JSONArray merged = new JSONArray();
         Set<String> seen = new HashSet<>();
 
-        List<String> sources = Arrays.asList("hot_movie", "hot_tv", "hot_show");
+        List<String> sources = Arrays.asList("latest", "hot_movie", "hot_tv", "hot_show");
         for (String id : sources) {
             try {
                 JSONObject data = fetchCategoryInternal(id, 1, null);
@@ -220,6 +237,34 @@ public class DoubanFetcher {
             }
             if (total <= 0) total = 250;
 
+        } else if ("latest".equals(id)) {
+            JSONObject movieData = requestDouban(HOST + "/movie/recommend?sort=R&start=" + start + "&count=" + COUNT);
+            if (movieData != null) {
+                mergeItems(items, movieData.optJSONArray("items"));
+                total += movieData.optInt("total", 200);
+            }
+            JSONObject tvData = requestDouban(HOST + "/tv/recommend?sort=R&start=" + start + "&count=" + COUNT);
+            if (tvData != null) {
+                mergeItems(items, tvData.optJSONArray("items"));
+                total += tvData.optInt("total", 200);
+            }
+            if (total <= 0) total = items.length() + COUNT;
+
+        } else if ("anime".equals(id)) {
+            String animeTag = (filters != null) ? filters.get("类型") : null;
+            if (TextUtils.isEmpty(animeTag)) animeTag = "动画";
+            JSONObject movieData = requestDouban(HOST + "/movie/recommend?tags=" + URLEncoder.encode(animeTag, "UTF-8") + "&sort=" + sort + "&start=" + start + "&count=" + COUNT);
+            if (movieData != null) {
+                mergeItems(items, movieData.optJSONArray("items"));
+                total += movieData.optInt("total", 100);
+            }
+            JSONObject tvData = requestDouban(HOST + "/tv/recommend?tags=" + URLEncoder.encode(animeTag + ",日本动漫,动漫", "UTF-8") + "&sort=" + sort + "&start=" + start + "&count=" + COUNT);
+            if (tvData != null) {
+                mergeItems(items, tvData.optJSONArray("items"));
+                total += tvData.optInt("total", 100);
+            }
+            if (total <= 0) total = items.length() + COUNT;
+
         } else if ("movie".equals(id) || "tv".equals(id) || "show".equals(id)) {
             String typeStr = "";
             if ("tv".equals(id)) typeStr = "电视剧";
@@ -268,6 +313,18 @@ public class DoubanFetcher {
             } else if ("top_250".equals(id)) {
                 JSONObject data = requestDouban(HOST + "/subject_collection/movie_top250/items?start=" + offset + "&count=" + COUNT);
                 if (data != null) mergeItems(items, data.optJSONArray("subject_collection_items"));
+            } else if ("latest".equals(id)) {
+                JSONObject md = requestDouban(HOST + "/movie/recommend?sort=R&start=" + offset + "&count=" + COUNT);
+                if (md != null) mergeItems(items, md.optJSONArray("items"));
+                JSONObject td = requestDouban(HOST + "/tv/recommend?sort=R&start=" + offset + "&count=" + COUNT);
+                if (td != null) mergeItems(items, td.optJSONArray("items"));
+            } else if ("anime".equals(id)) {
+                String animeTag = (filters != null) ? filters.get("类型") : null;
+                if (TextUtils.isEmpty(animeTag)) animeTag = "动画";
+                JSONObject md = requestDouban(HOST + "/movie/recommend?tags=" + URLEncoder.encode(animeTag, "UTF-8") + "&sort=" + sort + "&start=" + offset + "&count=" + COUNT);
+                if (md != null) mergeItems(items, md.optJSONArray("items"));
+                JSONObject td = requestDouban(HOST + "/tv/recommend?tags=" + URLEncoder.encode(animeTag + ",日本动漫,动漫", "UTF-8") + "&sort=" + sort + "&start=" + offset + "&count=" + COUNT);
+                if (td != null) mergeItems(items, td.optJSONArray("items"));
             } else if ("movie".equals(id) || "tv".equals(id) || "show".equals(id)) {
                 String ep = ("tv".equals(id) || "show".equals(id)) ? "tv/recommend" : "movie/recommend";
                 String tagStr = "";
@@ -357,17 +414,14 @@ public class DoubanFetcher {
                 JSONObject ratingObj = raw.optJSONObject("rating");
                 if (ratingObj == null && sub != null) ratingObj = sub.optJSONObject("rating");
 
-                JSONObject picObj = raw.optJSONObject("pic");
-                if (picObj == null) picObj = raw.optJSONObject("cover");
-                if (picObj == null && sub != null) picObj = sub.optJSONObject("pic");
-                String pic = "";
-                if (picObj != null) {
-                    pic = picObj.optString("url", "");
-                    if (TextUtils.isEmpty(pic)) pic = picObj.optString("normal", "");
+                String pic = extractImage(raw, "cover");
+                if (TextUtils.isEmpty(pic)) pic = extractImage(raw, "pic");
+                if (TextUtils.isEmpty(pic) && sub != null) pic = extractImage(sub, "pic");
+                if (!TextUtils.isEmpty(pic)) {
+                    pic = pic.replace("img9.doubanio.com", "img1.doubanio.com")
+                            .replace("img2.doubanio.com", "img1.doubanio.com")
+                            .replace("img3.doubanio.com", "img1.doubanio.com");
                 }
-                pic = pic.replace("img9.doubanio.com", "img1.doubanio.com")
-                        .replace("img2.doubanio.com", "img1.doubanio.com")
-                        .replace("img3.doubanio.com", "img1.doubanio.com");
 
                 String pubdate = "";
                 if (sub != null) {
@@ -440,6 +494,17 @@ public class DoubanFetcher {
         }
         obj.put("value", arr);
         return obj;
+    }
+
+    private static String extractImage(JSONObject obj, String field) {
+        Object val = obj.opt(field);
+        if (val instanceof String) return (String) val;
+        if (val instanceof JSONObject) {
+            String url = ((JSONObject) val).optString("url", "");
+            if (TextUtils.isEmpty(url)) url = ((JSONObject) val).optString("normal", "");
+            return url;
+        }
+        return "";
     }
 
     private static JSONObject requestDouban(String url) {
