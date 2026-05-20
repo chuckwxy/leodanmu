@@ -166,18 +166,13 @@ public class DoubanFetcher {
                 filter("榜单", "榜单", "", new String[][]{
                         {"豆瓣实时热门电影榜", "movie_real_time_hotest"},
                         {"豆瓣一周口碑电影榜", "movie_weekly_best"},
-                        {"豆瓣电影Top250", "movie_top250"},
+                        {"豆瓣电影Top250", "top250"},
                         {"360影视电影榜", "rank?cat=2"},
                         {"爱奇艺热播榜", "ranks1/1/0"},
                         {"爱奇艺飙升榜", "ranks1/1/-1"},
                         {"爱奇艺必看榜", "ranks1/1/-6"},
                         {"爱奇艺上新榜", "ranks1/1/-5"},
                         {"爱奇艺好评榜", "ranks1/1/-4"},
-                        {"爱奇艺枪战榜", "ranks1/1/8201844980650933"},
-                        {"爱奇艺青春榜", "ranks1/1/8902937931540733"},
-                        {"爱奇艺奇幻榜", "ranks1/1/8035796650176933"},
-                        {"爱奇艺恐怖榜", "ranks1/1/7128547076428333"},
-                        {"爱奇艺战争榜", "ranks1/1/4705204050526533"},
                         {"腾讯剧情榜", "rank_hot_movie_story"},
                         {"腾讯口碑经典榜", "rank_hot_movie_classic"},
                         {"腾讯喜剧片榜", "rank_hot_movie_comedy"},
@@ -187,9 +182,11 @@ public class DoubanFetcher {
                         {"优酷上新榜", "youku_movie_1"},
                         {"优酷高分榜", "youku_movie_2"},
                         {"优酷免费榜", "youku_movie_3"},
-                        {"优酷网打榜", "youku_movie_4"},
-                        {"优酷港片榜", "youku_movie_5"},
-                        {"优酷喜剧榜", "youku_movie_6"}
+                }),
+                filter("标签", "标签", "", new String[][]{
+                        {"豆瓣", "豆瓣"}, {"最新", "最新"}, {"高分", "高分"},
+                        {"冷门佳片", "冷门佳片"}, {"华语", "华语"}, {"欧美", "欧美"},
+                        {"韩国", "韩国"}, {"日本", "日本"}
                 })
         ));
 
@@ -224,6 +221,11 @@ public class DoubanFetcher {
                         {"优酷港剧榜", "youku_tv_4"},
                         {"优酷悬疑榜", "youku_tv_5"},
                         {"优酷高清榜", "youku_tv_6"}
+                }),
+                filter("标签", "标签", "", new String[][]{
+                        {"豆瓣", "豆瓣"}, {"国产剧", "国产剧"}, {"美剧", "美剧"},
+                        {"日剧", "日剧"}, {"韩剧", "韩剧"}, {"日本动画", "日本动画"},
+                        {"纪录片", "纪录片"}
                 })
         ));
 
@@ -386,24 +388,17 @@ public class DoubanFetcher {
             } catch (Exception ignored) {}
         }
 
-        // 3. 平台聚合 (腾讯 → 爱奇艺 → 优酷 → 芒果 → 360 → 搜狗, 参照 JS homeVod br_requests)
+        // 3. 腾讯
         mergeItems(merged, PlatformFetcher.fetchTencent("movie", 1, "75"), seen, 200);
         mergeItems(merged, PlatformFetcher.fetchTencent("tv", 1, "75"), seen, 200);
-        mergeItems(merged, PlatformFetcher.fetchTencent("variety", 1, "75"), seen, 200);
-        mergeItems(merged, PlatformFetcher.fetchTencent("anime", 1, "75"), seen, 200);
-        mergeItems(merged, PlatformFetcher.fetchIqiyi("movie", 1), seen, 200);
-        mergeItems(merged, PlatformFetcher.fetchIqiyi("tv", 1), seen, 200);
-        mergeItems(merged, PlatformFetcher.fetchIqiyi("variety", 1), seen, 200);
-        mergeItems(merged, PlatformFetcher.fetchIqiyi("anime", 1), seen, 200);
-        mergeItems(merged, PlatformFetcher.fetchYouku("movie", 1, "new"), seen, 200);
-        mergeItems(merged, PlatformFetcher.fetchYouku("tv", 1, "hot"), seen, 200);
-        mergeItems(merged, PlatformFetcher.fetchYouku("variety", 1, "hot"), seen, 200);
+
+        // 4. 芒果TV
         mergeItems(merged, PlatformFetcher.fetchMangoTV("3", 1), seen, 200);
         mergeItems(merged, PlatformFetcher.fetchMangoTV("2", 1), seen, 200);
+
+        // 5. 360影视
         mergeItems(merged, PlatformFetcher.fetch360kan("1", 1), seen, 200);
         mergeItems(merged, PlatformFetcher.fetch360kan("2", 1), seen, 200);
-        mergeItems(merged, PlatformFetcher.fetchSogou("film", 1), seen, 200);
-        mergeItems(merged, PlatformFetcher.fetchSogou("teleplay", 1), seen, 200);
 
         return merged;
     }
@@ -471,15 +466,29 @@ public class DoubanFetcher {
         // ── 电影榜单 ──────────────────────────────────────────────────────
         } else if ("hot_movie".equals(id)) {
             String slug = getFilter(filters, "榜单", "");
-            if (TextUtils.isEmpty(slug)) slug = "movie_real_time_hotest";
-            fetchMovielist(slug, pg, items);
+            String tag = getFilter(filters, "标签", "");
+            if (!TextUtils.isEmpty(tag)) {
+                String url = SEARCH_HOST + "/j/search_subjects?type=movie&tag=" + URLEncoder.encode(tag, "UTF-8") + "&page_limit=50&page_start=" + ((pg - 1) * 50);
+                JSONObject data = requestDoubanSearch(url);
+                if (data != null) mergeItems(items, data.optJSONArray("subjects"));
+            } else {
+                if (TextUtils.isEmpty(slug)) slug = "movie_real_time_hotest";
+                fetchMovielist(slug, pg, items);
+            }
             total = items.length() + 20;
 
         // ── 剧集榜单 ──────────────────────────────────────────────────────
         } else if ("hot_tv".equals(id)) {
             String slug = getFilter(filters, "榜单", "");
-            if (TextUtils.isEmpty(slug)) slug = "tv_real_time_hotest";
-            fetchTvlist(slug, pg, items);
+            String tag = getFilter(filters, "标签", "");
+            if (!TextUtils.isEmpty(tag)) {
+                String url = SEARCH_HOST + "/j/search_subjects?type=tv&tag=" + URLEncoder.encode(tag, "UTF-8") + "&page_limit=50&page_start=" + ((pg - 1) * 50);
+                JSONObject data = requestDoubanSearch(url);
+                if (data != null) mergeItems(items, data.optJSONArray("subjects"));
+            } else {
+                if (TextUtils.isEmpty(slug)) slug = "tv_real_time_hotest";
+                fetchTvlist(slug, pg, items);
+            }
             total = items.length() + 20;
 
         // ── 电影筛选 ──────────────────────────────────────────────────────
@@ -541,17 +550,9 @@ public class DoubanFetcher {
                 String platName = prefixToPlatform(platform);
                 boolean isDoubanAll = "douban".equals(platName) && TextUtils.isEmpty(contentType);
                 if (isDoubanAll) {
-                    String year = new SimpleDateFormat("yyyy", Locale.getDefault()).format(new Date());
-                    String movieUrl = HOST + "/movie/recommend?refresh=0&start=" + offset + "&count=" + COUNT
-                        + "&selected_categories=" + URLEncoder.encode("{%}", "UTF-8") + "&uncollect=false&tags=" + URLEncoder.encode(year, "UTF-8");
-                    JSONObject md = requestDouban(movieUrl);
+                    JSONObject md = requestDouban(HOST + "/movie/recommend?sort=R&start=" + offset + "&count=" + COUNT);
                     if (md != null) mergeItems(items, md.optJSONArray("items"));
-                    String tvUrl = HOST + "/tv/recommend?refresh=0&start=" + offset + "&count=" + COUNT
-                        + "&selected_categories=" + URLEncoder.encode("{\"类型\":\"\",\"形式\":\"电视剧\"}", "UTF-8")
-                        + "&uncollect=false&tags=" + URLEncoder.encode("电视剧," + year, "UTF-8");
-                    JSONObject td = requestDouban(tvUrl);
-                    if (td != null) mergeItems(items, td.optJSONArray("items"));
-                    if (td != null) mergeItems(items, td.optJSONArray("items"));
+                    JSONObject td = requestDouban(HOST + "/tv/recommend?sort=R&start=" + offset + "&count=" + COUNT);
                 }
             }
             if (items.length() == before) break;
@@ -601,61 +602,30 @@ public class DoubanFetcher {
             }
             return;
         }
-        // douban branch (匹配 JS _0x18978b / recentlyupdated)
-        String year = new SimpleDateFormat("yyyy", Locale.getDefault()).format(new Date());
-        String encYear = URLEncoder.encode(year, "UTF-8");
-
+        // douban branch (frodo API: use sort=R, tags for filtering)
         if ("ru_all".equals(contentType)) {
-            // ru_movie: movie/recommend with empty category
-            String movieUrl = HOST + "/movie/recommend?refresh=0&start=" + (pg - 1) * COUNT + "&count=" + COUNT
-                + "&selected_categories=" + URLEncoder.encode("{%}", "UTF-8") + "&uncollect=false&tags=" + encYear;
-            JSONObject md = requestDouban(movieUrl);
+            JSONObject md = requestDouban(HOST + "/movie/recommend?sort=R&start=" + (pg - 1) * COUNT + "&count=" + COUNT);
             if (md != null) mergeItems(items, md.optJSONArray("items"));
-
-            // ru_tv: tv/recommend with 电视剧 category
-            String tvUrl = HOST + "/tv/recommend?refresh=0&start=" + (pg - 1) * COUNT + "&count=" + COUNT
-                + "&selected_categories=" + URLEncoder.encode("{\"类型\":\"\",\"形式\":\"电视剧\"}", "UTF-8")
-                + "&uncollect=false&tags=" + URLEncoder.encode("电视剧," + year, "UTF-8");
-            JSONObject td = requestDouban(tvUrl);
+            JSONObject td = requestDouban(HOST + "/tv/recommend?sort=R&start=" + (pg - 1) * COUNT + "&count=" + COUNT);
             if (td != null) mergeItems(items, td.optJSONArray("items"));
-
-            // ru_zy: tv/recommend with 综艺 category
-            String zyUrl = HOST + "/tv/recommend?refresh=0&start=" + (pg - 1) * COUNT + "&count=" + COUNT
-                + "&selected_categories=" + URLEncoder.encode("{\"类型\":\"\",\"形式\":\"综艺\"}", "UTF-8")
-                + "&uncollect=false&tags=" + URLEncoder.encode("综艺," + year, "UTF-8");
-            JSONObject zd = requestDouban(zyUrl);
-            if (zd != null) mergeItems(items, zd.optJSONArray("items"));
-
-            // ru_dm: tv/recommend with 动画 category
-            String dmUrl = HOST + "/tv/recommend?refresh=0&start=" + (pg - 1) * COUNT + "&count=" + COUNT
-                + "&selected_categories=" + URLEncoder.encode("{\"类型\":\"动画\",\"形式\":\"电视剧\"}", "UTF-8")
-                + "&uncollect=false&tags=" + URLEncoder.encode("动画," + year, "UTF-8");
-            JSONObject dd = requestDouban(dmUrl);
-            if (dd != null) mergeItems(items, dd.optJSONArray("items"));
         } else {
+            String year = new SimpleDateFormat("yyyy", Locale.getDefault()).format(new Date());
             String ep;
-            String selCat;
-            String tagStr;
+            String typeTag;
             if ("ru_movie".equals(contentType)) {
                 ep = "movie/recommend";
-                selCat = "{%}";
-                tagStr = year;
+                typeTag = "";
             } else {
                 ep = "tv/recommend";
-                if ("ru_tv".equals(contentType)) {
-                    selCat = "{\"类型\":\"\",\"形式\":\"电视剧\"}";
-                    tagStr = "电视剧," + year;
-                } else if ("ru_zy".equals(contentType)) {
-                    selCat = "{\"类型\":\"\",\"形式\":\"综艺\"}";
-                    tagStr = "综艺," + year;
-                } else {
-                    selCat = "{\"类型\":\"动画\",\"形式\":\"电视剧\"}";
-                    tagStr = "动画," + year;
-                }
+                if ("ru_tv".equals(contentType)) typeTag = "\u7535\u89c6\u5267";
+                else if ("ru_zy".equals(contentType)) typeTag = "\u7efc\u827a";
+                else if ("ru_dm".equals(contentType)) typeTag = "\u52a8\u753b";
+                else typeTag = "";
             }
-            String url = HOST + "/" + ep + "?refresh=0&start=" + (pg - 1) * COUNT + "&count=" + COUNT
-                + "&selected_categories=" + URLEncoder.encode(selCat, "UTF-8")
-                + "&uncollect=false&tags=" + URLEncoder.encode(tagStr, "UTF-8");
+            String tags = typeTag;
+            if (!TextUtils.isEmpty(tags)) tags = "," + tags;
+            String url = HOST + "/" + ep + "?tags=" + URLEncoder.encode(year + tags, "UTF-8")
+                    + "&sort=R&start=" + (pg - 1) * COUNT + "&count=" + COUNT;
             JSONObject data = requestDouban(url);
             if (data != null) mergeItems(items, data.optJSONArray("items"));
         }
