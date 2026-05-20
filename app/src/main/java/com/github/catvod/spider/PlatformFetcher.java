@@ -14,6 +14,12 @@ import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
 
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+
 public class PlatformFetcher {
 
     private static final String IQIYI_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36";
@@ -98,6 +104,30 @@ public class PlatformFetcher {
         return sb.toString();
     }
 
+    private static JSONObject tencentPost(String url, String json) {
+        try {
+            RequestBody body = RequestBody.create(MediaType.parse("application/json"), json);
+            Request req = new Request.Builder()
+                .url(url)
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36")
+                .header("Content-Type", "application/json")
+                .header("Cookie", "video_platform=2;")
+                .post(body)
+                .build();
+            OkHttpClient client = com.github.catvod.net.OkHttp.client();
+            Response res = client.newCall(req).execute();
+            String respBody = res.body() != null ? res.body().string() : null;
+            if (TextUtils.isEmpty(respBody)) {
+                Leodanmu.log("tencentPost body empty");
+                return null;
+            }
+            return new JSONObject(respBody);
+        } catch (Exception e) {
+            Leodanmu.log("tencentPost err: " + e.getMessage());
+            return null;
+        }
+    }
+
     private static String optStr(JSONObject obj, String... keys) {
         for (String k : keys) {
             String v = obj.optString(k);
@@ -174,14 +204,9 @@ public class PlatformFetcher {
             bypassParams.put("scene", "operation");
             body.put("page_bypass_params", bypassParams);
 
-            Map<String, String> h = new HashMap<>();
-            h.put("Cookie", "video_platform=2;");
-            h.put("Content-Type", "application/json");
-            h.put("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36");
-
             Leodanmu.log("腾请求 URL=" + url);
             Leodanmu.log("腾请求 body=" + body.toString());
-            JSONObject data = safePost(url, body.toString(), h);
+            JSONObject data = tencentPost(url, body.toString());
             if (data == null) {
                 Leodanmu.log("腾POST返回null");
                 return items;
