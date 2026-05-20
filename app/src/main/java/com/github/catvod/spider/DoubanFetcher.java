@@ -749,6 +749,7 @@ public class DoubanFetcher {
             JSONObject item = target.optJSONObject(i);
             if (item != null) {
                 String id = item.optString("id");
+                if (TextUtils.isEmpty(id)) id = item.optString("vod_id");
                 if (!TextUtils.isEmpty(id)) seen.add(id);
             }
         }
@@ -756,6 +757,7 @@ public class DoubanFetcher {
             JSONObject item = source.optJSONObject(i);
             if (item == null) continue;
             String id = item.optString("id");
+            if (TextUtils.isEmpty(id)) id = item.optString("vod_id");
             if (TextUtils.isEmpty(id) || seen.contains(id)) continue;
             seen.add(id);
             target.put(item);
