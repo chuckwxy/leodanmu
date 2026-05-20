@@ -29,8 +29,12 @@ public class PlatformFetcher {
         TENCENT_TAB_IDS.put("tx_hot_tv", "100113");
         TENCENT_TAB_IDS.put("tx_hot_zy", "100109");
         TENCENT_TAB_IDS.put("tx_hot_dm", "100119");
+        TENCENT_TAB_IDS.put("ru_movie", "100173");
+        TENCENT_TAB_IDS.put("ru_tv", "100113");
+        TENCENT_TAB_IDS.put("ru_zy", "100109");
+        TENCENT_TAB_IDS.put("ru_dm", "100119");
         TENCENT_TAB_IDS.put("tx_ru", "100173");
-        // aliases for type-based calls (hot context)
+        // aliases for type-based calls
         TENCENT_TAB_IDS.put("movie", "100173");
         TENCENT_TAB_IDS.put("tv", "100113");
         TENCENT_TAB_IDS.put("variety", "100109");
@@ -68,10 +72,16 @@ public class PlatformFetcher {
     private static JSONObject safePost(String url, String bodyJson, Map<String, String> headers) {
         try {
             String body = OkHttp.post(url, bodyJson, headers).getBody();
-            if (TextUtils.isEmpty(body)) return null;
+            if (TextUtils.isEmpty(body)) {
+                Leodanmu.log("platform POST body empty: " + url);
+                return null;
+            }
             return new JSONObject(body);
+        } catch (JSONException e) {
+            Leodanmu.log("platform POST JSON err: " + url + " -> " + e.getMessage().substring(0, Math.min(100, e.getMessage().length())));
+            return null;
         } catch (Exception e) {
-            Leodanmu.log("平台POST请求失败: " + url + " -> " + e.getMessage());
+            Leodanmu.log("platform POST err: " + url + " -> " + e.getMessage());
             return null;
         }
     }
@@ -96,13 +106,32 @@ public class PlatformFetcher {
 
     public static JSONArray fetchTencent(String type, int page, String lftxs) {
         JSONArray items = new JSONArray();
-        String tabId = TENCENT_TAB_IDS.get(type);
-        if (tabId == null) return items;
         if (TextUtils.isEmpty(lftxs) || "U".equals(lftxs)) lftxs = "75";
+        // Map internal type to JS-compatible lftxc value
+        // "75" → hot context: tx_hot_movie/tv/zy/dm
+        // other ("10","79","23") → latest context: ru_movie/tv/zy/dm
+        // If type already has "tx_" or "ru_" prefix, use as-is
+        String lftxc = type;
+        if (!type.startsWith("tx_") && !type.startsWith("ru_")) {
+            if ("75".equals(lftxs)) {
+                if ("movie".equals(type)) lftxc = "tx_hot_movie";
+                else if ("tv".equals(type)) lftxc = "tx_hot_tv";
+                else if ("variety".equals(type)) lftxc = "tx_hot_zy";
+                else if ("anime".equals(type)) lftxc = "tx_hot_dm";
+            } else {
+                if ("movie".equals(type)) lftxc = "ru_movie";
+                else if ("tv".equals(type)) lftxc = "ru_tv";
+                else if ("variety".equals(type)) lftxc = "ru_zy";
+                else if ("anime".equals(type)) lftxc = "ru_dm";
+            }
+        }
+        String tabId = TENCENT_TAB_IDS.get(lftxc);
+        if (tabId == null) return items;
 
         try {
-            String url = "https://pbaccess.video.qq.com/trpc.vector_layout.page_view.PageService/getPage?video_appid=3000010";
+            // Build URL matching JS: includes lftxs, lftxc, pg in query string
             int pg = page - 1;
+            String url = "https://pbaccess.video.qq.com/trpc.vector_layout.page_view.PageService/getPage?video_appid=3000010&lftxs=" + lftxs + "&lftxc=" + lftxc + "&pg=" + pg;
             String filterParams = "sort=" + lftxs;
 
             JSONObject body = new JSONObject();
@@ -134,26 +163,48 @@ public class PlatformFetcher {
             body.put("page_bypass_params", bypassParams);
 
             Map<String, String> h = new HashMap<>();
-            h.put("User-Agent", TENCENT_UA);
+            h.put("Cookie", "video_platform=2;");
             h.put("Content-Type", "application/json");
-            h.put("Cookie", "video_platform=2");
+            h.put("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36 Edg/114.0.1823.82");
+            h.put("Referer", "https://v.qq.com/");
+            h.put("Origin", "https://v.qq.com");
 
             JSONObject data = safePost(url, body.toString(), h);
-            if (data == null) return items;
+            if (data == null) {
+                Leodanmu.log("腾POST返回null");
+                return items;
+            }
+            Leodanmu.log("腾POST OK ret=" + data.optInt("ret", -1) + " msg=" + data.optString("msg","") + " hasData=" + data.has("data"));
 
-            // data.CardList[last].children_list.list.cards
             JSONObject dataObj = data.optJSONObject("data");
-            if (dataObj == null) return items;
+            if (dataObj == null) {
+                Leodanmu.log("腾data为空");
+                return items;
+            }
             JSONArray cardList = dataObj.optJSONArray("CardList");
-            if (cardList == null || cardList.length() == 0) return items;
+            if (cardList == null || cardList.length() == 0) {
+                Leodanmu.log("腾CardList为空 dataObj keys=" + dataObj.keySet().toString());
+                return items;
+            }
+            Leodanmu.log("腾CardList len=" + cardList.length() + " lastCard keys=" + cardList.optJSONObject(cardList.length()-1).keySet().toString());
             JSONObject lastCard = cardList.optJSONObject(cardList.length() - 1);
             if (lastCard == null) return items;
             JSONObject childrenList = lastCard.optJSONObject("children_list");
-            if (childrenList == null) return items;
+            if (childrenList == null) {
+                Leodanmu.log("腾children_list为空, lastCard keys=" + lastCard.keySet().toString());
+                return items;
+            }
             JSONObject list = childrenList.optJSONObject("list");
-            if (list == null) return items;
+            if (list == null) {
+                Leodanmu.log("腾list为空, childrenList keys=" + childrenList.keySet().toString());
+                return items;
+            }
             JSONArray cards = list.optJSONArray("cards");
-            if (cards == null) return items;
+            if (cards == null) {
+                Leodanmu.log("腾cards为空, list keys=" + list.keySet().toString());
+                return items;
+            }
+            Leodanmu.log("腾cards len=" + cards.length());
 
             for (int i = 0; i < cards.length(); i++) {
                 try {
