@@ -30,11 +30,21 @@ public class PlatformFetcher {
         TENCENT_TAB_IDS.put("tx_hot_zy", "100109");
         TENCENT_TAB_IDS.put("tx_hot_dm", "100119");
         TENCENT_TAB_IDS.put("tx_ru", "100173");
-        // aliases for type-based calls
+        // aliases for type-based calls (hot context)
         TENCENT_TAB_IDS.put("movie", "100173");
         TENCENT_TAB_IDS.put("tv", "100113");
         TENCENT_TAB_IDS.put("variety", "100109");
         TENCENT_TAB_IDS.put("anime", "100119");
+    }
+
+    // Tencent lftxs (sort param) per type in latest context
+    // hot context always uses "75"
+    private static final Map<String, String> TENCENT_LFTXS_LATEST = new HashMap<>();
+    static {
+        TENCENT_LFTXS_LATEST.put("movie", "10");
+        TENCENT_LFTXS_LATEST.put("tv", "79");
+        TENCENT_LFTXS_LATEST.put("variety", "23");
+        TENCENT_LFTXS_LATEST.put("anime", "23");
     }
 
     private static Map<String, String> headers(String ua, String referer) {
@@ -81,13 +91,19 @@ public class PlatformFetcher {
     // Response: data.CardList[last].children_list.list.cards
 
     public static JSONArray fetchTencent(String type, int page) {
+        return fetchTencent(type, page, "75");
+    }
+
+    public static JSONArray fetchTencent(String type, int page, String lftxs) {
         JSONArray items = new JSONArray();
         String tabId = TENCENT_TAB_IDS.get(type);
         if (tabId == null) return items;
+        if (TextUtils.isEmpty(lftxs) || "U".equals(lftxs)) lftxs = "75";
 
         try {
             String url = "https://pbaccess.video.qq.com/trpc.vector_layout.page_view.PageService/getPage?video_appid=3000010";
             int pg = page - 1;
+            String filterParams = "sort=" + lftxs;
 
             JSONObject body = new JSONObject();
             JSONObject pageContext = new JSONObject();
@@ -98,7 +114,7 @@ public class PlatformFetcher {
             pageParams.put("page_id", "channel_list_second_page");
             pageParams.put("page_type", "operation");
             pageParams.put("channel_id", tabId);
-            pageParams.put("filter_params", "sort=75");
+            pageParams.put("filter_params", filterParams);
             pageParams.put("page", pg);
             body.put("page_params", pageParams);
 
@@ -107,7 +123,7 @@ public class PlatformFetcher {
             innerParams.put("page_id", "channel_list_second_page");
             innerParams.put("page_type", "operation");
             innerParams.put("channel_id", tabId);
-            innerParams.put("filter_params", "sort=75");
+            innerParams.put("filter_params", filterParams);
             innerParams.put("page", pg);
             innerParams.put("caller_id", "3000010");
             innerParams.put("platform_id", "2");
@@ -578,11 +594,17 @@ public class PlatformFetcher {
 
     // ─── Unified category dispatcher ─────────────────────────────────────────
 
+    // Tencent latest context lftxs lookup
+    public static String tencentLatestLftxs(String typeName) {
+        String lftxs = TENCENT_LFTXS_LATEST.get(typeName);
+        return lftxs != null ? lftxs : "23";
+    }
+
     public static JSONArray fetchPlatform(String platform, String type, int page, String sort) {
         if ("iqiyi".equals(platform)) {
             return fetchIqiyi(type, page);
         } else if ("tencent".equals(platform)) {
-            return fetchTencent(type, page);
+            return fetchTencent(type, page, sort);
         } else if ("youku".equals(platform)) {
             return fetchYouku(type, page, sort);
         } else if ("mgtv".equals(platform)) {

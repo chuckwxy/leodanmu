@@ -550,12 +550,15 @@ public class DoubanFetcher {
         if (!"douban_ru".equals(platform)) {
             String platName = prefixToPlatform(platform);
             if (isKnownPlatform(platform) && platName != null && !"douban".equals(platName)) {
+                String sort = "tencent".equals(platName) ? PlatformFetcher.tencentLatestLftxs("movie") : "U";
                 if ("ru_all".equals(contentType)) {
-                    mergeItems(items, PlatformFetcher.fetchPlatform(platName, "movie", pg, "U"));
-                    mergeItems(items, PlatformFetcher.fetchPlatform(platName, "tv", pg, "U"));
+                    mergeItems(items, PlatformFetcher.fetchPlatform(platName, "movie", pg, sort));
+                    sort = "tencent".equals(platName) ? PlatformFetcher.tencentLatestLftxs("tv") : "U";
+                    mergeItems(items, PlatformFetcher.fetchPlatform(platName, "tv", pg, sort));
                 } else {
                     String typeName = RU_TYPE_MAP.containsKey(contentType) ? RU_TYPE_MAP.get(contentType) : "movie";
-                    mergeItems(items, PlatformFetcher.fetchPlatform(platName, typeName, pg, "U"));
+                    sort = "tencent".equals(platName) ? PlatformFetcher.tencentLatestLftxs(typeName) : "U";
+                    mergeItems(items, PlatformFetcher.fetchPlatform(platName, typeName, pg, sort));
                 }
             }
             return;
