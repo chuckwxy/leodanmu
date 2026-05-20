@@ -348,6 +348,165 @@ public class PlatformFetcher {
         return items;
     }
 
+    // ─── Tencent Ranking ──────────────────────────────────────────────────────
+    public static java.util.List<JSONObject> fetchTencentRank(String type, String slug, int page) {
+        java.util.List<JSONObject> items = new java.util.ArrayList<>();
+        try {
+            String channel = "tv".equals(type) ? "tv" : "movie";
+            String url = "https://v.qq.com/biu/ranks/?t=hotplay&channel=" + channel + "&ct=" + slug;
+            String body = OkHttp.string(url, headers(TENCENT_UA, "https://v.qq.com/"));
+            if (TextUtils.isEmpty(body)) return items;
+            // Parse using regex to extract JSON
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("<div class=\"mod_sunmenu_box\"[\\s\\S]*?</div>").matcher(body);
+            if (m.find()) {
+                String block = m.group();
+                java.util.regex.Matcher itemM = java.util.regex.Pattern.compile("<a[^>]*href=\"([^\"]+)\"[^>]*>\\s*<img[^>]*alt=\"([^\"]*)\"[^>]*src=\"([^\"]*)\"").matcher(block);
+                while (itemM.find()) {
+                    String href = itemM.group(1);
+                    String alt = itemM.group(2);
+                    String src = itemM.group(3);
+                    if (TextUtils.isEmpty(href)) continue;
+                    String vid = href.replaceAll(".*?/(\\w+)\\.html$", "$1");
+                    if (vid.equals(href)) vid = href;
+                    String img = src.startsWith("//") ? "https:" + src : src;
+                    JSONObject vod = toVod("tencent_rank_" + vid, alt, img, "");
+                    items.add(vod);
+                }
+            }
+        } catch (Exception e) {
+            Leodanmu.log("腾讯榜单请求失败: " + e.getMessage());
+        }
+        return items;
+    }
+
+    // ─── iQiyi Ranking ────────────────────────────────────────────────────────
+    // slug format: "ranks1/{category_id}/{page_st}" e.g. "ranks1/1/2"
+    public static JSONArray fetchIqiyiRank(String slug, int page) {
+        JSONArray items = new JSONArray();
+        try {
+            String[] parts = slug.split("/");
+            String page_st = parts.length >= 3 ? parts[2] : "2";
+            String category_id = parts.length >= 2 ? parts[1] : "1";
+            String url = IQIYI_HOST + "/portal/pcw/rankList/comSecRankList?page_st=" + page_st + "&category_id=" + category_id + "&pg_num=" + page;
+            JSONObject data = safeGet(url, headers(IQIYI_UA, "https://www.iqiyi.com/"));
+            if (data == null) return items;
+            JSONArray list = parseList(data, new String[]{"data", "items", "0", "contents"});
+            if (list == null) list = data.optJSONArray("data");
+            if (list != null) {
+                for (int i = 0; i < list.length(); i++) {
+                    try {
+                        JSONObject item = list.getJSONObject(i);
+                        items.put(toVod(
+                                "iqiyi_rank_" + item.optString("tvid", item.optString("id", "")),
+                                item.optString("title", item.optString("name", "")),
+                                item.optString("img", "").replaceAll("\\.jpg$", "_260_360.jpg"),
+                                "热度:" + item.optString("mainIndex", "")
+                        ));
+                    } catch (JSONException ignored) {}
+                }
+            }
+        } catch (Exception e) {
+            Leodanmu.log("爱奇艺榜单请求失败: " + e.getMessage());
+        }
+        return items;
+    }
+
+    // ─── Youku Ranking ────────────────────────────────────────────────────────
+    public static JSONArray fetchYoukuRank(String type, int index, int page) {
+        JSONArray items = new JSONArray();
+        try {
+            int moduleIdx = "movie".equals(type) ? 3 : 5;
+            String channel = "movie".equals(type) ? "webmovie" : "webtv";
+            String url = "https://www.youku.com/channel/" + channel;
+            String body = OkHttp.string(url, headers(YOUKU_UA, "https://www.youku.com/"));
+            if (TextUtils.isEmpty(body)) return items;
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("window\\.__INITIAL_DATA__ =\\s*(\\{[\\s\\S]*?\\});\\s*window\\.__PAGE_CONF").matcher(body);
+            if (m.find()) {
+                String jsonStr = m.group(1);
+                jsonStr = jsonStr.replaceAll("/undefined/g", "\"\"");
+                JSONObject data = new JSONObject(jsonStr);
+                JSONArray moduleList = data.optJSONArray("moduleList");
+                if (moduleList != null && moduleList.length() > moduleIdx) {
+                    JSONObject module = moduleList.optJSONObject(moduleIdx);
+                    if (module != null) {
+                        JSONArray components = module.optJSONArray("components");
+                        if (components != null && components.length() > index) {
+                            JSONObject comp = components.optJSONObject(index);
+                            if (comp != null) {
+                                JSONArray itemList = comp.optJSONArray("itemList");
+                                if (itemList != null) {
+                                    for (int i = 0; i < itemList.length(); i++) {
+                                        JSONObject item = itemList.getJSONObject(i);
+                                        items.put(toVod(
+                                                "youku_rank_" + item.optString("videoLink", "").replaceAll(".*?(\\d+).*", "$1"),
+                                                item.optString("title", ""),
+                                                item.optString("img", "").replaceAll("^//", "https://"),
+                                                item.optString("summary", "")
+                                        ));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            // fallback: use category API
+            if (items.length() == 0) {
+                String typeName = "movie".equals(type) ? "电影" : "电视剧";
+                String params = "{\"type\":\"" + typeName + "\",\"sort\":1}";
+                String catUrl = YOUKU_HOST + "/category/data?params=" + URLEncoder.encode(params, "UTF-8") + "&optionRefresh=1&pageNo=" + page;
+                JSONObject data = safeGet(catUrl, headers(YOUKU_UA, "https://www.youku.com/"));
+                if (data != null) {
+                    JSONObject dataObj = data.optJSONObject("data");
+                    JSONArray list = null;
+                    if (dataObj != null) list = dataObj.optJSONArray("list");
+                    if (list == null) list = data.optJSONArray("list");
+                    if (list != null) {
+                        for (int i = 0; i < list.length(); i++) {
+                            JSONObject item = list.getJSONObject(i);
+                            items.put(toVod(
+                                    "youku_rank_" + item.optString("id", item.optString("videoId", "")),
+                                    item.optString("title", item.optString("name", "")),
+                                    item.optString("pic", item.optString("img", item.optString("poster", ""))),
+                                    item.optString("score", item.optString("rating", ""))
+                            ));
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Leodanmu.log("优酷榜单请求失败: " + e.getMessage());
+        }
+        return items;
+    }
+
+    // ─── 360kan Ranking ───────────────────────────────────────────────────────
+    public static JSONArray fetch360kanRank(String catId) {
+        JSONArray items = new JSONArray();
+        try {
+            String url = "https://api.web.360kan.com/v1/rank?cat=" + catId;
+            JSONObject data = safeGet(url, headers(
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
+                    "https://www.360kan.com/"));
+            if (data == null) return items;
+            JSONArray list = data.optJSONArray("data");
+            if (list != null) {
+                for (int i = 0; i < list.length(); i++) {
+                    JSONObject item = list.getJSONObject(i);
+                    items.put(toVod(
+                            "360kan_rank_" + item.optString("ent_id", ""),
+                            item.optString("title", ""),
+                            item.optString("cover", ""),
+                            item.optString("pubdate", "")
+                    ));
+                }
+            }
+        } catch (Exception e) {
+            Leodanmu.log("360kan榜单请求失败: " + e.getMessage());
+        }
+        return items;
+    }
+
     // ─── Unified category dispatcher ─────────────────────────────────────────
 
     public static JSONArray fetchPlatform(String platform, String type, int page, String sort) {
