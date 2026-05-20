@@ -114,10 +114,9 @@ public class PlatformFetcher {
             RequestBody body = RequestBody.create(MediaType.parse("application/json"), json);
             Request req = new Request.Builder()
                 .url(urlStr)
-                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36")
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36 Edg/114.0.1823.82")
                 .header("Content-Type", "application/json")
                 .header("Cookie", "video_platform=2;")
-                .header("Accept", "*/*")
                 .post(body)
                 .build();
             try (Response res = client.newCall(req).execute()) {
@@ -179,7 +178,7 @@ public class PlatformFetcher {
 
         try {
             int pg = page - 1;
-            String url = "https://pbaccess.video.qq.com/trpc.vector_layout.page_view.PageService/getPage?video_appid=3000010&lftxs=" + lftxs + "&lftxc=" + lftxc + "&pg=" + pg;
+            String url = "https://pbaccess.video.qq.com/trpc.vector_layout.page_view.PageService/getPage?video_appid=3000010";
             String filterParams = "sort=" + lftxs;
 
             JSONObject body = new JSONObject();
