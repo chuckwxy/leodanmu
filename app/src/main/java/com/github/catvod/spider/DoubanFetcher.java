@@ -620,7 +620,7 @@ public class DoubanFetcher {
     private static void fetchHotMovie(String platTag, int pg, JSONArray items) throws Exception {
         if (TextUtils.isEmpty(platTag)) platTag = "";
         if (isKnownPlatform(platTag)) {
-            mergeItems(items, PlatformFetcher.fetchPlatform(prefixToPlatform(platTag), "movie", pg, "U"));
+            mergeItems(items, PlatformFetcher.fetchPlatform(prefixToPlatform(platTag), "movie", pg, "75"));
             return;
         }
         // Use frodo API with tag
@@ -636,7 +636,7 @@ public class DoubanFetcher {
     private static void fetchHotTv(String platTag, int pg, JSONArray items) throws Exception {
         if (TextUtils.isEmpty(platTag)) platTag = "";
         if (isKnownPlatform(platTag)) {
-            mergeItems(items, PlatformFetcher.fetchPlatform(prefixToPlatform(platTag), "tv", pg, "U"));
+            mergeItems(items, PlatformFetcher.fetchPlatform(prefixToPlatform(platTag), "tv", pg, "75"));
             return;
         }
         String url = HOST + "/tv/recommend?sort=U&start=" + (pg - 1) * COUNT + "&count=" + COUNT;
@@ -652,7 +652,7 @@ public class DoubanFetcher {
         if (TextUtils.isEmpty(platTag)) platTag = "zy_all";
 
         if (isKnownPlatform(platTag)) {
-            mergeItems(items, PlatformFetcher.fetchPlatform(prefixToPlatform(platTag), "variety", pg, "U"));
+            mergeItems(items, PlatformFetcher.fetchPlatform(prefixToPlatform(platTag), "variety", pg, "75"));
             return;
         }
 
@@ -683,7 +683,7 @@ public class DoubanFetcher {
                 if (tried.contains(tag)) continue;
                 tried.add(tag);
                 String platName = prefixToPlatform(tag);
-                JSONArray result = PlatformFetcher.fetchPlatform(platName, "anime", pg, "U");
+                JSONArray result = PlatformFetcher.fetchPlatform(platName, "anime", pg, "75");
                 if (result != null && result.length() > 0) {
                     mergeItems(items, result);
                     return;
