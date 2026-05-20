@@ -10,6 +10,7 @@ import org.json.JSONObject;
 
 import java.net.URLEncoder;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
 
@@ -84,6 +85,17 @@ public class PlatformFetcher {
             Leodanmu.log("platform POST err: " + url + " -> " + e.getMessage());
             return null;
         }
+    }
+
+    private static String joinKeys(JSONObject obj) {
+        if (obj == null) return "null";
+        StringBuilder sb = new StringBuilder();
+        Iterator<String> it = obj.keys();
+        while (it.hasNext()) {
+            if (sb.length() > 0) sb.append(",");
+            sb.append(it.next());
+        }
+        return sb.toString();
     }
 
     private static String optStr(JSONObject obj, String... keys) {
@@ -183,25 +195,25 @@ public class PlatformFetcher {
             }
             JSONArray cardList = dataObj.optJSONArray("CardList");
             if (cardList == null || cardList.length() == 0) {
-                Leodanmu.log("腾CardList为空 dataObj keys=" + dataObj.keySet().toString());
+                Leodanmu.log("腾CardList为空 dataObj keys=" + joinKeys(dataObj));
                 return items;
             }
-            Leodanmu.log("腾CardList len=" + cardList.length() + " lastCard keys=" + cardList.optJSONObject(cardList.length()-1).keySet().toString());
+            Leodanmu.log("腾CardList len=" + cardList.length() + " lastCard keys=" + joinKeys(cardList.optJSONObject(cardList.length()-1)));
             JSONObject lastCard = cardList.optJSONObject(cardList.length() - 1);
             if (lastCard == null) return items;
             JSONObject childrenList = lastCard.optJSONObject("children_list");
             if (childrenList == null) {
-                Leodanmu.log("腾children_list为空, lastCard keys=" + lastCard.keySet().toString());
+                Leodanmu.log("腾children_list为空, lastCard keys=" + joinKeys(lastCard));
                 return items;
             }
             JSONObject list = childrenList.optJSONObject("list");
             if (list == null) {
-                Leodanmu.log("腾list为空, childrenList keys=" + childrenList.keySet().toString());
+                Leodanmu.log("腾list为空, childrenList keys=" + joinKeys(childrenList));
                 return items;
             }
             JSONArray cards = list.optJSONArray("cards");
             if (cards == null) {
-                Leodanmu.log("腾cards为空, list keys=" + list.keySet().toString());
+                Leodanmu.log("腾cards为空, list keys=" + joinKeys(list));
                 return items;
             }
             Leodanmu.log("腾cards len=" + cards.length());
