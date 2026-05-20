@@ -8,7 +8,11 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Locale;
@@ -104,19 +108,26 @@ public class PlatformFetcher {
         return sb.toString();
     }
 
-    private static JSONObject tencentPost(String url, String json) {
+    private static JSONObject tencentPost(String urlStr, String json) {
         try {
-            RequestBody body = RequestBody.create(MediaType.parse("application/json"), json);
-            Request req = new Request.Builder()
-                .url(url)
-                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36")
-                .header("Content-Type", "application/json")
-                .header("Cookie", "video_platform=2;")
-                .post(body)
-                .build();
-            OkHttpClient client = com.github.catvod.net.OkHttp.client();
-            Response res = client.newCall(req).execute();
-            String respBody = res.body() != null ? res.body().string() : null;
+            URL url = new URL(urlStr);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36");
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setRequestProperty("Cookie", "video_platform=2;");
+            conn.setDoOutput(true);
+            conn.setConnectTimeout(15000);
+            conn.setReadTimeout(15000);
+            byte[] input = json.getBytes("UTF-8");
+            conn.setFixedLengthStreamingMode(input.length);
+            try (OutputStream os = conn.getOutputStream()) {
+                os.write(input);
+            }
+            int code = conn.getResponseCode();
+            Leodanmu.log("tencentPost HTTP " + code);
+            java.io.InputStream is = code >= 400 ? conn.getErrorStream() : conn.getInputStream();
+            String respBody = is != null ? new java.util.Scanner(is, "UTF-8").useDelimiter("\\A").next() : "";
             if (TextUtils.isEmpty(respBody)) {
                 Leodanmu.log("tencentPost body empty");
                 return null;
