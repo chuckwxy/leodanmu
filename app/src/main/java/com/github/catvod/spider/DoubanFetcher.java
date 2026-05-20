@@ -404,7 +404,7 @@ public class DoubanFetcher {
         int total = 0;
 
         String sort = getFilter(filters, "排序", "U");
-        sort = SORT_MAP.getOrDefault(sort, sort);
+        sort = SORT_MAP.containsKey(sort) ? SORT_MAP.get(sort) : sort;
 
         // ── 最近更新 ──────────────────────────────────────────────────────
         if ("latest".equals(id)) {
@@ -458,7 +458,7 @@ public class DoubanFetcher {
             String tagYear = getFilter(filters, "年代", "");
             String tagLabel = getFilter(filters, "标签", "");
             String tagSort = getFilter(filters, "排序", "U");
-            tagSort = SORT_MAP.getOrDefault(tagSort, "U");
+            tagSort = SORT_MAP.containsKey(tagSort) ? SORT_MAP.get(tagSort) : "U";
             StringBuilder tags = new StringBuilder();
             appendTag(tags, tagType);
             appendTag(tags, tagRegion);
@@ -477,7 +477,7 @@ public class DoubanFetcher {
             String tagPlatform = getFilter(filters, "平台", "");
             String tagLabel = getFilter(filters, "标签", "");
             String tagSort = getFilter(filters, "排序", "U");
-            tagSort = SORT_MAP.getOrDefault(tagSort, "U");
+            tagSort = SORT_MAP.containsKey(tagSort) ? SORT_MAP.get(tagSort) : "U";
 
             String effectiveType = tagType;
             String effectiveSub = "";
@@ -554,7 +554,7 @@ public class DoubanFetcher {
                     mergeItems(items, PlatformFetcher.fetchPlatform(platName, "movie", pg, "U"));
                     mergeItems(items, PlatformFetcher.fetchPlatform(platName, "tv", pg, "U"));
                 } else {
-                    String typeName = RU_TYPE_MAP.getOrDefault(contentType, "movie");
+                    String typeName = RU_TYPE_MAP.containsKey(contentType) ? RU_TYPE_MAP.get(contentType) : "movie";
                     mergeItems(items, PlatformFetcher.fetchPlatform(platName, typeName, pg, "U"));
                 }
             }

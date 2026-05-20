@@ -17,6 +17,7 @@ public class PlatformFetcher {
 
     private static final String IQIYI_HOST = "https://mesh.if.iqiyi.com";
     private static final String IQIYI_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36";
+    private static final String TENCENT_HOST = "https://pbaccess.video.qq.com";
     private static final String TENCENT_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36";
     private static final String YOUKU_HOST = "https://www.youku.com";
     private static final String YOUKU_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36";
@@ -97,13 +98,13 @@ public class PlatformFetcher {
         return items;
     }
 
-    // ─── Tencent Video (v.qq.com/biu/ranks HTML-based API) ─────────────────
+    // ─── Tencent Video (pbaccess POST API) ─────────────────────────────────
 
     private static final Map<String, String> TENCENT_TABS = new HashMap<>();
     static {
-        TENCENT_TABS.put("movie", "100173");
-        TENCENT_TABS.put("tv", "100113");
-        TENCENT_TABS.put("variety", "100109");
+        TENCENT_TABS.put("movie", "100001");
+        TENCENT_TABS.put("tv", "100002");
+        TENCENT_TABS.put("variety", "100003");
         TENCENT_TABS.put("anime", "100119");
     }
 
@@ -113,22 +114,40 @@ public class PlatformFetcher {
         if (tabId == null) return items;
 
         try {
-            String url = "https://v.qq.com/biu/ranks/?t=hotplay&channel=" + tabId;
-            String html = OkHttp.string(url, headers(TENCENT_UA, "https://v.qq.com/"));
-            if (TextUtils.isEmpty(html)) return items;
+            String url = TENCENT_HOST + "/trpc.vector_layout.page_view.PageService/getPage"
+                    + "?video_appid=3000010&lftxs=lftxc="
+                    + "&page_id=channel_" + tabId + "_list"
+                    + "&page_num=" + page + "&page_size=" + PAGE_SIZE;
+            String body = "{\"page_context\":{},\"page_params\":{\"page_id\":\"channel_" + tabId + "_list\",\"page_type\":\"channel_list\",\"page_size\":" + PAGE_SIZE + ",\"page_num\":" + page + "}}";
 
-            java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
-                    "<a[^>]*href=\"([^\"]+)\"[^>]*>\\s*<img[^>]*alt=\"([^\"]*)\"[^>]*src=\"([^\"]*)\"");
-            java.util.regex.Matcher matcher = pattern.matcher(html);
-            while (matcher.find()) {
-                String href = matcher.group(1);
-                String alt = matcher.group(2);
-                String src = matcher.group(3);
-                if (TextUtils.isEmpty(href)) continue;
-                String vid = href.replaceAll(".*?/(\\w+)\\.html$", "$1");
-                if (vid.equals(href)) vid = href;
-                String img = src.startsWith("//") ? "https:" + src : src;
-                items.put(toVod("tencent_" + vid, alt, img, ""));
+            JSONObject data = safePost(url, body, headers(TENCENT_UA, "https://v.qq.com/"));
+            if (data == null) return items;
+
+            JSONArray list = parseList(data, new String[]{"data", "card_item_list"}, new String[]{"data", "list"});
+            if (list == null) {
+                JSONObject dataObj = data.optJSONObject("data");
+                if (dataObj != null) list = dataObj.optJSONArray("card_item_list");
+            }
+
+            for (int i = 0; i < (list != null ? list.length() : 0); i++) {
+                try {
+                    JSONObject item = list.getJSONObject(i);
+                    JSONObject resource = item.optJSONObject("resource");
+                    if (resource == null) resource = item;
+                    JSONObject cover = resource.optJSONObject("cover");
+                    String img = "";
+                    if (cover != null) {
+                        img = cover.optString("url", "");
+                        if (TextUtils.isEmpty(img)) img = cover.optString("h", "");
+                    }
+                    if (TextUtils.isEmpty(img)) img = resource.optString("pic", "");
+                    items.put(toVod(
+                            "tencent_" + resource.optString("vid", resource.optString("id", "")),
+                            resource.optString("title", item.optString("name", "")),
+                            img,
+                            resource.optString("score", resource.optString("mark", ""))
+                    ));
+                } catch (JSONException ignored) {}
             }
         } catch (Exception e) {
             Leodanmu.log("腾讯视频请求失败: " + e.getMessage());
@@ -157,7 +176,7 @@ public class PlatformFetcher {
         JSONArray items = new JSONArray();
         String typeName = YOUKU_TYPES.get(type);
         if (typeName == null) return items;
-        String sortVal = YOUKU_SORTS.getOrDefault(sort, "1");
+        String sortVal = YOUKU_SORTS.containsKey(sort) ? YOUKU_SORTS.get(sort) : "1";
 
         try {
             String params = "{\"type\":\"" + typeName + "\",\"sort\":" + sortVal + "}";
@@ -507,10 +526,10 @@ public class PlatformFetcher {
             else if ("anime".equals(type)) channelId = "50";
             items = fetchMangoTV(channelId, page);
         } else if ("360kan".equals(platform)) {
-            String catId = KAN360_CATS.getOrDefault(type, "1");
+            String catId = KAN360_CATS.containsKey(type) ? KAN360_CATS.get(type) : "1";
             items = fetch360kan(catId, page);
         } else if ("sogou".equals(platform)) {
-            String tab = SOGOU_TABS.getOrDefault(type, "movie");
+            String tab = SOGOU_TABS.containsKey(type) ? SOGOU_TABS.get(type) : "movie";
             items = fetchSogou(tab, page);
         }
 
