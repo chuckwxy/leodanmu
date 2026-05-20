@@ -132,11 +132,10 @@ public class PlatformFetcher {
         }
     };
 
-    // ─── Tencent (channel_list_second_page, matches JS _0x288ea5) ────────────
-    // Uses page_id=channel_list_second_page + filter_params=sort=X
-    // Supports pagination via page_context.page_index (0-based)
-    // Response: data.CardList[last].children_list.list.cards[].params
-    //   cid, title, image_url_vertical(or image_url), timelong/publish_date
+    // ─── Tencent (data_key variant, ver_channel_heavy_page) ───────────────────
+    // Uses source_key/rec_module_id + channel_id=100191
+    // Response: data.CardList[].children_list.list.cards[].params
+    //   cid, title, new_pic_vt/image_url_vertical, timelong/publish_date
 
     public static JSONArray fetchTencent(String type, int page) {
         return fetchTencent(type, page, "75");
@@ -144,74 +143,89 @@ public class PlatformFetcher {
 
     public static JSONArray fetchTencent(String type, int page, String lftxs) {
         JSONArray items = new JSONArray();
-        String channelId = TENCENT_TAB_IDS.get(type);
-        if (channelId == null) channelId = "100173";
-        if (TextUtils.isEmpty(lftxs) || "U".equals(lftxs)) {
-            String def = TENCENT_LFTXS_LATEST.get(type);
-            lftxs = (def != null) ? def : "23";
+        String sourceKey;
+        String channelFirstClass;
+        if (type.contains("tv") || "tv".equals(type)) {
+            sourceKey = "100113"; channelFirstClass = "2";
+        } else if (type.contains("zy") || "variety".equals(type)) {
+            sourceKey = "100109"; channelFirstClass = "1";
+        } else if (type.contains("dm") || "anime".equals(type)) {
+            sourceKey = "100119"; channelFirstClass = "1";
+        } else {
+            sourceKey = "100173"; channelFirstClass = "1";
         }
-        int zeroPage = Math.max(0, page - 1);
-        String cacheKey = "tencent_" + type + "_" + zeroPage + "_" + lftxs;
+        String moduleId = "100113".equals(sourceKey) ? "20190529006317" : "20190621006455";
+        String cacheKey = "tencent_" + type + "_" + page + "_" + sourceKey;
         synchronized (tencentCache) {
             JSONArray cached = tencentCache.get(cacheKey);
             if (cached != null) { Leodanmu.log("腾缓存 hit"); return cached; }
         }
         try {
             String url = "https://pbaccess.video.qq.com/trpc.vector_layout.page_view.PageService/getPage?video_appid=3000010";
-            JSONObject pageContext = new JSONObject();
-            pageContext.put("page_index", zeroPage);
+            String dataKey = "source_key=" + sourceKey
+                + "+rec_module_id=" + moduleId
+                + "+rec_module_type=801002+module_data_type=1"
+                + "+rec_extend_info=\u0001rec_source_key\u0002" + sourceKey
+                + "\u0001rec_module_type\u0002801002"
+                + "\u0001rec_module_id\u0002" + moduleId;
+
             JSONObject pageParams = new JSONObject();
-            pageParams.put("page_id", "channel_list_second_page");
+            pageParams.put("data_key", dataKey);
             pageParams.put("page_type", "operation");
-            pageParams.put("channel_id", channelId);
-            pageParams.put("filter_params", "sort=" + lftxs);
-            pageParams.put("page", zeroPage);
-            JSONObject bypassInner = new JSONObject();
-            bypassInner.put("page_id", "channel_list_second_page");
-            bypassInner.put("page_type", "operation");
-            bypassInner.put("channel_id", channelId);
-            bypassInner.put("filter_params", "sort=" + lftxs);
-            bypassInner.put("page", zeroPage);
-            bypassInner.put("caller_id", "3000010");
-            bypassInner.put("platform_id", "2");
-            bypassInner.put("data_mode", "default");
-            bypassInner.put("user_mode", "default");
+            pageParams.put("channel_id", "100191");
+            pageParams.put("channel_first_class", channelFirstClass);
+
+            JSONObject innerParams = new JSONObject();
+            innerParams.put("data_key", dataKey);
+            innerParams.put("channel_first_class", channelFirstClass);
+            innerParams.put("page_id", "ver_channel_heavy_page");
+            innerParams.put("page_type", "operation");
+            innerParams.put("channel_id", "100191");
+            innerParams.put("caller_id", "3000010");
+            innerParams.put("platform_id", "2");
+            innerParams.put("data_mode", "default");
+            innerParams.put("user_mode", "default");
+
             JSONObject bypassParams = new JSONObject();
-            bypassParams.put("params", bypassInner);
+            bypassParams.put("params", innerParams);
             bypassParams.put("scene", "operation");
+
             JSONObject body = new JSONObject();
-            body.put("page_context", pageContext);
             body.put("page_params", pageParams);
             body.put("page_bypass_params", bypassParams);
-            Leodanmu.log("腾请求 type=" + type + " page=" + page + " sort=" + lftxs + " channel=" + channelId);
+
+            Leodanmu.log("腾请求 type=" + type + " page=" + page + " sourceKey=" + sourceKey);
             JSONObject data = tencentPost(url, body.toString());
             if (data == null) return items;
+
             JSONObject dataObj = data.optJSONObject("data");
             if (dataObj == null) { Leodanmu.log("腾data null"); return items; }
             JSONArray cardList = dataObj.optJSONArray("CardList");
             if (cardList == null || cardList.length() == 0) { Leodanmu.log("腾CardList empty"); return items; }
-            JSONObject lastCard = cardList.optJSONObject(cardList.length() - 1);
-            if (lastCard == null) return items;
-            JSONObject childrenList = lastCard.optJSONObject("children_list");
-            if (childrenList == null) return items;
-            JSONObject list = childrenList.optJSONObject("list");
-            if (list == null) return items;
-            JSONArray cards = list.optJSONArray("cards");
-            if (cards == null) return items;
-            for (int i = 0; i < cards.length(); i++) {
-                try {
-                    JSONObject c = cards.getJSONObject(i);
-                    JSONObject params = c.optJSONObject("params");
-                    if (params == null) continue;
-                    String vid = params.optString("cid", "");
-                    if (TextUtils.isEmpty(vid)) continue;
-                    String remark = params.optString("timelong", "");
-                    if (TextUtils.isEmpty(remark)) remark = params.optString("publish_date", "");
-                    String pic = params.optString("new_pic_vt", "");
-                    if (TextUtils.isEmpty(pic)) pic = params.optString("image_url_vertical", "");
-                    if (TextUtils.isEmpty(pic)) pic = params.optString("image_url", "");
-                    items.put(toVod("tencent_" + vid, params.optString("title", ""), pic, remark));
-                } catch (JSONException ignored) {}
+            for (int ci = 0; ci < cardList.length(); ci++) {
+                JSONObject card = cardList.optJSONObject(ci);
+                if (card == null) continue;
+                JSONObject childrenList = card.optJSONObject("children_list");
+                if (childrenList == null) continue;
+                JSONObject list = childrenList.optJSONObject("list");
+                if (list == null) continue;
+                JSONArray cards = list.optJSONArray("cards");
+                if (cards == null) continue;
+                for (int i = 0; i < cards.length(); i++) {
+                    try {
+                        JSONObject c = cards.getJSONObject(i);
+                        JSONObject params = c.optJSONObject("params");
+                        if (params == null) continue;
+                        String vid = params.optString("cid", "");
+                        if (TextUtils.isEmpty(vid)) continue;
+                        String remark = params.optString("timelong", "");
+                        if (TextUtils.isEmpty(remark)) remark = params.optString("publish_date", "");
+                        String pic = params.optString("new_pic_vt", "");
+                        if (TextUtils.isEmpty(pic)) pic = params.optString("image_url_vertical", "");
+                        if (TextUtils.isEmpty(pic)) pic = params.optString("image_url", "");
+                        items.put(toVod("tencent_" + vid, params.optString("title", ""), pic, remark));
+                    } catch (JSONException ignored) {}
+                }
             }
             Leodanmu.log("腾结果 items=" + items.length());
             synchronized (tencentCache) {
