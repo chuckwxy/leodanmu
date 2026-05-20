@@ -177,10 +177,10 @@ public class PlatformFetcher {
             Map<String, String> h = new HashMap<>();
             h.put("Cookie", "video_platform=2;");
             h.put("Content-Type", "application/json");
-            h.put("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36 Edg/114.0.1823.82");
-            h.put("Referer", "https://v.qq.com/");
-            h.put("Origin", "https://v.qq.com");
+            h.put("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36");
 
+            Leodanmu.log("腾请求 URL=" + url);
+            Leodanmu.log("腾请求 body=" + body.toString());
             JSONObject data = safePost(url, body.toString(), h);
             if (data == null) {
                 Leodanmu.log("腾POST返回null");
