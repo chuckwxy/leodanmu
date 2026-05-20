@@ -142,7 +142,7 @@ public class PlatformFetcher {
         return fetchTencent(type, page, "75");
     }
 
-    private static JSONArray fetchTencent(String type, int page, String lftxs) {
+    public static JSONArray fetchTencent(String type, int page, String lftxs) {
         JSONArray items = new JSONArray();
         String channelId = TENCENT_TAB_IDS.get(type);
         if (channelId == null) channelId = "100173";
