@@ -64,6 +64,14 @@ public class DoubanFetcher {
         CONTENT_TYPE_MAP.put("综艺", "variety");
         CONTENT_TYPE_MAP.put("动漫", "anime");
     }
+    // ─── ru_ prefix type map ─────────────────────────────────────────────────
+    private static final Map<String, String> RU_TYPE_MAP = new HashMap<>();
+    static {
+        RU_TYPE_MAP.put("ru_movie", "movie");
+        RU_TYPE_MAP.put("ru_tv", "tv");
+        RU_TYPE_MAP.put("ru_zy", "variety");
+        RU_TYPE_MAP.put("ru_dm", "anime");
+    }
 
     // ─── Platform detection & mapping ──────────────────────────────────────
     private static final Set<String> PLATFORM_PREFIXES = new HashSet<>(Arrays.asList(
@@ -112,14 +120,11 @@ public class DoubanFetcher {
         // ── 最近更新 ──────────────────────────────────────────────────────
         root.put("latest", buildFilters(
                 filter("类型", "类型", "", new String[][]{
-                        {"全部类型", ""}, {"电影", "电影"}, {"电视剧", "电视剧"}, {"综艺", "综艺"}, {"动漫", "动漫"}
+                        {"电影", "ru_movie"}, {"电视剧", "ru_tv"}, {"综艺", "ru_zy"}, {"动漫", "ru_dm"}
                 }),
                 filter("数据源", "数据源", "", new String[][]{
-                        {"豆瓣", "douban"}, {"爱奇艺", "iqiyi"}, {"腾讯", "tencent"}, {"优酷", "youku"},
-                        {"芒果TV", "mgtv"}, {"360影视", "360kan"}, {"搜狗视频", "sogou"}
-                }),
-                filter("排序", "排序", "", new String[][]{
-                        {"近期热度", "U"}, {"综合排序", "T"}, {"首映时间", "R"}, {"高分优先", "S"}
+                        {"豆瓣", "douban_ru"}, {"爱奇艺", "iqy_ru"}, {"腾讯", "tx_ru"}, {"优酷", "youku_ru"},
+                        {"芒果TV", "mgtv_ru"}, {"360影视", "360ys_ru"}, {"搜狗视频", "sogousp_ru"}
                 })
         ));
 
@@ -127,10 +132,7 @@ public class DoubanFetcher {
         root.put("movie", buildFilters(
                 filter("平台", "平台", "", new String[][]{
                         {"爱奇艺", "iqy_hot_movie"}, {"腾讯", "tx_hot_movie"}, {"优酷", "youku_hot_movie"},
-                        {"芒果TV", "mgtv_hot_movie"}, {"360影视", "360ys_hot_movie"}, {"搜狗视频", "sogousp_hot_movie"},
-                        {"豆瓣", ""}, {"最新", "最新"}, {"高分", "高分"},
-                        {"冷门佳片", "冷门佳片"}, {"华语", "华语"}, {"欧美", "欧美"},
-                        {"韩国", "韩国"}, {"日本", "日本"}
+                        {"芒果TV", "mgtv_hot_movie"}, {"360影视", "360ys_hot_movie"}, {"搜狗视频", "sogousp_hot_movie"}
                 })
         ));
 
@@ -138,10 +140,7 @@ public class DoubanFetcher {
         root.put("tv", buildFilters(
                 filter("平台", "平台", "", new String[][]{
                         {"爱奇艺", "iqy_hot_tv"}, {"腾讯", "tx_hot_tv"}, {"优酷", "youku_hot_tv"},
-                        {"芒果TV", "mgtv_hot_tv"}, {"360影视", "360ys_hot_tv"}, {"搜狗视频", "sogousp_hot_tv"},
-                        {"豆瓣", ""}, {"国产剧", "国产剧"}, {"综艺", "综艺"},
-                        {"美剧", "美剧"}, {"日剧", "日剧"}, {"韩剧", "韩剧"},
-                        {"日本动画", "日本动画"}, {"纪录片", "纪录片"}
+                        {"芒果TV", "mgtv_hot_tv"}, {"360影视", "360ys_hot_tv"}, {"搜狗视频", "sogousp_hot_tv"}
                 })
         ));
 
@@ -411,8 +410,6 @@ public class DoubanFetcher {
         if ("latest".equals(id)) {
             String contentType = getFilter(filters, "类型", "");
             String platform = getFilter(filters, "数据源", "");
-            if (TextUtils.isEmpty(platform)) platform = "douban";
-            if (TextUtils.isEmpty(contentType)) contentType = "all";
             fetchLatest(platform, contentType, pg, sort, items);
             total = items.length() + COUNT;
 
@@ -508,15 +505,15 @@ public class DoubanFetcher {
         for (int round = 0; round < 2 && items.length() < COUNT; round++) {
             int before = items.length();
             if ("latest".equals(id)) {
-                String platform = getFilter(filters, "数据源", "douban");
-                String contentType = getFilter(filters, "类型", "all");
-                if ("douban".equals(platform) && "all".equals(contentType)) {
+                String platform = getFilter(filters, "数据源", "");
+                String contentType = getFilter(filters, "类型", "");
+                String platName = prefixToPlatform(platform);
+                boolean isDoubanAll = "douban".equals(platName) && TextUtils.isEmpty(contentType);
+                if (isDoubanAll) {
                     JSONObject md = requestDouban(HOST + "/movie/recommend?sort=R&start=" + offset + "&count=" + COUNT);
                     if (md != null) mergeItems(items, md.optJSONArray("items"));
                     JSONObject td = requestDouban(HOST + "/tv/recommend?sort=R&start=" + offset + "&count=" + COUNT);
                     if (td != null) mergeItems(items, td.optJSONArray("items"));
-                } else if (start > 0) {
-                    // Don't retry platform APIs with offset - they handle page internally
                 }
             }
             if (items.length() == before) break;
@@ -547,18 +544,24 @@ public class DoubanFetcher {
 
     // ─── Latest (最近更新) ─────────────────────────────────────────────────
     private static void fetchLatest(String platform, String contentType, int pg, String sort, JSONArray items) throws Exception {
-        if (!"douban".equals(platform)) {
+        if (TextUtils.isEmpty(platform)) platform = "douban_ru";
+        if (TextUtils.isEmpty(contentType)) contentType = "ru_all";
+
+        if (!"douban_ru".equals(platform)) {
             String platName = prefixToPlatform(platform);
-            if ("all".equals(contentType)) {
-                mergeItems(items, PlatformFetcher.fetchPlatform(platName, "movie", pg, sort));
-                mergeItems(items, PlatformFetcher.fetchPlatform(platName, "tv", pg, sort));
-            } else {
-                String typeName = CONTENT_TYPE_MAP.getOrDefault(contentType, contentType);
-                mergeItems(items, PlatformFetcher.fetchPlatform(platName, typeName, pg, sort));
+            if (isKnownPlatform(platform) && platName != null && !"douban".equals(platName)) {
+                if ("ru_all".equals(contentType)) {
+                    mergeItems(items, PlatformFetcher.fetchPlatform(platName, "movie", pg, "U"));
+                    mergeItems(items, PlatformFetcher.fetchPlatform(platName, "tv", pg, "U"));
+                } else {
+                    String typeName = RU_TYPE_MAP.getOrDefault(contentType, "movie");
+                    mergeItems(items, PlatformFetcher.fetchPlatform(platName, typeName, pg, "U"));
+                }
             }
             return;
         }
-        if ("all".equals(contentType)) {
+        // douban branch
+        if ("ru_all".equals(contentType)) {
             JSONObject md = requestDouban(HOST + "/movie/recommend?sort=R&start=" + (pg - 1) * COUNT + "&count=" + COUNT);
             if (md != null) mergeItems(items, md.optJSONArray("items"));
             JSONObject td = requestDouban(HOST + "/tv/recommend?sort=R&start=" + (pg - 1) * COUNT + "&count=" + COUNT);
@@ -567,14 +570,14 @@ public class DoubanFetcher {
             String year = new SimpleDateFormat("yyyy", Locale.getDefault()).format(new Date());
             String ep;
             String typeTag;
-            if ("电影".equals(contentType)) {
+            if ("ru_movie".equals(contentType)) {
                 ep = "movie/recommend";
                 typeTag = "";
             } else {
                 ep = "tv/recommend";
-                if ("电视剧".equals(contentType)) typeTag = "电视剧";
-                else if ("综艺".equals(contentType)) typeTag = "综艺";
-                else if ("动漫".equals(contentType)) typeTag = "日本动漫,动漫";
+                if ("ru_tv".equals(contentType)) typeTag = "电视剧";
+                else if ("ru_zy".equals(contentType)) typeTag = "综艺";
+                else if ("ru_dm".equals(contentType)) typeTag = "日本动漫,动漫";
                 else typeTag = "";
             }
             String tags = typeTag;
@@ -647,8 +650,18 @@ public class DoubanFetcher {
     private static void fetchHotDm(String platTag, int pg, JSONArray items) throws Exception {
         if (TextUtils.isEmpty(platTag)) platTag = "tx_hot_dm";
         if (isKnownPlatform(platTag)) {
-            mergeItems(items, PlatformFetcher.fetchPlatform(prefixToPlatform(platTag), "anime", pg, "U"));
-            return;
+            String[] fallbacks = {platTag, "iqy_hot_dm", "youku_hot_dm", "mgtv_hot_dm", "360ys_hot_dm", "sogousp_hot_dm"};
+            Set<String> tried = new HashSet<>();
+            for (String tag : fallbacks) {
+                if (tried.contains(tag)) continue;
+                tried.add(tag);
+                String platName = prefixToPlatform(tag);
+                JSONArray result = PlatformFetcher.fetchPlatform(platName, "anime", pg, "U");
+                if (result != null && result.length() > 0) {
+                    mergeItems(items, result);
+                    return;
+                }
+            }
         }
     }
 
