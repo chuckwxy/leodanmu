@@ -3,26 +3,17 @@ package com.github.catvod.spider;
 import android.text.TextUtils;
 
 import com.github.catvod.net.OkHttp;
+import com.github.catvod.net.OkResult;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
-
-import okhttp3.MediaType;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.RequestBody;
-import okhttp3.Response;
 
 public class PlatformFetcher {
 
@@ -110,24 +101,13 @@ public class PlatformFetcher {
 
     private static JSONObject tencentPost(String urlStr, String json) {
         try {
-            OkHttpClient client = com.github.catvod.net.OkHttp.client();
-            RequestBody body = RequestBody.create(MediaType.parse("application/json"), json);
-            Request req = new Request.Builder()
-                .url(urlStr)
-                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36 Edg/114.0.1823.82")
-                .header("Content-Type", "application/json")
-                .header("Cookie", "video_platform=2;")
-                .post(body)
-                .build();
-            try (Response res = client.newCall(req).execute()) {
-                Leodanmu.log("tencentPost HTTP " + res.code());
-                String respBody = res.body() != null ? res.body().string() : null;
-                if (TextUtils.isEmpty(respBody)) {
-                    Leodanmu.log("tencentPost body empty");
-                    return null;
-                }
-                return new JSONObject(respBody);
-            }
+            Map<String, String> headers = new HashMap<>();
+            headers.put("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36 Edg/114.0.1823.82");
+            headers.put("Cookie", "video_platform=2;");
+            OkResult res = OkHttp.post(urlStr, json, headers);
+            Leodanmu.log("tencentPost HTTP " + res.getCode() + " body=" + (res.getBody().length() > 200 ? res.getBody().substring(0, 200) : res.getBody()));
+            if (res.getCode() != 200 || TextUtils.isEmpty(res.getBody())) return null;
+            return new JSONObject(res.getBody());
         } catch (Exception e) {
             Leodanmu.log("tencentPost err: " + e.getMessage());
             return null;
