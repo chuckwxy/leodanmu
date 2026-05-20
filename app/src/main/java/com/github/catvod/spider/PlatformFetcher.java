@@ -110,29 +110,25 @@ public class PlatformFetcher {
 
     private static JSONObject tencentPost(String urlStr, String json) {
         try {
-            URL url = new URL(urlStr);
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("POST");
-            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36");
-            conn.setRequestProperty("Content-Type", "application/json");
-            conn.setRequestProperty("Cookie", "video_platform=2;");
-            conn.setDoOutput(true);
-            conn.setConnectTimeout(15000);
-            conn.setReadTimeout(15000);
-            byte[] input = json.getBytes("UTF-8");
-            conn.setFixedLengthStreamingMode(input.length);
-            try (OutputStream os = conn.getOutputStream()) {
-                os.write(input);
+            OkHttpClient client = com.github.catvod.net.OkHttp.client();
+            RequestBody body = RequestBody.create(MediaType.parse("application/json"), json);
+            Request req = new Request.Builder()
+                .url(urlStr)
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36")
+                .header("Content-Type", "application/json")
+                .header("Cookie", "video_platform=2;")
+                .header("Accept", "*/*")
+                .post(body)
+                .build();
+            try (Response res = client.newCall(req).execute()) {
+                Leodanmu.log("tencentPost HTTP " + res.code());
+                String respBody = res.body() != null ? res.body().string() : null;
+                if (TextUtils.isEmpty(respBody)) {
+                    Leodanmu.log("tencentPost body empty");
+                    return null;
+                }
+                return new JSONObject(respBody);
             }
-            int code = conn.getResponseCode();
-            Leodanmu.log("tencentPost HTTP " + code);
-            java.io.InputStream is = code >= 400 ? conn.getErrorStream() : conn.getInputStream();
-            String respBody = is != null ? new java.util.Scanner(is, "UTF-8").useDelimiter("\\A").next() : "";
-            if (TextUtils.isEmpty(respBody)) {
-                Leodanmu.log("tencentPost body empty");
-                return null;
-            }
-            return new JSONObject(respBody);
         } catch (Exception e) {
             Leodanmu.log("tencentPost err: " + e.getMessage());
             return null;
@@ -182,8 +178,8 @@ public class PlatformFetcher {
         if (tabId == null) return items;
 
         try {
-            // Build URL matching JS: includes lftxs, lftxc, pg in query string
             int pg = page - 1;
+            String lftxc = type;
             String url = "https://pbaccess.video.qq.com/trpc.vector_layout.page_view.PageService/getPage?video_appid=3000010&lftxs=" + lftxs + "&lftxc=" + lftxc + "&pg=" + pg;
             String filterParams = "sort=" + lftxs;
 
