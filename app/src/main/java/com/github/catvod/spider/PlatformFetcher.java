@@ -179,7 +179,6 @@ public class PlatformFetcher {
 
         try {
             int pg = page - 1;
-            String lftxc = type;
             String url = "https://pbaccess.video.qq.com/trpc.vector_layout.page_view.PageService/getPage?video_appid=3000010&lftxs=" + lftxs + "&lftxc=" + lftxc + "&pg=" + pg;
             String filterParams = "sort=" + lftxs;
 
