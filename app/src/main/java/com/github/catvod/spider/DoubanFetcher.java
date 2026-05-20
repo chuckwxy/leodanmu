@@ -24,6 +24,7 @@ import java.util.regex.Pattern;
 public class DoubanFetcher {
 
     private static final String HOST = "https://frodo.douban.com/api/v2";
+    private static final String REXXAR_HOST = "https://m.douban.com/rexxar/api/v2";
     private static final String SEARCH_HOST = "https://movie.douban.com";
     private static final String API_KEY = "0ac44ae016490db2204ce0a042db2916";
     private static final String API_UA = "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/53.0.2785.143 Safari/537.36 MicroMessenger/7.0.9.501 NetType/WIFI MiniProgramEnv/Windows WindowsWechat";
@@ -133,6 +134,11 @@ public class DoubanFetcher {
                 filter("平台", "平台", "", new String[][]{
                         {"爱奇艺", "iqy_hot_movie"}, {"腾讯", "tx_hot_movie"}, {"优酷", "youku_hot_movie"},
                         {"芒果TV", "mgtv_hot_movie"}, {"360影视", "360ys_hot_movie"}, {"搜狗视频", "sogousp_hot_movie"}
+                }),
+                filter("标签", "标签", "", new String[][]{
+                        {"豆瓣", "豆瓣"}, {"最新", "最新"}, {"高分", "高分"},
+                        {"冷门佳片", "冷门佳片"}, {"华语", "华语"}, {"欧美", "欧美"},
+                        {"韩国", "韩国"}, {"日本", "日本"}
                 })
         ));
 
@@ -141,6 +147,11 @@ public class DoubanFetcher {
                 filter("平台", "平台", "", new String[][]{
                         {"爱奇艺", "iqy_hot_tv"}, {"腾讯", "tx_hot_tv"}, {"优酷", "youku_hot_tv"},
                         {"芒果TV", "mgtv_hot_tv"}, {"360影视", "360ys_hot_tv"}, {"搜狗视频", "sogousp_hot_tv"}
+                }),
+                filter("标签", "标签", "", new String[][]{
+                        {"豆瓣", "豆瓣"}, {"国产剧", "国产剧"}, {"美剧", "美剧"},
+                        {"日剧", "日剧"}, {"韩剧", "韩剧"}, {"日本动画", "日本动画"},
+                        {"纪录片", "纪录片"}
                 })
         ));
 
@@ -442,13 +453,27 @@ public class DoubanFetcher {
         // ── 热门电影 ──────────────────────────────────────────────────────
         } else if ("movie".equals(id)) {
             String platTag = getFilter(filters, "平台", "");
-            fetchHotMovie(platTag, pg, items);
+            String tag = getFilter(filters, "标签", "");
+            if (TextUtils.isEmpty(platTag) && !TextUtils.isEmpty(tag)) {
+                String url = SEARCH_HOST + "/j/search_subjects?type=movie&tag=" + URLEncoder.encode(tag, "UTF-8") + "&page_limit=50&page_start=" + ((pg - 1) * 50);
+                JSONObject data = requestDoubanSearch(url);
+                if (data != null) mergeItems(items, data.optJSONArray("subjects"));
+            } else {
+                fetchHotMovie(platTag, pg, items);
+            }
             total = items.length() + COUNT;
 
         // ── 热门剧集 ──────────────────────────────────────────────────────
         } else if ("tv".equals(id)) {
             String platTag = getFilter(filters, "平台", "");
-            fetchHotTv(platTag, pg, items);
+            String tag = getFilter(filters, "标签", "");
+            if (TextUtils.isEmpty(platTag) && !TextUtils.isEmpty(tag)) {
+                String url = SEARCH_HOST + "/j/search_subjects?type=tv&tag=" + URLEncoder.encode(tag, "UTF-8") + "&page_limit=50&page_start=" + ((pg - 1) * 50);
+                JSONObject data = requestDoubanSearch(url);
+                if (data != null) mergeItems(items, data.optJSONArray("subjects"));
+            } else {
+                fetchHotTv(platTag, pg, items);
+            }
             total = items.length() + COUNT;
 
         // ── 热播综艺 ──────────────────────────────────────────────────────
@@ -602,31 +627,44 @@ public class DoubanFetcher {
             }
             return;
         }
-        // douban branch (frodo API: use sort=R, tags for filtering)
+        // douban branch (匹配 JS: rexxar API with selected_categories)
+        String year = new SimpleDateFormat("yyyy", Locale.getDefault()).format(new Date());
         if ("ru_all".equals(contentType)) {
-            JSONObject md = requestDouban(HOST + "/movie/recommend?sort=R&start=" + (pg - 1) * COUNT + "&count=" + COUNT);
+            // JS: movie/recommend + tv/recommend(电视剧) + tv/recommend(综艺) + tv/recommend(动漫)
+            String movieUrl = REXXAR_HOST + "/movie/recommend?refresh=0&start=" + (pg - 1) * COUNT + "&count=" + COUNT
+                + "&selected_categories=" + URLEncoder.encode("{%}", "UTF-8") + "&uncollect=false&tags=" + URLEncoder.encode(year, "UTF-8");
+            JSONObject md = requestRexxar(movieUrl);
             if (md != null) mergeItems(items, md.optJSONArray("items"));
-            JSONObject td = requestDouban(HOST + "/tv/recommend?sort=R&start=" + (pg - 1) * COUNT + "&count=" + COUNT);
+            String tvUrl = REXXAR_HOST + "/tv/recommend?refresh=0&start=" + (pg - 1) * COUNT + "&count=" + COUNT
+                + "&selected_categories=" + URLEncoder.encode("{\"类型\":\"\",\"形式\":\"电视剧\"}", "UTF-8")
+                + "&uncollect=false&tags=" + URLEncoder.encode("电视剧," + year, "UTF-8");
+            JSONObject td = requestRexxar(tvUrl);
             if (td != null) mergeItems(items, td.optJSONArray("items"));
         } else {
-            String year = new SimpleDateFormat("yyyy", Locale.getDefault()).format(new Date());
             String ep;
-            String typeTag;
+            String selCat;
+            String tagStr;
             if ("ru_movie".equals(contentType)) {
                 ep = "movie/recommend";
-                typeTag = "";
+                selCat = "{%}";
+                tagStr = year;
             } else {
                 ep = "tv/recommend";
-                if ("ru_tv".equals(contentType)) typeTag = "\u7535\u89c6\u5267";
-                else if ("ru_zy".equals(contentType)) typeTag = "\u7efc\u827a";
-                else if ("ru_dm".equals(contentType)) typeTag = "\u52a8\u753b";
-                else typeTag = "";
+                if ("ru_tv".equals(contentType)) {
+                    selCat = "{\"类型\":\"\",\"形式\":\"电视剧\"}";
+                    tagStr = "电视剧," + year;
+                } else if ("ru_zy".equals(contentType)) {
+                    selCat = "{\"类型\":\"\",\"形式\":\"综艺\"}";
+                    tagStr = "综艺," + year;
+                } else {
+                    selCat = "{\"类型\":\"动画\",\"形式\":\"电视剧\"}";
+                    tagStr = "动画," + year;
+                }
             }
-            String tags = typeTag;
-            if (!TextUtils.isEmpty(tags)) tags = "," + tags;
-            String url = HOST + "/" + ep + "?tags=" + URLEncoder.encode(year + tags, "UTF-8")
-                    + "&sort=R&start=" + (pg - 1) * COUNT + "&count=" + COUNT;
-            JSONObject data = requestDouban(url);
+            String url = REXXAR_HOST + "/" + ep + "?refresh=0&start=" + (pg - 1) * COUNT + "&count=" + COUNT
+                + "&selected_categories=" + URLEncoder.encode(selCat, "UTF-8")
+                + "&uncollect=false&tags=" + URLEncoder.encode(tagStr, "UTF-8");
+            JSONObject data = requestRexxar(url);
             if (data != null) mergeItems(items, data.optJSONArray("items"));
         }
     }
@@ -987,6 +1025,20 @@ public class DoubanFetcher {
             return new JSONObject(body);
         } catch (Exception e) {
             Leodanmu.log("\u8c46\u74e3\u641c\u7d22\u8bf7\u6c42\u5931\u8d25: " + e.getMessage());
+            return null;
+        }
+    }
+
+    private static JSONObject requestRexxar(String url) {
+        try {
+            Map<String, String> headers = new HashMap<>();
+            headers.put("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36");
+            headers.put("Referer", "https://m.douban.com/");
+            String body = OkHttp.string(url, headers);
+            if (TextUtils.isEmpty(body)) return null;
+            return new JSONObject(body);
+        } catch (Exception e) {
+            Leodanmu.log("豆瓣rexxar请求失败: " + e.getMessage());
             return null;
         }
     }
