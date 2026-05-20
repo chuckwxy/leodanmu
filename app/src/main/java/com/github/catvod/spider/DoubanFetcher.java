@@ -99,6 +99,11 @@ public class DoubanFetcher {
         return CATEGORIES.contains(tid);
     }
 
+    public static void prewarm() {
+        // force static initializer + cache warmup
+        CATEGORIES.size();
+    }
+
     // ─── Categories ─────────────────────────────────────────────────────────
     public static JSONArray getCategories() throws Exception {
         JSONArray arr = new JSONArray();
@@ -602,10 +607,12 @@ public class DoubanFetcher {
         if (data != null) {
             JSONArray rawItems = data.optJSONArray("items");
             if (rawItems != null) {
+                // 检查frodo API是否返回type字段；若无则跳过类型过滤（都来自正确的endpoint）
+                boolean hasTypeField = rawItems.length() > 0 && rawItems.optJSONObject(0) != null && rawItems.optJSONObject(0).has("type");
                 String filterType = "ru_movie".equals(contentType) ? "movie" : "tv";
                 for (int i = 0; i < rawItems.length(); i++) {
                     JSONObject item = rawItems.optJSONObject(i);
-                    if (item != null && filterType.equals(item.optString("type"))) {
+                    if (item != null && (!hasTypeField || filterType.equals(item.optString("type")))) {
                         items.put(item);
                     }
                 }
@@ -947,7 +954,6 @@ public class DoubanFetcher {
             if (TextUtils.isEmpty(body)) return null;
             return new JSONObject(body);
         } catch (Exception e) {
-            Leodanmu.log("\u8c46\u74e3\u8bf7\u6c42\u5931\u8d25: " + e.getMessage());
             return null;
         }
     }
@@ -961,21 +967,6 @@ public class DoubanFetcher {
             if (TextUtils.isEmpty(body)) return null;
             return new JSONObject(body);
         } catch (Exception e) {
-            Leodanmu.log("\u8c46\u74e3\u641c\u7d22\u8bf7\u6c42\u5931\u8d25: " + e.getMessage());
-            return null;
-        }
-    }
-
-    private static JSONObject requestRexxar(String url) {
-        try {
-            Map<String, String> headers = new HashMap<>();
-            headers.put("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36");
-            headers.put("Referer", "https://m.douban.com/");
-            String body = OkHttp.string(url, headers);
-            if (TextUtils.isEmpty(body)) return null;
-            return new JSONObject(body);
-        } catch (Exception e) {
-            Leodanmu.log("豆瓣rexxar请求失败: " + e.getMessage());
             return null;
         }
     }

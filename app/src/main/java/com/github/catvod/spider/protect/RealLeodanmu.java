@@ -32,6 +32,7 @@ public class RealLeodanmu implements PayloadBridge {
 
     @Override
     public void init(Context context, String extend) throws Exception {
+        DoubanFetcher.prewarm();
         Leodanmu.updateHookStatus("init", "enter", "", "", extend, "");
         if (TextUtils.isEmpty(extend) && TextUtils.isEmpty(Leodanmu.getCachedExtForShell())) {
             Leodanmu.log("init: 未提供 ext，已禁用自动补配置，等待前台手动保存");

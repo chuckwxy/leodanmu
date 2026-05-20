@@ -143,6 +143,8 @@ public class PlatformFetcher {
 
     public static JSONArray fetchTencent(String type, int page, String lftxs) {
         JSONArray items = new JSONArray();
+        // data_key (ver_channel_heavy_page) API不支持翻页，只返回page 1
+        if (page > 1) return items;
         String sourceKey;
         String channelFirstClass;
         if (type.contains("tv") || "tv".equals(type)) {
