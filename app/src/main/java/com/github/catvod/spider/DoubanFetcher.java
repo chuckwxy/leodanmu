@@ -353,25 +353,49 @@ public class DoubanFetcher {
     }
 
     // ─── Home feed ──────────────────────────────────────────────────────────
+    private static void mergeItems(JSONArray target, JSONArray source, Set<String> seen, int max) {
+        if (source == null) return;
+        for (int i = 0; i < source.length(); i++) {
+            JSONObject item = source.optJSONObject(i);
+            if (item == null) continue;
+            String vid = item.optString("vod_id");
+            if (TextUtils.isEmpty(vid) || seen.contains(vid)) continue;
+            seen.add(vid);
+            target.put(item);
+            if (max > 0 && target.length() >= max) return;
+        }
+    }
+
     public static JSONArray fetchHomeList() {
         JSONArray merged = new JSONArray();
         Set<String> seen = new HashSet<>();
+
+        // 多平台首页聚合 (参照 JS homeVod / br_requests)
+        mergeItems(merged, PlatformFetcher.fetchTencent("movie", 1, "75"), seen, 200);
+        mergeItems(merged, PlatformFetcher.fetchTencent("tv", 1, "75"), seen, 200);
+        mergeItems(merged, PlatformFetcher.fetchTencent("variety", 1, "75"), seen, 200);
+        mergeItems(merged, PlatformFetcher.fetchTencent("anime", 1, "75"), seen, 200);
+        mergeItems(merged, PlatformFetcher.fetchIqiyi("movie", 1), seen, 200);
+        mergeItems(merged, PlatformFetcher.fetchIqiyi("tv", 1), seen, 200);
+        mergeItems(merged, PlatformFetcher.fetchIqiyi("variety", 1), seen, 200);
+        mergeItems(merged, PlatformFetcher.fetchIqiyi("anime", 1), seen, 200);
+        mergeItems(merged, PlatformFetcher.fetchYouku("movie", 1, "new"), seen, 200);
+        mergeItems(merged, PlatformFetcher.fetchYouku("tv", 1, "hot"), seen, 200);
+        mergeItems(merged, PlatformFetcher.fetchYouku("variety", 1, "hot"), seen, 200);
+        mergeItems(merged, PlatformFetcher.fetchMangoTV("3", 1), seen, 200);
+        mergeItems(merged, PlatformFetcher.fetchMangoTV("2", 1), seen, 200);
+        mergeItems(merged, PlatformFetcher.fetch360kan("1", 1), seen, 200);
+        mergeItems(merged, PlatformFetcher.fetch360kan("2", 1), seen, 200);
+        mergeItems(merged, PlatformFetcher.fetchSogou("film", 1), seen, 200);
+        mergeItems(merged, PlatformFetcher.fetchSogou("tv", 1), seen, 200);
+
+        // 豆瓣已有内容
         List<String> sources = Arrays.asList("latest", "hot_movie", "hot_tv", "show", "anime");
         for (String id : sources) {
             try {
                 JSONObject data = fetchCategoryInternal(id, 1, null);
                 if (data == null) continue;
-                JSONArray list = data.optJSONArray("list");
-                if (list == null) continue;
-                for (int i = 0; i < list.length(); i++) {
-                    JSONObject item = list.optJSONObject(i);
-                    if (item == null) continue;
-                    String vid = item.optString("vod_id");
-                    if (TextUtils.isEmpty(vid) || seen.contains(vid)) continue;
-                    seen.add(vid);
-                    merged.put(item);
-                    if (merged.length() >= 120) return merged;
-                }
+                mergeItems(merged, data.optJSONArray("list"), seen, 200);
             } catch (Exception ignored) {}
         }
         return merged;
