@@ -470,33 +470,37 @@ public class DoubanFetcher {
             fetchHotDm(platTag, pg, items);
             total = items.length() + COUNT;
 
-        // ── 电影榜单 ──────────────────────────────────────────────────────
+        // ── 电影榜单（翻页守卫：榜单API不支持翻页）───────────────────────
         } else if ("hot_movie".equals(id)) {
-            String slug = getFilter(filters, "榜单", "");
-            String tag = getFilter(filters, "标签", "");
-            if (!TextUtils.isEmpty(tag)) {
-                String url = SEARCH_HOST + "/j/search_subjects?type=movie&tag=" + URLEncoder.encode(tag, "UTF-8") + "&page_limit=50&page_start=" + ((pg - 1) * 50);
-                JSONObject data = requestDoubanSearch(url);
-                if (data != null) mergeItems(items, data.optJSONArray("subjects"));
-            } else {
-                if (TextUtils.isEmpty(slug)) slug = "movie_real_time_hotest";
-                fetchMovielist(slug, pg, items);
+            if (pg == 1) {
+                String slug = getFilter(filters, "榜单", "");
+                String tag = getFilter(filters, "标签", "");
+                if (!TextUtils.isEmpty(tag)) {
+                    String url = SEARCH_HOST + "/j/search_subjects?type=movie&tag=" + URLEncoder.encode(tag, "UTF-8") + "&page_limit=50&page_start=" + ((pg - 1) * 50);
+                    JSONObject data = requestDoubanSearch(url);
+                    if (data != null) mergeItems(items, data.optJSONArray("subjects"));
+                } else {
+                    if (TextUtils.isEmpty(slug)) slug = "movie_real_time_hotest";
+                    fetchMovielist(slug, pg, items);
+                }
+                total = items.length() + 20;
             }
-            total = items.length() + 20;
 
-        // ── 剧集榜单 ──────────────────────────────────────────────────────
+        // ── 剧集榜单（翻页守卫：榜单API不支持翻页）───────────────────────
         } else if ("hot_tv".equals(id)) {
-            String slug = getFilter(filters, "榜单", "");
-            String tag = getFilter(filters, "标签", "");
-            if (!TextUtils.isEmpty(tag)) {
-                String url = SEARCH_HOST + "/j/search_subjects?type=tv&tag=" + URLEncoder.encode(tag, "UTF-8") + "&page_limit=50&page_start=" + ((pg - 1) * 50);
-                JSONObject data = requestDoubanSearch(url);
-                if (data != null) mergeItems(items, data.optJSONArray("subjects"));
-            } else {
-                if (TextUtils.isEmpty(slug)) slug = "tv_real_time_hotest";
-                fetchTvlist(slug, pg, items);
+            if (pg == 1) {
+                String slug = getFilter(filters, "榜单", "");
+                String tag = getFilter(filters, "标签", "");
+                if (!TextUtils.isEmpty(tag)) {
+                    String url = SEARCH_HOST + "/j/search_subjects?type=tv&tag=" + URLEncoder.encode(tag, "UTF-8") + "&page_limit=50&page_start=" + ((pg - 1) * 50);
+                    JSONObject data = requestDoubanSearch(url);
+                    if (data != null) mergeItems(items, data.optJSONArray("subjects"));
+                } else {
+                    if (TextUtils.isEmpty(slug)) slug = "tv_real_time_hotest";
+                    fetchTvlist(slug, pg, items);
+                }
+                total = items.length() + 20;
             }
-            total = items.length() + 20;
 
         // ── 电影筛选 ──────────────────────────────────────────────────────
         } else if ("movie_filter".equals(id)) {
@@ -584,7 +588,7 @@ public class DoubanFetcher {
             }
             return;
         }
-        // douban branch — use frodo API (sort=R matches JS refresh=0)
+        // douban branch — frodo默认排序（无sort=参数）更接近rexxar的推荐算法
         String year = new SimpleDateFormat("yyyy", Locale.getDefault()).format(new Date());
         String ep;
         String typeTag;
@@ -601,7 +605,7 @@ public class DoubanFetcher {
                 typeTag = "动漫," + year;
             }
         }
-        String url = HOST + "/" + ep + "?sort=R&start=" + (pg - 1) * COUNT + "&count=" + COUNT
+        String url = HOST + "/" + ep + "?start=" + (pg - 1) * COUNT + "&count=" + COUNT
             + "&tags=" + URLEncoder.encode(typeTag, "UTF-8");
         JSONObject data = requestDouban(url);
         if (data != null) {
