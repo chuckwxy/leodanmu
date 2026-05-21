@@ -539,20 +539,25 @@ public class PlatformFetcher {
             String url = "https://mesh.if.iqiyi.com/portal/pcw/rankList/comSecRankList?page_st=" + page_st + "&category_id=" + category_id + "&pg_num=" + page;
             JSONObject data = safeGet(url, headers(IQIYI_UA, "https://www.iqiyi.com/"));
             if (data == null) return items;
-            JSONArray list = parseList(data, new String[]{"data", "items", "0", "contents"});
-            if (list != null) {
-                for (int i = 0; i < list.length(); i++) {
-                    try {
-                        JSONObject item = list.getJSONObject(i);
-                        String img = item.optString("img", "").replaceAll("\\.jpg$", "_260_360.jpg");
-                        items.put(toVod(
-                                "iqiyi_rank_" + item.optString("tvid", item.optString("id", "")),
-                                item.optString("title", item.optString("name", "")),
-                                img,
-                                "热度:" + item.optString("mainIndex", "")
-                        ));
-                    } catch (JSONException ignored) {}
-                }
+            JSONObject dataObj = data.optJSONObject("data");
+            if (dataObj == null) return items;
+            JSONArray itemsArr = dataObj.optJSONArray("items");
+            if (itemsArr == null || itemsArr.length() == 0) return items;
+            JSONObject first = itemsArr.optJSONObject(0);
+            if (first == null) return items;
+            JSONArray contents = first.optJSONArray("contents");
+            if (contents == null) return items;
+            for (int i = 0; i < contents.length(); i++) {
+                try {
+                    JSONObject item = contents.getJSONObject(i);
+                    String img = item.optString("img", "").replaceAll("\\.jpg$", "_260_360.jpg");
+                    items.put(toVod(
+                            "iqiyi_rank_" + item.optString("tvid", item.optString("id", "")),
+                            item.optString("title", item.optString("name", "")),
+                            img,
+                            "热度:" + item.optString("mainIndex", "")
+                    ));
+                } catch (JSONException ignored) {}
             }
         } catch (Exception e) {
             Leodanmu.log("爱奇艺榜单请求失败: " + e.getMessage());

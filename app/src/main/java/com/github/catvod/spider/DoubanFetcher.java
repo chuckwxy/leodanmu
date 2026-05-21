@@ -40,8 +40,8 @@ public class DoubanFetcher {
 
     private static final Set<String> CATEGORIES = new HashSet<>(Arrays.asList(
             "latest", "movie", "tv", "show", "anime",
-            "hot_movie", "hot_tv",
-            "movie_filter", "tv_filter"
+            "hot_movie", "hot_tv", "hot_show",
+            "movie_filter", "tv_filter", "top_250"
     ));
 
     // ─── JS tag ↔ sort map ─────────────────────────────────────────────────
@@ -114,8 +114,10 @@ public class DoubanFetcher {
         arr.put(classObj("anime", "\u70ed\u64ad\u52a8\u6f2b"));
         arr.put(classObj("hot_movie", "\u7535\u5f71\u699c\u5355"));
         arr.put(classObj("hot_tv", "\u5267\u96c6\u699c\u5355"));
+        arr.put(classObj("hot_show", "\u7efc\u827a\u699c\u5355"));
         arr.put(classObj("movie_filter", "\u7535\u5f71\u7b5b\u9009"));
         arr.put(classObj("tv_filter", "\u7535\u89c6\u7b5b\u9009"));
+        arr.put(classObj("top_250", "\u8c46\u74e3\u7535\u5f71Top250"));
         return arr;
     }
 
@@ -233,6 +235,15 @@ public class DoubanFetcher {
                         {"优酷港剧榜", "youku_tv_4"},
                         {"优酷悬疑榜", "youku_tv_5"},
                         {"优酷高清榜", "youku_tv_6"}
+                })
+        ));
+
+        // ── 综艺榜单 ─────────────────────────────────────────────────────
+        root.put("hot_show", buildFilters(
+                filter("榜单", "榜单", "", new String[][]{
+                        {"豆瓣综艺热播榜", "tv_variety_show"},
+                        {"豆瓣国内口碑综艺榜", "show_chinese_best_weekly"},
+                        {"豆瓣国外口碑综艺榜", "show_global_best_weekly"}
                 })
         ));
 
@@ -358,6 +369,13 @@ public class DoubanFetcher {
                 })
         ));
 
+        // ── 豆瓣电影Top250 ───────────────────────────────────────────────
+        root.put("top_250", buildFilters(
+                filter("榜单", "榜单", "movie_top250", new String[][]{
+                        {"豆瓣电影Top250", "movie_top250"}
+                })
+        ));
+
         return root;
     }
 
@@ -386,7 +404,7 @@ public class DoubanFetcher {
         }
 
         // 2. 豆瓣分类 (最新+热播)
-        List<String> doubanSources = Arrays.asList("latest", "hot_movie", "hot_tv", "show", "anime");
+        List<String> doubanSources = Arrays.asList("latest", "hot_movie", "hot_tv", "hot_show", "top_250", "show", "anime");
         for (String id : doubanSources) {
             try {
                 JSONObject data = fetchCategoryInternal(id, 1, null);
@@ -502,6 +520,18 @@ public class DoubanFetcher {
                 total = items.length() + 20;
             }
 
+        // ── 综艺榜单 ─────────────────────────────────────────────────────
+        } else if ("hot_show".equals(id)) {
+            if (pg == 1) {
+                String slug = getFilter(filters, "榜单", "");
+                if (TextUtils.isEmpty(slug)) slug = "tv_variety_show";
+                JSONObject data = requestDouban(HOST + "/subject_collection/" + slug + "/items?start=" + (pg - 1) * COUNT + "&count=" + COUNT);
+                if (data != null) {
+                    mergeItems(items, data.optJSONArray("subject_collection_items"));
+                }
+                total = items.length() + 20;
+            }
+
         // ── 电影筛选 ──────────────────────────────────────────────────────
         } else if ("movie_filter".equals(id)) {
             String tagType = getFilter(filters, "类型", "");
@@ -549,6 +579,15 @@ public class DoubanFetcher {
             appendTag(tags, tagLabel);
 
             fetchFiltered("tv", tags.toString(), tagSort, start, items);
+            total = items.length() + COUNT;
+
+        // ── 豆瓣电影Top250 ──────────────────────────────────────────────
+        } else if ("top_250".equals(id)) {
+            String slug = getFilter(filters, "榜单", "movie_top250");
+            JSONObject data = requestDouban(HOST + "/subject_collection/" + slug + "/items?start=" + start + "&count=" + COUNT);
+            if (data != null) {
+                mergeItems(items, data.optJSONArray("subject_collection_items"));
+            }
             total = items.length() + COUNT;
         }
 
@@ -709,7 +748,7 @@ public class DoubanFetcher {
         } else if (slug.startsWith("rank?cat=")) {
             // 360 rank
             mergeItems(items, PlatformFetcher.fetch360kanRank(slug.replace("rank?cat=", "")));
-        } else if ("movie_top250".equals(slug)) {
+        } else if ("top250".equals(slug)) {
             JSONObject data = requestDouban(HOST + "/subject_collection/movie_top250/items?start=" + (pg - 1) * 25 + "&count=25");
             if (data != null) {
                 mergeItems(items, data.optJSONArray("subject_collection_items"));
