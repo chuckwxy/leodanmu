@@ -4,6 +4,9 @@ import com.github.catvod.spider.entity.DanmakuItem;
 
 import android.text.TextUtils;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -12,29 +15,56 @@ public class DanmakuManager {
     // 缓存过期时间：24小时（兜底安全网，主要靠换系列/退出时清理）
     private static final long CACHE_EXPIRE_TIME = 24 * 60 * 60 * 1000L;
 
-    public static String lastAutoDanmakuUrl = "";  // 上次自动推送的弹幕URL
-    public static String lastManualDanmakuUrl = ""; // 上次手动选择的弹幕URL
-    public static String lastDanmakuUrl = ""; // 上次弹幕URL
+    public static String lastAutoDanmakuUrl = "";
+    public static String lastManualDanmakuUrl = "";
+    public static String lastDanmakuUrl = "";
     public static ConcurrentMap<Integer, DanmakuItem> lastDanmakuItemMap = new ConcurrentHashMap<>();
-    public static int lastDanmakuId = -1;          // 上次的弹幕ID
-    public static boolean hasAutoSearched = false; // 是否已自动搜索过
-    public static String lastProcessedTitle = "";  // 上次处理的标题
-    public static String currentVideoSignature = "";  // 当前视频的唯一标识（基于标题提取）
-    public static long lastVideoDetectedTime = 0;     // 上次检测到视频的时间
+    public static int lastDanmakuId = -1;
+    public static boolean hasAutoSearched = false;
+    public static String lastProcessedTitle = "";
+    public static String currentVideoSignature = "";
+    public static long lastVideoDetectedTime = 0;
 
-    // 预缓存：推送成功后提前抓取下集弹幕 XML，换集时直接使用本地缓存
     private static DanmakuItem sPreCachedDanmakuItem = null;
     private static int sPreCachedEpId = -1;
     private static String sPreCachedXml = null;
-    // 持久 XML 缓存，WebServer /danmaku-cache 端点可查，clearPreCache 时清理
-    private static final ConcurrentMap<Integer, String> sCachedXmlMap = new ConcurrentHashMap<>();
-    // 缓存时间戳，用于判断缓存是否过期
-    private static final ConcurrentMap<Integer, Long> sCachedXmlTimestamps = new ConcurrentHashMap<>();
-    // 缓存来源 apiBase，用于跨剧集防污染
-    private static final ConcurrentMap<Integer, String> sCachedXmlApiBases = new ConcurrentHashMap<>();
-    // 正在使用预缓存推送的标志
+    private static final ConcurrentMap<String, String> sCachedXmlMap = new ConcurrentHashMap<>();
+    private static final ConcurrentMap<String, Long> sCachedXmlTimestamps = new ConcurrentHashMap<>();
     private static volatile boolean sUsingPreCache = false;
     private static volatile String sPreCachedXmlForPush = null;
+
+    // 从 DanmakuItem 构建唯一缓存 key: "animeTitle|from|epId"
+    // 如果 animeTitle 为空则回退到 title
+    public static String buildCacheKey(DanmakuItem item) {
+        if (item == null) return "";
+        String showId = item.getAnimeTitle();
+        if (TextUtils.isEmpty(showId)) showId = item.getTitle();
+        if (TextUtils.isEmpty(showId)) return "";
+        String from = item.getFrom();
+        if (TextUtils.isEmpty(from)) from = "";
+        Integer epId = item.getEpId();
+        if (epId == null) return "";
+        return showId + "|" + from + "|" + epId;
+    }
+
+    public static String encodeCacheKey(DanmakuItem item) {
+        String key = buildCacheKey(item);
+        if (TextUtils.isEmpty(key)) return "";
+        try {
+            return URLEncoder.encode(key, "UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            return key;
+        }
+    }
+
+    public static String decodeCacheKey(String encoded) {
+        if (TextUtils.isEmpty(encoded)) return "";
+        try {
+            return URLDecoder.decode(encoded, "UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            return encoded;
+        }
+    }
 
     public static void recordDanmakuUrl(DanmakuItem danmakuItem, boolean isAuto) {
         if (isAuto) {
@@ -48,14 +78,10 @@ public class DanmakuManager {
         lastDanmakuId = danmakuItem.getEpId();
         lastDanmakuItemMap.put(lastDanmakuId, danmakuItem);
 
-        // 记录视频检测时间
         lastVideoDetectedTime = System.currentTimeMillis();
-//        DanmakuSpider.log("✅ 更新视频检测时间: " + lastVideoDetectedTime);
 
-        // 设置已搜索过，这样换集时就会尝试递增
         if (lastDanmakuId > 0) {
             hasAutoSearched = true;
-//            DanmakuSpider.log("✅ 设置 hasAutoSearched = true (ID: " + lastDanmakuId + ")");
         }
     }
 
@@ -67,26 +93,23 @@ public class DanmakuManager {
             return null;
         }
 
-        // 1. 优先从已有缓存 Map 中查找
         DanmakuItem nextDanmakuItem = lastDanmakuItemMap.get(nextId);
         if (nextDanmakuItem != null) {
             Leodanmu.log("✅ 获取到下一个弹幕弹幕信息: " + nextDanmakuItem.toString());
-            // 检查是否有预缓存 XML（含过期检查）
-            String cachedXml = getCachedXml(nextId);
+            String cachedXml = getCachedXml(nextDanmakuItem);
             if (cachedXml != null) {
                 sPreCachedXmlForPush = cachedXml;
                 sUsingPreCache = true;
-                Leodanmu.log("⚡ 预缓存有效(来自持久Map): epId=" + nextId);
+                Leodanmu.log("⚡ 预缓存有效(来自持久Map): " + buildCacheKey(nextDanmakuItem));
             } else {
                 sPreCachedXmlForPush = null;
                 sUsingPreCache = false;
-                Leodanmu.log("📋 预缓存不可用(持久Map无数据): epId=" + nextId);
+                Leodanmu.log("📋 预缓存不可用(持久Map无数据): " + buildCacheKey(nextDanmakuItem));
             }
             lastDanmakuId = nextId;
             return nextDanmakuItem;
         }
 
-        // 2. 检查预缓存是否有命中
         if (nextId == sPreCachedEpId && sPreCachedDanmakuItem != null) {
             Leodanmu.log("⚡ 预缓存命中: epId=" + nextId);
             sPreCachedXmlForPush = sPreCachedXml;
@@ -99,8 +122,6 @@ public class DanmakuManager {
             return lastDanmakuItemMap.get(nextId);
         }
 
-        // 3. 兜底构造（仅当 nextId 合理时）
-        // nextId < 100000 通常说明 lastDanmakuId 已被重置或异常
         if (nextId < 100000) {
             Leodanmu.log("⚠️ ID递增结果异常，跳过构造: nextId=" + nextId + " (lastDanmakuId=" + lastDanmakuId + ")");
             return null;
@@ -131,49 +152,53 @@ public class DanmakuManager {
         sPreCachedDanmakuItem = item;
         sPreCachedXml = xmlData;
         if (xmlData != null && !xmlData.isEmpty()) {
-            sCachedXmlMap.put(epId, xmlData);
-            sCachedXmlTimestamps.put(epId, System.currentTimeMillis());
-            if (item != null && item.getApiBase() != null) {
-                sCachedXmlApiBases.put(epId, item.getApiBase());
+            String key = buildCacheKey(item);
+            if (!TextUtils.isEmpty(key)) {
+                sCachedXmlMap.put(key, xmlData);
+                sCachedXmlTimestamps.put(key, System.currentTimeMillis());
+                Leodanmu.log("💾 预缓存已保存: key=" + key + ", xmlLen=" + xmlData.length());
             }
         }
-        Leodanmu.log("💾 预缓存已保存: epId=" + epId + ", xmlLen=" + (xmlData == null ? 0 : xmlData.length()));
     }
 
     public static int getPreCachedEpId() {
         return sPreCachedEpId;
     }
 
-    /** WebServer /danmaku-cache 查询接口（含过期检查 + apiBase 校验） */
-    public static String getCachedXml(int epId, String apiBase) {
-        Long cachedAt = sCachedXmlTimestamps.get(epId);
+    // 按 DanmakuItem 完全匹配（含过期检查），保证同一剧集同一集才能命中
+    public static String getCachedXml(DanmakuItem item) {
+        if (item == null) return null;
+        String key = buildCacheKey(item);
+        if (TextUtils.isEmpty(key)) return null;
+        Long cachedAt = sCachedXmlTimestamps.get(key);
         if (cachedAt != null && System.currentTimeMillis() - cachedAt > CACHE_EXPIRE_TIME) {
-            invalidateCacheEntry(epId);
-            Leodanmu.log("⏰ 缓存已过期: epId=" + epId + " (cacheAge=" + (System.currentTimeMillis() - cachedAt) / 1000 + "s)");
+            invalidateCacheEntry(key);
+            Leodanmu.log("⏰ 缓存已过期: key=" + key + " (cacheAge=" + (System.currentTimeMillis() - cachedAt) / 1000 + "s)");
             return null;
         }
-        String cachedBase = sCachedXmlApiBases.get(epId);
-        if (cachedBase != null && !TextUtils.isEmpty(apiBase) && !cachedBase.equals(apiBase)) {
-            Leodanmu.log("⚠️ 缓存 apiBase 不匹配，已丢弃: epId=" + epId + " cached=" + cachedBase + " current=" + apiBase);
-            invalidateCacheEntry(epId);
+        return sCachedXmlMap.get(key);
+    }
+
+    // 按原始 key 查（WebServer 用）
+    public static String getCachedXmlByKey(String key) {
+        if (TextUtils.isEmpty(key)) return null;
+        Long cachedAt = sCachedXmlTimestamps.get(key);
+        if (cachedAt != null && System.currentTimeMillis() - cachedAt > CACHE_EXPIRE_TIME) {
+            invalidateCacheEntry(key);
+            Leodanmu.log("⏰ 缓存已过期: key=" + key);
             return null;
         }
-        return sCachedXmlMap.get(epId);
+        return sCachedXmlMap.get(key);
     }
 
-    public static void invalidateCacheEntry(int epId) {
-        sCachedXmlMap.remove(epId);
-        sCachedXmlTimestamps.remove(epId);
-        sCachedXmlApiBases.remove(epId);
-    }
-
-    public static String getCachedApiBase(int epId) {
-        return sCachedXmlApiBases.get(epId);
-    }
-
-    // 兼容旧版无 apiBase 的查询（仅 WebServer 使用，走宽松校验）
+    // 兼容旧版无参数的查询（清除相关联的缓存时用）
     public static String getCachedXml(int epId) {
-        return getCachedXml(epId, null);
+        return null;
+    }
+
+    public static void invalidateCacheEntry(String key) {
+        sCachedXmlMap.remove(key);
+        sCachedXmlTimestamps.remove(key);
     }
 
     public static boolean isUsingPreCache() {
@@ -195,7 +220,6 @@ public class DanmakuManager {
         sUsingPreCache = false;
         sCachedXmlMap.clear();
         sCachedXmlTimestamps.clear();
-        sCachedXmlApiBases.clear();
     }
 
     public static void resetAutoSearch() {
@@ -208,7 +232,6 @@ public class DanmakuManager {
         lastManualDanmakuUrl = "";
         lastDanmakuUrl = "";
         lastDanmakuItemMap.clear();
-        // 不清理预缓存: 预缓存由 consume 或 stopHookMonitor 清理
     }
 
     public static void setItemEpisodeTitle(DanmakuItem item, String epNum, String from) {
