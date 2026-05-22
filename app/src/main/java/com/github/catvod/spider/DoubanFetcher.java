@@ -790,7 +790,7 @@ public class DoubanFetcher {
             slugSort.put("anime_recent", "R");
             slugSort.put("anime_hot", "U");
             slugSort.put("anime_best", "S");
-            String effectiveSort = slugSort.getOrDefault(slug, partSort);
+            String effectiveSort = slugSort.containsKey(slug) ? slugSort.get(slug) : partSort;
 
             StringBuilder tags = new StringBuilder("动画");
             if (!TextUtils.isEmpty(tagType) && !"动画".equals(tagType)) {
