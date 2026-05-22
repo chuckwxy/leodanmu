@@ -20,7 +20,6 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
@@ -43,13 +42,9 @@ public class DoubanFetcher {
 
     private static boolean sDebugLogged = false;
 
-    // ─── Cache ─────────────────────────────────────────────────────────────
-    private static final long PAGE_CACHE_TTL = 30 * 60 * 1000;
-    private static final long SUBJECT_CACHE_TTL = 6 * 60 * 60 * 1000;
+    // ─── 分页缓存 ──────────────────────────────────────────────────────────
     private static final long CACHE_CLEAN_INTERVAL = 24 * 60 * 60 * 1000;
     private static final ConcurrentHashMap<String, PageCacheEntry> pageCache = new ConcurrentHashMap<>();
-    private static final ConcurrentHashMap<String, SubjectCacheEntry> subjectCache = new ConcurrentHashMap<>();
-    private static final ConcurrentHashMap<String, Future<JSONObject>> subjectPending = new ConcurrentHashMap<>();
     private static final ScheduledExecutorService sCacheScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "douban-cache");
         t.setDaemon(true);
@@ -63,15 +58,6 @@ public class DoubanFetcher {
         PageCacheEntry(JSONObject data, long lastAccess) {
             this.data = data;
             this.lastAccess = lastAccess;
-        }
-    }
-
-    private static class SubjectCacheEntry {
-        final JSONObject data;
-        final long time;
-        SubjectCacheEntry(JSONObject data, long time) {
-            this.data = data;
-            this.time = time;
         }
     }
 
