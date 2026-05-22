@@ -336,8 +336,7 @@ public class DanmakuUIHelper {
 
         button.setTag(item);
 
-        boolean isCurrentDanmaku = !TextUtils.isEmpty(DanmakuManager.lastDanmakuUrl)
-                && TextUtils.equals(DanmakuManager.lastDanmakuUrl, item.getDanmakuUrl());
+        boolean isCurrentDanmaku = matchesCurrentDanmaku(item);
         int currentDanmakuColor = colors == LIGHT_THEME ? 0xFF8A6500 : 0xFFC2A14A;
 
         // 创建统一的背景 Drawable（包含背景色和圆角，初始无边框）
@@ -1502,16 +1501,7 @@ public class DanmakuUIHelper {
 
                                 tabContainer.addView(tabBtn);
 
-                                boolean containsLastUrl = false;
-                                if (DanmakuManager.lastDanmakuUrl != null && !DanmakuManager.lastDanmakuUrl.isEmpty()) {
-                                    for (DanmakuItem item : groupedResults.get(tabName)) {
-                                        if (item.getDanmakuUrl() != null &&
-                                                item.getDanmakuUrl().equals(DanmakuManager.lastDanmakuUrl)) {
-                                            containsLastUrl = true;
-                                            break;
-                                        }
-                                    }
-                                }
+                                boolean containsLastUrl = containsMatchingItem(groupedResults.get(tabName));
 
                                 if ((DanmakuManager.lastDanmakuUrl == null || DanmakuManager.lastDanmakuUrl.isEmpty()) && i == 0) {
                                     showResultsForTab(resultContainer, groupedResults.get(tabName), activity, dialog);
@@ -1631,6 +1621,24 @@ public class DanmakuUIHelper {
         return (ms > 0 ? "+" : "") + String.format("%.1fs", sec);
     }
 
+    private static boolean matchesCurrentDanmaku(DanmakuItem item) {
+        if (item == null) return false;
+        if (!TextUtils.isEmpty(DanmakuManager.lastDanmakuUrl) && item.getDanmakuUrl() != null
+                && DanmakuManager.lastDanmakuUrl.equals(item.getDanmakuUrl())) {
+            return true;
+        }
+        return DanmakuManager.lastDanmakuId > 0 && item.getEpId() != null
+                && DanmakuManager.lastDanmakuId == item.getEpId();
+    }
+
+    private static boolean containsMatchingItem(List<DanmakuItem> items) {
+        if (items == null) return false;
+        for (DanmakuItem item : items) {
+            if (matchesCurrentDanmaku(item)) return true;
+        }
+        return false;
+    }
+
     private static int dpToPx(Context context, int dp) {
         if (context == null) {
             return Math.round(dp * 3.0f);
@@ -1666,13 +1674,10 @@ public class DanmakuUIHelper {
         }
 
         Set<String> groupsWithLastUrl = new HashSet<>();
-        if (DanmakuManager.lastDanmakuUrl != null) {
+        if (DanmakuManager.lastDanmakuUrl != null || DanmakuManager.lastDanmakuId > 0) {
             for (Map.Entry<String, List<DanmakuItem>> entry : animeGroups.entrySet()) {
-                for (DanmakuItem item : entry.getValue()) {
-                    if (item.getDanmakuUrl() != null && item.getDanmakuUrl().equals(DanmakuManager.lastDanmakuUrl)) {
-                        groupsWithLastUrl.add(entry.getKey());
-                        break;
-                    }
+                if (containsMatchingItem(entry.getValue())) {
+                    groupsWithLastUrl.add(entry.getKey());
                 }
             }
         }
@@ -1785,8 +1790,7 @@ public class DanmakuUIHelper {
                                 View child = grid.getChildAt(i);
                                 if (child instanceof Button && child.getTag() instanceof DanmakuItem) {
                                     DanmakuItem it = (DanmakuItem) child.getTag();
-                                    if (it.getDanmakuUrl() != null &&
-                                            it.getDanmakuUrl().equals(DanmakuManager.lastDanmakuUrl)) {
+                                    if (matchesCurrentDanmaku(it)) {
                                         child.requestFocus();
                                         break;
                                     }
