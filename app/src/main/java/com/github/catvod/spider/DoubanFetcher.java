@@ -37,6 +37,12 @@ public class DoubanFetcher {
     private static final Pattern DOUBAN_IMG_PATTERN = Pattern.compile("https://img\\d*\\.doubanio\\.com");
     private static final int COUNT = 40;
 
+    // ─── 签名 API (豆瓣片单用) ──────────────────────────────────────────────
+    private static final String DOUBAN_SIGN_SECRET = "bf7dddc7c9cfe6f7";
+    private static final String DOUBAN_APP_KEY = "0dad551ec0f84ed02907ff5c42e8ec70";
+    private static final String DOUBAN_DEVICE_ID = java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 32);
+    private static final String DOUBAN_APP_UA = "Rexxar-Core/0.1.3 api-client/1 com.douban.frodo/7.9.0(216) Android/28 product/Xiaomi11 rom/android network/wifi udid/" + DOUBAN_DEVICE_ID + " platform/mobile com.douban.frodo/7.9.0(216) Rexxar/1.2.151 platform/mobile 1.2.151";
+
     private static boolean sDebugLogged = false;
 
     // ─── 分页缓存 ──────────────────────────────────────────────────────────
@@ -101,9 +107,9 @@ public class DoubanFetcher {
             Leodanmu.log("[豆瓣缓存] 开始后台预热...");
             int refreshed = 0;
             String[][] coreTargets = {
-                {"movie", "U"}, {"tv", "U"}, {"show", "U"}, {"anime", "U"},
+                {"douban_hot", null}, {"movie", "U"}, {"tv", "U"}, {"show", "U"}, {"anime", "U"},
                 {"hot_movie", null}, {"hot_tv", null}, {"hot_show", null},
-                {"douban_anime", null}, {"top_250", null}
+                {"douban_anime", null}, {"top_250", null}, {"douban_playlist", null}
             };
             for (String[] target : coreTargets) {
                 try {
@@ -126,9 +132,9 @@ public class DoubanFetcher {
     }
 
     private static final Set<String> CATEGORIES = new HashSet<>(Arrays.asList(
-            "latest", "movie", "tv", "show", "anime", "douban_anime",
+            "latest", "douban_hot", "movie", "tv", "show", "anime", "douban_anime",
             "hot_movie", "hot_tv", "hot_show",
-            "movie_filter", "tv_filter", "top_250"
+            "movie_filter", "tv_filter", "top_250", "douban_playlist"
     ));
 
     // ─── JS tag ↔ sort map ─────────────────────────────────────────────────
@@ -183,7 +189,9 @@ public class DoubanFetcher {
     }
 
     public static boolean isDouban(String tid) {
-        return CATEGORIES.contains(tid);
+        if (CATEGORIES.contains(tid)) return true;
+        if (tid != null && (tid.startsWith("cr_") || tid.startsWith("dl_"))) return true;
+        return false;
     }
 
     public static void prewarm() {
@@ -195,6 +203,7 @@ public class DoubanFetcher {
     public static JSONArray getCategories() throws Exception {
         JSONArray arr = new JSONArray();
         arr.put(classObj("latest", "\u6700\u8fd1\u66f4\u65b0"));
+        arr.put(classObj("douban_hot", "\u8c46\u74e3\u70ed\u64ad"));
         arr.put(classObj("movie", "\u70ed\u95e8\u7535\u5f71"));
         arr.put(classObj("tv", "\u70ed\u95e8\u5267\u96c6"));
         arr.put(classObj("show", "\u70ed\u64ad\u7efc\u827a"));
@@ -206,6 +215,7 @@ public class DoubanFetcher {
         arr.put(classObj("movie_filter", "\u7535\u5f71\u7b5b\u9009"));
         arr.put(classObj("tv_filter", "\u7535\u89c6\u7b5b\u9009"));
         arr.put(classObj("top_250", "\u8c46\u74e3\u7535\u5f71Top250"));
+        arr.put(classObj("douban_playlist", "\u8c46\u74e3\u7247\u5355"));
         return arr;
     }
 
@@ -221,6 +231,20 @@ public class DoubanFetcher {
                 filter("数据源", "数据源", "", new String[][]{
                         {"豆瓣", "douban_ru"}, {"爱奇艺", "iqy_ru"}, {"腾讯", "tx_ru"}, {"优酷", "youku_ru"},
                         {"芒果TV", "mgtv_ru"}, {"360影视", "360ys_ru"}, {"搜狗视频", "sogousp_ru"}
+                })
+        ));
+
+        // ── 豆瓣热播 ────────────────────────────────────────────────────
+        root.put("douban_hot", buildFilters(
+                filter("分类", "分类", "movie/hot_gaia", new String[][]{
+                        {"电视剧", "subject_collection/tv_hot/items"},
+                        {"电影", "movie/hot_gaia"},
+                        {"国产剧", "subject_collection/tv_domestic/items"},
+                        {"美剧", "subject_collection/tv_american/items"},
+                        {"日剧", "subject_collection/tv_japanese/items"},
+                        {"韩剧", "subject_collection/tv_korean/items"},
+                        {"动漫", "subject_collection/tv_animation/items"},
+                        {"综艺", "subject_collection/show_hot/items"}
                 })
         ));
 
@@ -464,6 +488,20 @@ public class DoubanFetcher {
                 })
         ));
 
+        // ── 豆瓣片单 ─────────────────────────────────────────────────────
+        root.put("douban_playlist", buildFilters(
+                filter("类型", "类型", "", new String[][]{
+                        {"全部", ""}, {"电影", "movie"}, {"电视剧", "tv"}
+                }),
+                filter("分类", "分类", "all", new String[][]{
+                        {"全部", "all"}, {"豆瓣片单", "official"}, {"精选", "selected"},
+                        {"经典", "classical"}, {"获奖", "prize"}, {"高分", "high_score"},
+                        {"榜单", "movie_list"}, {"冷门佳片", "dark_horse"},
+                        {"主题", "topic"}, {"导演", "director"}, {"演员", "actor"},
+                        {"系列", "series"}
+                })
+        ));
+
         // ── 豆瓣动漫（合并动漫剧集+动漫电影）────────────────────────────
         root.put("douban_anime", buildFilters(
                 filter("榜单", "榜单", "anime_recent", new String[][]{
@@ -577,7 +615,7 @@ public class DoubanFetcher {
         }
 
         // 3. 其他豆瓣分类 (填充剩余)
-        List<String> doubanSources = Arrays.asList("douban_anime", "latest", "top_250", "show", "anime", "movie", "tv");
+        List<String> doubanSources = Arrays.asList("douban_hot", "douban_anime", "latest", "top_250", "douban_playlist", "show", "anime", "movie", "tv");
         for (String id : doubanSources) {
             if (merged.length() >= 200) break;
             try {
@@ -658,6 +696,50 @@ public class DoubanFetcher {
             String platform = getFilter(filters, "数据源", "");
             fetchLatest(platform, contentType, pg, sort, items);
             total = items.length() + COUNT;
+
+        // ── 豆瓣热播 ────────────────────────────────────────────────────
+        } else if ("douban_hot".equals(id)) {
+            String u = getFilter(filters, "分类", "movie/hot_gaia");
+            String safeU = u.replaceAll("^/+", "");
+            String url;
+            if (safeU.startsWith("subject_collection/")) {
+                url = HOST + "/" + safeU + "?start=" + start + "&count=" + COUNT;
+            } else {
+                url = HOST + "/" + safeU + "?area=\u5168\u90e8&sort=recommend&playable=0&loc_id=0&start=" + start + "&count=" + COUNT;
+            }
+            JSONObject data = requestDouban(url);
+            if (data != null) {
+                JSONArray arr = data.optJSONArray("subject_collection_items");
+                if (arr != null) {
+                    mergeItems(items, arr);
+                } else {
+                    mergeItems(items, data.optJSONArray("items"));
+                }
+                total = data.optInt("total", items.length() + COUNT);
+            }
+            // 不足40条时自动翻页补齐（最多3轮）
+            int offset = start + COUNT;
+            for (int round = 0; round < 3 && items.length() < COUNT; round++) {
+                int before = items.length();
+                String fillUrl;
+                if (safeU.startsWith("subject_collection/")) {
+                    fillUrl = HOST + "/" + safeU + "?start=" + offset + "&count=" + COUNT;
+                } else {
+                    fillUrl = HOST + "/" + safeU + "?area=\u5168\u90e8&sort=recommend&playable=0&loc_id=0&start=" + offset + "&count=" + COUNT;
+                }
+                JSONObject fillData = requestDouban(fillUrl);
+                if (fillData != null) {
+                    JSONArray fillArr = fillData.optJSONArray("subject_collection_items");
+                    if (fillArr != null) {
+                        mergeItems(items, fillArr);
+                    } else {
+                        mergeItems(items, fillData.optJSONArray("items"));
+                    }
+                }
+                if (items.length() == before) break;
+                offset += COUNT;
+            }
+            total = Math.max(total, items.length());
 
         // ── 热门电影 ──────────────────────────────────────────────────────
         } else if ("movie".equals(id)) {
@@ -820,6 +902,79 @@ public class DoubanFetcher {
                 mergeItems(items, data.optJSONArray("subject_collection_items"));
             }
             total = items.length() + COUNT;
+
+        // ── 豆瓣片单 ────────────────────────────────────────────────────
+        } else if ("douban_playlist".equals(id)) {
+            String type = getFilter(filters, "类型", "");
+            String cate = getFilter(filters, "分类", "all");
+            String plUrl = HOST + "/skynet/new_playlists?subject_type=" + URLEncoder.encode(type, "UTF-8")
+                    + "&category=" + URLEncoder.encode(cate, "UTF-8") + "&loc_id=0&start=" + start + "&count=" + COUNT;
+            JSONObject plData = requestDoubanSigned(plUrl);
+            if (plData != null) {
+                JSONArray rows = plData.optJSONArray("items");
+                if (rows == null) {
+                    JSONArray dataArr = plData.optJSONArray("data");
+                    if (dataArr != null && dataArr.length() > 0) {
+                        JSONObject first = dataArr.optJSONObject(0);
+                        if (first != null) rows = first.optJSONArray("items");
+                    }
+                }
+                if (rows == null) {
+                    JSONObject dataObj = plData.optJSONObject("data");
+                    if (dataObj != null) rows = dataObj.optJSONArray("items");
+                }
+                if (rows != null) {
+                    for (int i = 0; i < rows.length(); i++) {
+                        JSONObject vod = rows.optJSONObject(i);
+                        if (vod == null) continue;
+                        JSONObject folderItem = new JSONObject();
+                        String prefix = vod.has("owner") ? "dl_" : "cr_";
+                        folderItem.put("vod_id", prefix + vod.optString("id", ""));
+                        folderItem.put("vod_name", vod.optString("title", "\u672a\u77e5"));
+                        folderItem.put("vod_pic", vod.optString("cover_url", ""));
+                        folderItem.put("vod_remarks", "");
+                        folderItem.put("vod_tag", "folder");
+                        JSONObject style = new JSONObject();
+                        style.put("type", "rect");
+                        style.put("ratio", 1);
+                        folderItem.put("style", style);
+                        items.put(folderItem);
+                    }
+                }
+                total = plData.optInt("total", items.size() + COUNT);
+            }
+
+        // ── 片单二级：cr_=subject_collection, dl_=doulist ─────────────
+        } else if (id.startsWith("cr_")) {
+            String cid = id.substring(3);
+            JSONObject data = requestDouban(HOST + "/subject_collection/" + cid + "/items?start=" + start + "&count=" + COUNT + "&updated_at=&items_only=1");
+            if (data != null) {
+                JSONArray arr = data.optJSONArray("subject_collection_items");
+                if (arr == null) arr = data.optJSONArray("items");
+                mergeItems(items, arr);
+                total = data.optInt("total", items.length() + COUNT);
+            } else {
+                total = items.length() + COUNT;
+            }
+
+        } else if (id.startsWith("dl_")) {
+            String did = id.substring(3);
+            JSONObject data = requestDouban(HOST + "/doulist/" + did + "/posts?start=" + start + "&count=" + COUNT + "&updated_at=&items_only=1");
+            if (data != null) {
+                JSONArray rows = data.optJSONArray("items");
+                if (rows != null) {
+                    for (int i = 0; i < rows.length(); i++) {
+                        JSONObject row = rows.optJSONObject(i);
+                        if (row == null) continue;
+                        JSONObject subject = row.optJSONObject("content");
+                        if (subject != null) subject = subject.optJSONObject("subject");
+                        if (subject != null) items.put(subject);
+                    }
+                }
+                total = data.optInt("total", items.length() + COUNT);
+            } else {
+                total = items.length() + COUNT;
+            }
         }
 
         JSONArray mapped = mapItems(items);
@@ -1228,6 +1383,34 @@ public class DoubanFetcher {
             if (TextUtils.isEmpty(body)) return null;
             return new JSONObject(body);
         } catch (Exception e) {
+            return null;
+        }
+    }
+
+    // ─── 签名 API 请求（豆瓣片单用）──────────────────────────────────────────
+    private static JSONObject requestDoubanSigned(String url) {
+        try {
+            String withBase = url + (url.contains("?") ? "&" : "?")
+                    + "udid=" + DOUBAN_DEVICE_ID + "&uuid=" + DOUBAN_DEVICE_ID + "&rom=android&apikey=" + DOUBAN_APP_KEY
+                    + "&s=rexxar_new&channel=Yingyongbao_Market&timezone=Asia/Shanghai&device_id=" + DOUBAN_DEVICE_ID
+                    + "&os_rom=android&apple=c52fbb99b908be4d026954cc4374f16d&mooncake=0f607264fc6318a92b9e13c65db7cd3c&sugar=0";
+            java.net.URL u = new java.net.URL(withBase);
+            String pathname = u.getPath();
+            String ts = String.valueOf(System.currentTimeMillis() / 1000);
+            String signText = "GET&" + URLEncoder.encode(pathname, "UTF-8") + "&" + ts;
+            javax.crypto.Mac mac = javax.crypto.Mac.getInstance("HmacSHA1");
+            javax.crypto.spec.SecretKeySpec keySpec = new javax.crypto.spec.SecretKeySpec(DOUBAN_SIGN_SECRET.getBytes("UTF-8"), "HmacSHA1");
+            mac.init(keySpec);
+            byte[] rawHmac = mac.doFinal(signText.getBytes("UTF-8"));
+            String sig = URLEncoder.encode(android.util.Base64.encodeToString(rawHmac, android.util.Base64.NO_WRAP), "UTF-8");
+            String finalUrl = withBase + "&_sig=" + sig + "&_ts=" + ts;
+            Map<String, String> headers = new HashMap<>();
+            headers.put("User-Agent", DOUBAN_APP_UA);
+            String body = OkHttp.string(finalUrl, headers);
+            if (TextUtils.isEmpty(body)) return null;
+            return new JSONObject(body);
+        } catch (Exception e) {
+            Leodanmu.log("[豆瓣签名] 请求失败: " + e.getMessage());
             return null;
         }
     }
