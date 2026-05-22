@@ -1623,13 +1623,8 @@ public class DanmakuUIHelper {
 
     private static boolean matchesCurrentDanmaku(DanmakuItem item) {
         if (item == null) return false;
-        if (!TextUtils.isEmpty(DanmakuManager.lastDanmakuUrl) && item.getDanmakuUrl() != null
-                && DanmakuManager.lastDanmakuUrl.equals(item.getDanmakuUrl())) {
-            return true;
-        }
-        DanmakuItem lastItem = DanmakuManager.lastDanmakuItemMap.get(DanmakuManager.lastDanmakuId);
-        if (lastItem == null || TextUtils.isEmpty(item.getFrom())) return false;
-        return item.getFrom().equals(lastItem.getFrom());
+        return !TextUtils.isEmpty(DanmakuManager.lastDanmakuUrl) && item.getDanmakuUrl() != null
+                && DanmakuManager.lastDanmakuUrl.equals(item.getDanmakuUrl());
     }
 
     private static boolean containsMatchingItem(List<DanmakuItem> items) {
