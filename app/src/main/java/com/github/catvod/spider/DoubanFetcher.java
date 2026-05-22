@@ -602,11 +602,16 @@ public class DoubanFetcher {
             return cached.data;
         }
         Leodanmu.log("[豆瓣缓存] 未命中，实时抓取: " + cacheKey);
-        JSONObject data = fetchCategoryInternal(id, page, filters);
-        if (data != null) {
-            pageCache.put(cacheKey, new PageCacheEntry(data, System.currentTimeMillis()));
+        try {
+            JSONObject data = fetchCategoryInternal(id, page, filters);
+            if (data != null) {
+                pageCache.put(cacheKey, new PageCacheEntry(data, System.currentTimeMillis()));
+            }
+            return data;
+        } catch (Exception e) {
+            Leodanmu.log("[豆瓣缓存] 抓取异常: " + e.getMessage());
+            return null;
         }
-        return data;
     }
 
     // ─── Category fetch (public entry) ──────────────────────────────────────
