@@ -1627,8 +1627,9 @@ public class DanmakuUIHelper {
                 && DanmakuManager.lastDanmakuUrl.equals(item.getDanmakuUrl())) {
             return true;
         }
-        return DanmakuManager.lastDanmakuId > 0 && item.getEpId() != null
-                && DanmakuManager.lastDanmakuId == item.getEpId();
+        DanmakuItem lastItem = DanmakuManager.lastDanmakuItemMap.get(DanmakuManager.lastDanmakuId);
+        if (lastItem == null || TextUtils.isEmpty(item.getFrom())) return false;
+        return item.getFrom().equals(lastItem.getFrom());
     }
 
     private static boolean containsMatchingItem(List<DanmakuItem> items) {

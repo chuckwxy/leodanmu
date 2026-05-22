@@ -33,18 +33,14 @@ public class DanmakuManager {
     private static volatile boolean sUsingPreCache = false;
     private static volatile String sPreCachedXmlForPush = null;
 
-    // 从 DanmakuItem 构建唯一缓存 key: "animeTitle|from|epId"
-    // 如果 animeTitle 为空则回退到 title
+    // 缓存 key: "from|epId"，from 和 epId 均在剧中不变
     public static String buildCacheKey(DanmakuItem item) {
         if (item == null) return "";
-        String showId = item.getAnimeTitle();
-        if (TextUtils.isEmpty(showId)) showId = item.getTitle();
-        if (TextUtils.isEmpty(showId)) return "";
         String from = item.getFrom();
         if (TextUtils.isEmpty(from)) from = "";
         Integer epId = item.getEpId();
         if (epId == null) return "";
-        return showId + "|" + from + "|" + epId;
+        return from + "|" + epId;
     }
 
     public static String encodeCacheKey(DanmakuItem item) {
