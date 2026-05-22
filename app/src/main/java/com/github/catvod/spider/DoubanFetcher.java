@@ -19,9 +19,6 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -45,11 +42,6 @@ public class DoubanFetcher {
     // ─── 分页缓存 ──────────────────────────────────────────────────────────
     private static final long CACHE_CLEAN_INTERVAL = 24 * 60 * 60 * 1000;
     private static final ConcurrentHashMap<String, PageCacheEntry> pageCache = new ConcurrentHashMap<>();
-    private static final ScheduledExecutorService sCacheScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
-        Thread t = new Thread(r, "douban-cache");
-        t.setDaemon(true);
-        return t;
-    });
     private static volatile boolean sCacheInitialized = false;
 
     private static class PageCacheEntry {
@@ -76,8 +68,21 @@ public class DoubanFetcher {
     private static void initCache() {
         if (sCacheInitialized) return;
         sCacheInitialized = true;
-        sCacheScheduler.scheduleWithFixedDelay(DoubanFetcher::backgroundRefreshTask,
-                5000, CACHE_CLEAN_INTERVAL, TimeUnit.MILLISECONDS);
+        Thread cacheThread = new Thread("douban-cache") {
+            @Override
+            public void run() {
+                try {
+                    Thread.sleep(5000);
+                    while (true) {
+                        backgroundRefreshTask();
+                        Thread.sleep(CACHE_CLEAN_INTERVAL);
+                    }
+                } catch (InterruptedException ignored) {
+                }
+            }
+        };
+        cacheThread.setDaemon(true);
+        cacheThread.start();
     }
 
     private static void backgroundRefreshTask() {
