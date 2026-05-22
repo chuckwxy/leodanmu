@@ -1555,6 +1555,9 @@ public class DanmakuScanner {
 
                 Leodanmu.log("✅ 使用ID递增方式找到下一集弹幕: " + nextDanmakuItem.getDanmakuUrl());
 
+                // 修正 epTitle 显示为目标集数
+                DanmakuManager.setItemEpisodeTitle(nextDanmakuItem, lastEpisodeInfo.getEpisodeNum(), nextDanmakuItem.getFrom());
+
                 // 延迟推送，等待视频播放
                 String title = lastEpisodeInfo.getEpisodeNames() != null && !lastEpisodeInfo.getEpisodeNames().isEmpty() ?
                         lastEpisodeInfo.getEpisodeNames().get(0) : lastEpisodeInfo.getEpisodeName();
@@ -1603,6 +1606,9 @@ public class DanmakuScanner {
 
                 // 生成推送key
                 String pushKey = generateSignature(lastEpisodeInfo);
+
+                // 修正 epTitle 显示为目标集数
+                DanmakuManager.setItemEpisodeTitle(nextDanmakuItem, lastEpisodeInfo.getEpisodeNum(), nextDanmakuItem.getFrom());
 
                 // 延迟推送，等待视频播放
                 String title = lastEpisodeInfo.getEpisodeNames() != null && !lastEpisodeInfo.getEpisodeNames().isEmpty() ?

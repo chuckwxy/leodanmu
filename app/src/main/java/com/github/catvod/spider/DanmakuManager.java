@@ -2,6 +2,8 @@ package com.github.catvod.spider;
 
 import com.github.catvod.spider.entity.DanmakuItem;
 
+import android.text.TextUtils;
+
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -87,11 +89,6 @@ public class DanmakuManager {
             Leodanmu.log("⚡ 预缓存命中: epId=" + nextId);
             sPreCachedXmlForPush = sPreCachedXml;
             sUsingPreCache = true;
-            // 从 current 条目继承 epTitle，避免 "预缓存#XXX" 污染显示
-            DanmakuItem current = lastDanmakuItemMap.get(lastDanmakuId);
-            if (current != null && current.getEpTitle() != null) {
-                sPreCachedDanmakuItem.setEpTitle(current.getEpTitle());
-            }
             lastDanmakuItemMap.put(nextId, sPreCachedDanmakuItem);
             sPreCachedDanmakuItem = null;
             sPreCachedEpId = -1;
@@ -186,5 +183,17 @@ public class DanmakuManager {
         lastDanmakuUrl = "";
         lastDanmakuItemMap.clear();
         // 不清理预缓存: 预缓存由 consume 或 stopHookMonitor 清理
+    }
+
+    public static void setItemEpisodeTitle(DanmakuItem item, String epNum, String from) {
+        if (item == null || TextUtils.isEmpty(epNum)) return;
+        String epTitle;
+        if (!TextUtils.isEmpty(from)) {
+            epTitle = "[" + from + "] 第" + epNum + "集";
+        } else {
+            epTitle = "第" + epNum + "集";
+        }
+        item.setEpTitle(epTitle);
+        item.setShortTitle("第" + epNum + "集");
     }
 }
