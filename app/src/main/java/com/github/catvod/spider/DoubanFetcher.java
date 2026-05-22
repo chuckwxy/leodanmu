@@ -941,7 +941,7 @@ public class DoubanFetcher {
                         items.put(folderItem);
                     }
                 }
-                total = plData.optInt("total", items.size() + COUNT);
+                total = plData.optInt("total", items.length() + COUNT);
             }
 
         // ── 片单二级：cr_=subject_collection, dl_=doulist ─────────────
