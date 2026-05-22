@@ -18,6 +18,11 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -38,8 +43,95 @@ public class DoubanFetcher {
 
     private static boolean sDebugLogged = false;
 
+    // ─── Cache ─────────────────────────────────────────────────────────────
+    private static final long PAGE_CACHE_TTL = 30 * 60 * 1000;
+    private static final long SUBJECT_CACHE_TTL = 6 * 60 * 60 * 1000;
+    private static final long CACHE_CLEAN_INTERVAL = 24 * 60 * 60 * 1000;
+    private static final ConcurrentHashMap<String, PageCacheEntry> pageCache = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, SubjectCacheEntry> subjectCache = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, Future<JSONObject>> subjectPending = new ConcurrentHashMap<>();
+    private static final ScheduledExecutorService sCacheScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r, "douban-cache");
+        t.setDaemon(true);
+        return t;
+    });
+    private static volatile boolean sCacheInitialized = false;
+
+    private static class PageCacheEntry {
+        final JSONObject data;
+        final long lastAccess;
+        PageCacheEntry(JSONObject data, long lastAccess) {
+            this.data = data;
+            this.lastAccess = lastAccess;
+        }
+    }
+
+    private static class SubjectCacheEntry {
+        final JSONObject data;
+        final long time;
+        SubjectCacheEntry(JSONObject data, long time) {
+            this.data = data;
+            this.time = time;
+        }
+    }
+
+    private static String getPageCacheKey(String id, int page, Map<String, String> filters) {
+        if (filters == null || filters.isEmpty()) return id + "_" + page;
+        StringBuilder sb = new StringBuilder(id);
+        sb.append('_').append(page);
+        for (Map.Entry<String, String> e : filters.entrySet()) {
+            if (!TextUtils.isEmpty(e.getValue())) {
+                sb.append('_').append(e.getKey()).append('=').append(e.getValue());
+            }
+        }
+        return sb.toString();
+    }
+
+    private static void initCache() {
+        if (sCacheInitialized) return;
+        sCacheInitialized = true;
+        sCacheScheduler.scheduleWithFixedDelay(DoubanFetcher::backgroundRefreshTask,
+                5000, CACHE_CLEAN_INTERVAL, TimeUnit.MILLISECONDS);
+    }
+
+    private static void backgroundRefreshTask() {
+        try {
+            long now = System.currentTimeMillis();
+            // clean stale entries
+            for (Map.Entry<String, PageCacheEntry> e : pageCache.entrySet()) {
+                if (now - e.getValue().lastAccess > CACHE_CLEAN_INTERVAL) {
+                    pageCache.remove(e.getKey());
+                }
+            }
+            Leodanmu.log("[豆瓣缓存] 开始后台预热...");
+            int refreshed = 0;
+            String[][] coreTargets = {
+                {"movie", "U"}, {"tv", "U"}, {"show", "U"}, {"anime", "U"},
+                {"hot_movie", null}, {"hot_tv", null}, {"hot_show", null},
+                {"douban_anime", null}, {"top_250", null}
+            };
+            for (String[] target : coreTargets) {
+                try {
+                    String id = target[0];
+                    Map<String, String> f = new HashMap<>();
+                    if ("U".equals(target[1])) f.put("排序", "U");
+                    JSONObject data = fetchCategoryInternal(id, 1, f);
+                    if (data != null) {
+                        String key = getPageCacheKey(id, 1, f);
+                        pageCache.put(key, new PageCacheEntry(data, System.currentTimeMillis()));
+                        refreshed++;
+                    }
+                    Thread.sleep(2000);
+                } catch (Exception ignored) {}
+            }
+            Leodanmu.log("[豆瓣缓存] 后台预热完成，刷新 " + refreshed + " 个分类");
+        } catch (Exception e) {
+            Leodanmu.log("[豆瓣缓存] 预热异常: " + e.getMessage());
+        }
+    }
+
     private static final Set<String> CATEGORIES = new HashSet<>(Arrays.asList(
-            "latest", "movie", "tv", "show", "anime",
+            "latest", "movie", "tv", "show", "anime", "douban_anime",
             "hot_movie", "hot_tv", "hot_show",
             "movie_filter", "tv_filter", "top_250"
     ));
@@ -100,8 +192,8 @@ public class DoubanFetcher {
     }
 
     public static void prewarm() {
-        // force static initializer + cache warmup
         CATEGORIES.size();
+        initCache();
     }
 
     // ─── Categories ─────────────────────────────────────────────────────────
@@ -112,6 +204,7 @@ public class DoubanFetcher {
         arr.put(classObj("tv", "\u70ed\u95e8\u5267\u96c6"));
         arr.put(classObj("show", "\u70ed\u64ad\u7efc\u827a"));
         arr.put(classObj("anime", "\u70ed\u64ad\u52a8\u6f2b"));
+        arr.put(classObj("douban_anime", "\u8c46\u74e3\u52a8\u6f2b"));
         arr.put(classObj("hot_movie", "\u7535\u5f71\u699c\u5355"));
         arr.put(classObj("hot_tv", "\u5267\u96c6\u699c\u5355"));
         arr.put(classObj("hot_show", "\u7efc\u827a\u699c\u5355"));
@@ -376,6 +469,33 @@ public class DoubanFetcher {
                 })
         ));
 
+        // ── 豆瓣动漫（合并动漫剧集+动漫电影）────────────────────────────
+        root.put("douban_anime", buildFilters(
+                filter("榜单", "榜单", "anime_recent", new String[][]{
+                        {"最新动漫", "anime_recent"},
+                        {"近期热门动漫", "anime_hot"},
+                        {"高分动漫", "anime_best"}
+                }),
+                filter("类型", "类型", "", new String[][]{
+                        {"全部类型", ""}, {"动画", "动画"}, {"日本动画", "日本动画"},
+                        {"国产动画", "国产动画"}, {"欧美动画", "欧美动画"},
+                        {"剧场版", "剧场版"}, {"番剧", "番剧"}
+                }),
+                filter("地区", "地区", "", new String[][]{
+                        {"全部地区", ""}, {"日本", "日本"}, {"中国大陆", "中国大陆"},
+                        {"美国", "美国"}, {"欧美", "欧美"}
+                }),
+                filter("年代", "年代", "", new String[][]{
+                        {"全部年代", ""}, {"2026", "2026"}, {"2025", "2025"},
+                        {"2024", "2024"}, {"2023", "2023"}, {"2022", "2022"},
+                        {"2021", "2021"}, {"2020", "2020"}
+                }),
+                filter("排序", "排序", "U", new String[][]{
+                        {"近期热度", "U"}, {"综合排序", "T"},
+                        {"首播时间", "R"}, {"高分优先", "S"}
+                })
+        ));
+
         return root;
     }
 
@@ -397,42 +517,117 @@ public class DoubanFetcher {
         JSONArray merged = new JSONArray();
         Set<String> seen = new HashSet<>();
 
-        // 1. 豆瓣优先 (参照 JS homeVod: subject_real_time_hotest)
+        // 1. 豆瓣实时热门（每个 home 页都重新拉，不通过缓存）
         JSONObject db = requestDouban(HOST + "/subject_collection/subject_real_time_hotest/items?start=0&count=50&updated_at=&items_only=1&for_mobile=1");
         if (db != null) {
-            mergeItems(merged, mapItems(db.optJSONArray("subject_collection_items")), seen, 200);
+            mergeItems(merged, mapItems(db.optJSONArray("subject_collection_items")), seen, 80);
         }
 
-        // 2. 豆瓣分类 (最新+热播)
-        List<String> doubanSources = Arrays.asList("latest", "hot_movie", "hot_tv", "hot_show", "top_250", "show", "anime");
+        // 2. 智能混合配比 (参考 JS 版 pattern: [电影, 电影, 剧集, 剧集, 综艺])
+        JSONArray[] doubanPools = new JSONArray[3];
+        int[] doubanCursors = new int[3];
+        int[] doubanPages = new int[]{1, 1, 1};
+        boolean[] doubanNoMore = new boolean[3];
+        String[] doubanIds = {"hot_movie", "hot_tv", "hot_show"};
+
+        int[] pattern = {0, 0, 1, 1, 2};
+
+        for (int round = 0; round < 100 && merged.length() < 120; round++) {
+            boolean added = false;
+            for (int pi : pattern) {
+                JSONObject item = null;
+                // try primary → fallback (电影→剧集→综艺)
+                for (int fi = 0; fi < 3; fi++) {
+                    int srcIdx = (pi + fi) % 3;
+                    if (doubanNoMore[srcIdx]) continue;
+                    // ensure at least 1 item available
+                    while (doubanPools[srcIdx] == null
+                            || doubanCursors[srcIdx] >= doubanPools[srcIdx].length()) {
+                        try {
+                            JSONObject data = _category(doubanIds[srcIdx], doubanPages[srcIdx], null);
+                            doubanPages[srcIdx]++;
+                            if (data == null || data.optJSONArray("list").length() == 0) {
+                                doubanNoMore[srcIdx] = true;
+                                break;
+                            }
+                            doubanPools[srcIdx] = data.optJSONArray("list");
+                            doubanCursors[srcIdx] = 0;
+                            if (doubanPages[srcIdx] > data.optInt("pagecount", 1)) {
+                                doubanNoMore[srcIdx] = true;
+                            }
+                        } catch (Exception e) {
+                            doubanNoMore[srcIdx] = true;
+                            break;
+                        }
+                    }
+                    if (doubanNoMore[srcIdx]) continue;
+                    // take next unseen item
+                    while (doubanCursors[srcIdx] < doubanPools[srcIdx].length()) {
+                        JSONObject candidate = doubanPools[srcIdx].optJSONObject(doubanCursors[srcIdx]++);
+                        if (candidate != null && !seen.contains(candidate.optString("vod_id"))) {
+                            seen.add(candidate.optString("vod_id"));
+                            item = candidate;
+                            break;
+                        }
+                    }
+                    if (item != null) break;
+                }
+                if (item != null) {
+                    merged.put(item);
+                    added = true;
+                }
+                if (merged.length() >= 120) break;
+            }
+            if (!added) break;
+        }
+
+        // 3. 其他豆瓣分类 (填充剩余)
+        List<String> doubanSources = Arrays.asList("douban_anime", "latest", "top_250", "show", "anime", "movie", "tv");
         for (String id : doubanSources) {
+            if (merged.length() >= 200) break;
             try {
-                JSONObject data = fetchCategoryInternal(id, 1, null);
+                JSONObject data = _category(id, 1, null);
                 if (data == null) continue;
                 mergeItems(merged, data.optJSONArray("list"), seen, 200);
             } catch (Exception ignored) {}
         }
 
-        // 3. 腾讯
-        mergeItems(merged, PlatformFetcher.fetchTencent("movie", 1, "75"), seen, 200);
-        mergeItems(merged, PlatformFetcher.fetchTencent("tv", 1, "75"), seen, 200);
+        // 4. 腾讯
+        if (merged.length() < 200) mergeItems(merged, PlatformFetcher.fetchTencent("movie", 1, "75"), seen, 200);
+        if (merged.length() < 200) mergeItems(merged, PlatformFetcher.fetchTencent("tv", 1, "75"), seen, 200);
 
-        // 4. 芒果TV
-        mergeItems(merged, PlatformFetcher.fetchMangoTV("3", 1), seen, 200);
-        mergeItems(merged, PlatformFetcher.fetchMangoTV("2", 1), seen, 200);
+        // 5. 芒果TV
+        if (merged.length() < 200) mergeItems(merged, PlatformFetcher.fetchMangoTV("3", 1), seen, 200);
+        if (merged.length() < 200) mergeItems(merged, PlatformFetcher.fetchMangoTV("2", 1), seen, 200);
 
-        // 5. 360影视
-        mergeItems(merged, PlatformFetcher.fetch360kan("1", 1), seen, 200);
-        mergeItems(merged, PlatformFetcher.fetch360kan("2", 1), seen, 200);
+        // 6. 360影视
+        if (merged.length() < 200) mergeItems(merged, PlatformFetcher.fetch360kan("1", 1), seen, 200);
+        if (merged.length() < 200) mergeItems(merged, PlatformFetcher.fetch360kan("2", 1), seen, 200);
 
         return merged;
+    }
+
+    // ─── Cache-aware category fetch ─────────────────────────────────────────
+    private static JSONObject _category(String id, int page, Map<String, String> filters) {
+        String cacheKey = getPageCacheKey(id, page, filters);
+        PageCacheEntry cached = pageCache.get(cacheKey);
+        if (cached != null) {
+            Leodanmu.log("[豆瓣缓存] 命中: " + cacheKey);
+            return cached.data;
+        }
+        Leodanmu.log("[豆瓣缓存] 未命中，实时抓取: " + cacheKey);
+        JSONObject data = fetchCategoryInternal(id, page, filters);
+        if (data != null) {
+            pageCache.put(cacheKey, new PageCacheEntry(data, System.currentTimeMillis()));
+        }
+        return data;
     }
 
     // ─── Category fetch (public entry) ──────────────────────────────────────
     public static JSONObject fetchCategory(String id, int page, Map<String, String> filters) {
         try {
             if (!isDouban(id)) return null;
-            JSONObject result = fetchCategoryInternal(id, page, filters);
+            JSONObject result = _category(id, page, filters);
             if (result == null) {
                 result = new JSONObject();
                 result.put("list", new JSONArray());
@@ -580,6 +775,42 @@ public class DoubanFetcher {
 
             fetchFiltered("tv", tags.toString(), tagSort, start, items);
             total = items.length() + COUNT;
+
+        // ── 豆瓣动漫（合并剧集+电影）─────────────────────────────────────
+        } else if ("douban_anime".equals(id)) {
+            String slug = getFilter(filters, "榜单", "anime_recent");
+            String tagType = getFilter(filters, "类型", "");
+            String tagRegion = getFilter(filters, "地区", "");
+            String tagYear = getFilter(filters, "年代", "");
+            String tagSort = getFilter(filters, "排序", "U");
+            String partSort = SORT_MAP.containsKey(tagSort) ? SORT_MAP.get(tagSort) : tagSort;
+
+            // slug → sort mapping (when no explicit sort)
+            Map<String, String> slugSort = new HashMap<>();
+            slugSort.put("anime_recent", "R");
+            slugSort.put("anime_hot", "U");
+            slugSort.put("anime_best", "S");
+            String effectiveSort = slugSort.getOrDefault(slug, partSort);
+
+            StringBuilder tags = new StringBuilder("动画");
+            if (!TextUtils.isEmpty(tagType) && !"动画".equals(tagType)) {
+                appendTag(tags, tagType);
+            }
+            appendTag(tags, tagRegion);
+            appendTag(tags, tagYear);
+
+            // fetch from both movie and tv recommend
+            for (String ep : new String[]{"/movie/recommend", "/tv/recommend"}) {
+                String url = HOST + ep + "?sort=" + effectiveSort + "&start=" + start + "&count=" + COUNT;
+                if (tags.length() > 0) {
+                    url += "&tags=" + URLEncoder.encode(tags.toString(), "UTF-8");
+                }
+                JSONObject data = requestDouban(url);
+                if (data != null && data.optJSONArray("items") != null) {
+                    mergeItems(items, data.optJSONArray("items"));
+                }
+            }
+            total = Math.max(items.length(), COUNT);
 
         // ── 豆瓣电影Top250 ──────────────────────────────────────────────
         } else if ("top_250".equals(id)) {
