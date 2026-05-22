@@ -232,6 +232,7 @@ public class DanmakuScanner {
         Leodanmu.log("🚀 启动Hook监控");
         isMonitoring = true;
         isFirstDetection = true;
+        DanmakuManager.clearPreCache();
 
         hookTimer = new Timer("DanmakuHookTimer", true);
         hookTimer.schedule(new TimerTask() {

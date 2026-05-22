@@ -759,7 +759,7 @@ public class LeoDanmakuService {
                 int offsetMs = config != null ? config.getDanmakuTimeOffsetMs() : 0;
                 String refreshPath = buildDanmakuRefreshPath(danmakuItem, localIp, offsetMs);
                 Integer preCachedEpId = danmakuItem.getEpId();
-                String cachedXml = preCachedEpId != null ? DanmakuManager.getCachedXml(preCachedEpId) : null;
+                String cachedXml = preCachedEpId != null ? DanmakuManager.getCachedXml(preCachedEpId, danmakuItem.getApiBase()) : null;
                 boolean isUsingPreCache = DanmakuManager.isUsingPreCache();
                 Leodanmu.log("🔍 预缓存诊断: epId=" + preCachedEpId + " hasCachedXml=" + (cachedXml != null) + " isUsingPreCache=" + isUsingPreCache + " isAuto=" + isAuto);
                 if (isAuto && cachedXml != null) {
@@ -827,7 +827,7 @@ public class LeoDanmakuService {
             int offsetMs = config != null ? config.getDanmakuTimeOffsetMs() : 0;
             String refreshPath = buildDanmakuRefreshPath(danmakuItem, localIp, offsetMs);
             Integer preCachedEpId = danmakuItem.getEpId();
-            String cachedXml = preCachedEpId != null ? DanmakuManager.getCachedXml(preCachedEpId) : null;
+            String cachedXml = preCachedEpId != null ? DanmakuManager.getCachedXml(preCachedEpId, danmakuItem.getApiBase()) : null;
             boolean isUsingPreCache = DanmakuManager.isUsingPreCache();
             Leodanmu.log("🔍 预缓存诊断: epId=" + preCachedEpId + " hasCachedXml=" + (cachedXml != null) + " isUsingPreCache=" + isUsingPreCache + " isAuto=" + isAuto);
             if (isAuto && cachedXml != null) {
@@ -997,8 +997,16 @@ public class LeoDanmakuService {
     private static void triggerPreCacheNextEpisode(DanmakuItem currentItem, Activity activity) {
         if (currentItem == null || currentItem.getEpId() == null || currentItem.getEpId() <= 0) return;
         if (TextUtils.isEmpty(currentItem.getApiBase())) return;
-        // 已经缓存了该 id 则跳过
-        if (DanmakuManager.getPreCachedEpId() == currentItem.getEpId() + 1) return;
+        // 已经缓存了该 id 则跳过（但需校验 apiBase 一致，防止跨剧集污染）
+        if (DanmakuManager.getPreCachedEpId() == currentItem.getEpId() + 1) {
+            String cachedBase = DanmakuManager.getCachedApiBase(currentItem.getEpId() + 1);
+            if (cachedBase != null && !cachedBase.equals(currentItem.getApiBase())) {
+                Leodanmu.log("⚠️ 预缓存 apiBase 不匹配，强制刷新: epId=" + (currentItem.getEpId() + 1) + " cached=" + cachedBase + " current=" + currentItem.getApiBase());
+                DanmakuManager.invalidateCacheEntry(currentItem.getEpId() + 1);
+            } else {
+                return;
+            }
+        }
 
         final int nextEpId = currentItem.getEpId() + 1;
         final String apiBase = currentItem.getApiBase();
