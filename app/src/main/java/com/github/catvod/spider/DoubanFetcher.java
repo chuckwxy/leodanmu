@@ -74,7 +74,11 @@ public class DoubanFetcher {
                 try {
                     Thread.sleep(5000);
                     while (true) {
-                        backgroundRefreshTask();
+                        try {
+                            backgroundRefreshTask();
+                        } catch (Exception e) {
+                            Leodanmu.log("[豆瓣缓存] 线程异常: " + e.getMessage());
+                        }
                         Thread.sleep(CACHE_CLEAN_INTERVAL);
                     }
                 } catch (InterruptedException ignored) {
