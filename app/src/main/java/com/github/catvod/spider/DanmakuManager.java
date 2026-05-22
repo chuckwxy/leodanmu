@@ -78,6 +78,7 @@ public class DanmakuManager {
                 sUsingPreCache = false;
                 Leodanmu.log("📋 预缓存不可用(持久Map无数据): epId=" + nextId);
             }
+            lastDanmakuId = nextId;
             return nextDanmakuItem;
         }
 
@@ -95,6 +96,7 @@ public class DanmakuManager {
             sPreCachedDanmakuItem = null;
             sPreCachedEpId = -1;
             sPreCachedXml = null;
+            lastDanmakuId = nextId;
             return lastDanmakuItemMap.get(nextId);
         }
 
@@ -118,6 +120,7 @@ public class DanmakuManager {
             sUsingPreCache = false;
             Leodanmu.log("🛠️ 构造 ID 递增条目: epId=" + nextId + " apiBase=" + currentItem.getApiBase());
             lastDanmakuItemMap.put(nextId, constructed);
+            lastDanmakuId = nextId;
             return constructed;
         }
 

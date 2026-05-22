@@ -302,6 +302,11 @@ public class DanmakuScanner {
                                     // 视频开始播放
                                     videoPlayStartTime = System.currentTimeMillis();
 //                                    DanmakuSpider.log("▶️ 检测到视频开始播放");
+                                } else if (isFirstDetection) {
+                                    // 首次检测：即使播放器状态为 false，也尝试获取剧集信息触发自动搜索
+                                    Leodanmu.log("🎯 首次检测，尝试获取剧集信息");
+                                    lastEpisodeInfo = getEpisodeInfo(media, act);
+                                    isVideoPlaying = true;
                                 } else {
                                     // 视频停止播放
                                     Leodanmu.log("⏸️ 检测到视频停止播放");
@@ -312,6 +317,8 @@ public class DanmakuScanner {
 
                                     return;
                                 }
+
+                                isFirstDetection = false;
 
                                 // 检测是否开启自动查询或者已经手动查询过
                                 if (!Leodanmu.isRuntimeAutoPushEnabled() && TextUtils.isEmpty(DanmakuManager.lastManualDanmakuUrl)) {
