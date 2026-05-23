@@ -32,6 +32,7 @@ public class RealLeodanmu implements PayloadBridge {
 
     @Override
     public void init(Context context, String extend) throws Exception {
+        Leodanmu.clearLogs();
         DoubanFetcher.prewarm();
         Leodanmu.updateHookStatus("init", "enter", "", "", extend, "");
         if (TextUtils.isEmpty(extend) && TextUtils.isEmpty(Leodanmu.getCachedExtForShell())) {
