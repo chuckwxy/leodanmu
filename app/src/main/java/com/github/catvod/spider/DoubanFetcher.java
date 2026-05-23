@@ -104,7 +104,7 @@ public class DoubanFetcher {
                     pageCache.remove(e.getKey());
                 }
             }
-            Leodanmu.log("[豆瓣缓存] 开始后台预热...");
+            // Leodanmu.log("[豆瓣缓存] 开始后台预热...");
             int refreshed = 0;
             String[][] coreTargets = {
                 {"movie", "U"}, {"tv", "U"}, {"show", "U"}, {"anime", "U"},
@@ -125,7 +125,7 @@ public class DoubanFetcher {
                     Thread.sleep(2000);
                 } catch (Exception ignored) {}
             }
-            Leodanmu.log("[豆瓣缓存] 后台预热完成，刷新 " + refreshed + " 个分类");
+            // Leodanmu.log("[豆瓣缓存] 后台预热完成，刷新 " + refreshed + " 个分类");
         } catch (Exception e) {
             Leodanmu.log("[豆瓣缓存] 预热异常: " + e.getMessage());
         }
@@ -645,10 +645,10 @@ public class DoubanFetcher {
         String cacheKey = getPageCacheKey(id, page, filters);
         PageCacheEntry cached = pageCache.get(cacheKey);
         if (cached != null) {
-            Leodanmu.log("[豆瓣缓存] 命中: " + cacheKey);
+            // Leodanmu.log("[豆瓣缓存] 命中: " + cacheKey);
             return cached.data;
         }
-        Leodanmu.log("[豆瓣缓存] 未命中，实时抓取: " + cacheKey);
+        // Leodanmu.log("[豆瓣缓存] 未命中，实时抓取: " + cacheKey);
         try {
             JSONObject data = fetchCategoryInternal(id, page, filters);
             if (data != null) {
