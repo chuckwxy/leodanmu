@@ -58,6 +58,16 @@
       "ext": "./market.json"
     },
     {
+      "key": "wanou_juhe",
+      "name": "玩偶聚合[盘]",
+      "type": 3,
+      "api": "csp_WanouJuhe",
+      "searchable": 1,
+      "quickSearch": 1,
+      "changeable": 0,
+      "playerType": 3
+    },
+    {
       "key": "push_agent",
       "name": "Push",
       "type": 3,

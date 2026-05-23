@@ -54,7 +54,6 @@ public class RealLeodanmu implements PayloadBridge {
         try {
             JSONObject result = new JSONObject();
             JSONArray classes = DoubanFetcher.getCategories();
-            classes.put(createClass("leo_danmaku_config", "Leo弹幕设置"));
             result.put("class", classes);
             result.put("list", DoubanFetcher.fetchHomeList());
             result.put("filters", DoubanFetcher.getFilterConfig());
@@ -63,8 +62,7 @@ public class RealLeodanmu implements PayloadBridge {
             Leodanmu.log("homeContent error: " + e.getMessage());
             try {
                 JSONObject result = new JSONObject();
-                JSONArray classes = new JSONArray();
-                classes.put(createClass("leo_danmaku_config", "Leo弹幕设置"));
+                JSONArray classes = DoubanFetcher.getCategories();
                 result.put("class", classes);
                 result.put("list", new JSONArray());
                 return result.toString();
