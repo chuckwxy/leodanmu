@@ -107,9 +107,9 @@ public class DoubanFetcher {
             Leodanmu.log("[豆瓣缓存] 开始后台预热...");
             int refreshed = 0;
             String[][] coreTargets = {
-                {"douban_hot", null}, {"movie", "U"}, {"tv", "U"}, {"show", "U"}, {"anime", "U"},
+                {"movie", "U"}, {"tv", "U"}, {"show", "U"}, {"anime", "U"},
                 {"hot_movie", null}, {"hot_tv", null}, {"hot_show", null},
-                {"douban_anime", null}, {"top_250", null}, {"douban_playlist", null}
+                {"douban_anime", null}, {"top_250", null}
             };
             for (String[] target : coreTargets) {
                 try {
@@ -615,7 +615,7 @@ public class DoubanFetcher {
         }
 
         // 3. 其他豆瓣分类 (填充剩余)
-        List<String> doubanSources = Arrays.asList("douban_hot", "douban_anime", "latest", "top_250", "douban_playlist", "show", "anime", "movie", "tv");
+        List<String> doubanSources = Arrays.asList("douban_anime", "latest", "top_250", "show", "anime", "movie", "tv");
         for (String id : doubanSources) {
             if (merged.length() >= 200) break;
             try {
