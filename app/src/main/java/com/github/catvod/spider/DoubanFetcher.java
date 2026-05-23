@@ -83,7 +83,7 @@ public class DoubanFetcher {
                         try {
                             backgroundRefreshTask();
                         } catch (Exception e) {
-                            Leodanmu.log("[豆瓣缓存] 线程异常: " + e.getMessage());
+                            // Leodanmu.log("[豆瓣缓存] 线程异常: " + e.getMessage());
                         }
                         Thread.sleep(CACHE_CLEAN_INTERVAL);
                     }
@@ -127,7 +127,7 @@ public class DoubanFetcher {
             }
             // Leodanmu.log("[豆瓣缓存] 后台预热完成，刷新 " + refreshed + " 个分类");
         } catch (Exception e) {
-            Leodanmu.log("[豆瓣缓存] 预热异常: " + e.getMessage());
+            // Leodanmu.log("[豆瓣缓存] 预热异常: " + e.getMessage());
         }
     }
 
@@ -656,7 +656,7 @@ public class DoubanFetcher {
             }
             return data;
         } catch (Exception e) {
-            Leodanmu.log("[豆瓣缓存] 抓取异常: " + e.getMessage());
+            // Leodanmu.log("[豆瓣缓存] 抓取异常: " + e.getMessage());
             return null;
         }
     }
@@ -1410,7 +1410,7 @@ public class DoubanFetcher {
             if (TextUtils.isEmpty(body)) return null;
             return new JSONObject(body);
         } catch (Exception e) {
-            Leodanmu.log("[豆瓣签名] 请求失败: " + e.getMessage());
+            // Leodanmu.log("[豆瓣签名] 请求失败: " + e.getMessage());
             return null;
         }
     }
