@@ -32,6 +32,15 @@
   ],
   "sites": [
     {
+      "key": "config_center",
+      "name": "统一配置中心",
+      "type": 3,
+      "api": "csp_ConfigCenter",
+      "searchable": 1,
+      "changeable": 0,
+      "playerType": 1
+    },
+    {
       "key": "local",
       "name": "Local",
       "type": 3,

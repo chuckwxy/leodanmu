@@ -572,23 +572,12 @@ public class Leodanmu extends Spider {
         ensureConfig(Utils.getTopActivity());
         try {
             JSONObject result = new JSONObject();
-            JSONArray classes = DoubanFetcher.getCategories();
-            classes.put(createClassStatic("leo_danmaku_config", "Leo弹幕设置"));
-            result.put("class", classes);
+            result.put("class", DoubanFetcher.getCategories());
             result.put("list", DoubanFetcher.fetchHomeList());
             result.put("filters", DoubanFetcher.getFilterConfig());
             return result.toString();
         } catch (Exception e) {
-            try {
-                JSONObject result = new JSONObject();
-                JSONArray classes = new JSONArray();
-                classes.put(createClassStatic("leo_danmaku_config", "Leo弹幕设置"));
-                result.put("class", classes);
-                result.put("list", new JSONArray());
-                return result.toString();
-            } catch (Exception e2) {
-                return "";
-            }
+            return "";
         }
     }
 
@@ -598,47 +587,14 @@ public class Leodanmu extends Spider {
     }
 
     public static String categoryContentShellFallback(String tid, String pg, boolean filter, HashMap<String, String> extend) {
-        if (DoubanFetcher.isDouban(tid)) {
-            try {
-                int page = 1;
-                try { page = Integer.parseInt(pg); } catch (Exception ignored) {}
-                JSONObject result = DoubanFetcher.fetchCategory(tid, page, extend);
-                return result != null ? result.toString() : "";
-            } catch (Exception e) {
-                log("categoryContent douban error: " + e.getMessage());
-                return "";
-            }
-        }
-        ensureConfig(Utils.getTopActivity());
+        if (!DoubanFetcher.isDouban(tid)) return "";
         try {
-            Activity activity = Utils.getTopActivity();
-            DanmakuConfig config = DanmakuConfigManager.getConfig(activity);
-            JSONObject result = new JSONObject();
-            JSONArray list = new JSONArray();
-
-            JSONObject configVod = createVodStatic("config", "弹幕配置", "", "配置弹幕API");
-            list.put(configVod);
-
-            JSONObject autoPushVod = createVodStatic("auto_push", "自动推送弹幕", "",
-                    config.isAutoPushEnabled() ? "已开启" : "已关闭");
-            list.put(autoPushVod);
-
-            JSONObject logVod = createVodStatic("log", "查看日志", "", "调试信息");
-            list.put(logVod);
-
-            JSONObject hookDiagVod = createVodStatic("hook_diag", "Hook诊断", "", getHookStatusSummary());
-            list.put(hookDiagVod);
-
-            JSONObject lpConfigVod = createVodStatic("lp_config", "布局配置", "", "调整弹窗大小和透明度");
-            list.put(lpConfigVod);
-
-            result.put("list", list);
-            result.put("page", 1);
-            result.put("pagecount", 1);
-            result.put("limit", 20);
-            result.put("total", list.length());
-            return result.toString();
+            int page = 1;
+            try { page = Integer.parseInt(pg); } catch (Exception ignored) {}
+            JSONObject result = DoubanFetcher.fetchCategory(tid, page, extend);
+            return result != null ? result.toString() : "";
         } catch (Exception e) {
+            log("categoryContent douban error: " + e.getMessage());
             return "";
         }
     }
@@ -676,8 +632,7 @@ public class Leodanmu extends Spider {
                                     Utils.safeShowToast(ctx,
                                             config.isAutoPushEnabled() ? "自动推送已开启" : "自动推送已关闭");
 
-                                    // 重新加载页面以更新状态显示
-                                    refreshCategoryContentStatic(ctx);
+                                    Leodanmu.log("自动推送状态: " + (config.isAutoPushEnabled() ? "开启" : "关闭"));
                                 } else if (id.equals("lp_config")) {
                                     DanmakuUIHelper.showLpConfigDialog(ctx);
                                 } else if (id.equals("log")) {
@@ -722,30 +677,6 @@ public class Leodanmu extends Spider {
             return "";
         }
     }
-
-    // 添加刷新分类内容的方法
-    private static void refreshCategoryContentStatic(Activity ctx) {
-        try {
-            String content = categoryContentShellFallback("", "", false, new HashMap<String, String>());
-            if (!TextUtils.isEmpty(content)) {
-                JSONObject result = new JSONObject(content);
-                JSONArray list = result.getJSONArray("list");
-                DanmakuConfig config = DanmakuConfigManager.getConfig(ctx);
-
-                // 找到自动推送按钮并更新其remark
-                for (int i = 0; i < list.length(); i++) {
-                    JSONObject item = list.getJSONObject(i);
-                    if ("auto_push".equals(item.getString("vod_id"))) {
-                        item.put("vod_remarks", config.isAutoPushEnabled() ? "已开启" : "已关闭");
-                        break;
-                    }
-                }
-            }
-        } catch (Exception e) {
-            Leodanmu.log("刷新分类内容失败: " + e.getMessage());
-        }
-    }
-
 
     @Override
     public String playerContent(String flag, String id, List<String> vipFlags) {
@@ -871,19 +802,4 @@ public class Leodanmu extends Spider {
         return super.liveContent(url);
     }
 
-    private static JSONObject createClassStatic(String id, String name) throws Exception {
-        JSONObject cls = new JSONObject();
-        cls.put("type_id", id);
-        cls.put("type_name", name);
-        return cls;
-    }
-
-    private static JSONObject createVodStatic(String id, String name, String pic, String remark) throws Exception {
-        JSONObject vod = new JSONObject();
-        vod.put("vod_id", id);
-        vod.put("vod_name", name);
-        vod.put("vod_pic", pic);
-        vod.put("vod_remarks", remark);
-        return vod;
-    }
 }
