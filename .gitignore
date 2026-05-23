@@ -1,6 +1,7 @@
 *.jar
 !gradle/wrapper/gradle-wrapper.jar
 !jar/3rd/*.jar
+!jar/spider.jar/
 !jar/spider.jar/**
 build/
 .gradle/
