@@ -77,8 +77,6 @@ public class DanmakuManager {
     public static void resetAutoSearch() {
         hasAutoSearched = false;
         lastProcessedTitle = "";
-        currentVideoSignature = "";
-        lastVideoDetectedTime = 0;
         lastDanmakuId = -1;
         lastAutoDanmakuUrl = "";
         lastManualDanmakuUrl = "";
