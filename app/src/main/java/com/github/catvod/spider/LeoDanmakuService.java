@@ -30,10 +30,8 @@ public class LeoDanmakuService {
 
     // 官源弹幕站点列表（优先匹配）
     private static final Set<String> OFFICIAL_SOURCES = new HashSet<>(Arrays.asList(
-            "bahamut", "animeko", "iqiyi", "youku", "tencent",
-            "bilibili", "imgo", "tmdb", "renren", "hanjutv",
-            "migu", "maiduidui", "sohu", "leshi", "xigua",
-            "custom", "aiyifan"
+            "iqiyi", "youku", "tencent", "bilibili",
+            "imgo", "migu", "sohu", "leshi", "xigua"
     ));
 
     // 在 LeoDanmakuService 类中添加缓存相关字段
@@ -432,18 +430,15 @@ public class LeoDanmakuService {
 
         if (allResults.isEmpty()) return new SearchResult(false, 0, null);
 
-        GroupPickResult groupPick = pickBestGroup(allResults, episodeInfo);
-        DanmakuItem selectedItem = groupPick == null ? null : groupPick.bestItem;
+        List<GroupPickResult> candidates = pickSortedCandidates(allResults, episodeInfo);
+        if (candidates.isEmpty()) return new SearchResult(false, 0, null);
 
-        if (selectedItem != null) {
-            double finalScore = groupPick.groupScore + groupPick.itemScore;
-            Leodanmu.log("🎯 自动搜索选择: " + selectedItem.title + " - " + selectedItem.epTitle + " (组分: " + groupPick.groupScore + ", 组内分: " + groupPick.itemScore + ")");
-            return new SearchResult(true, finalScore, selectedItem);
-        }
-        return new SearchResult(false, 0, null);
+        GroupPickResult top = candidates.get(0);
+        Leodanmu.log("🎯 自动搜索选择: " + top.bestItem.title + " - " + top.bestItem.epTitle + " (组分: " + top.groupScore + ", 组内分: " + top.itemScore + ")");
+        return new SearchResult(true, top.groupScore + top.itemScore, top.bestItem);
     }
 
-    private static GroupPickResult pickBestGroup(List<DanmakuItem> allResults, EpisodeInfo episodeInfo) {
+    private static List<GroupPickResult> pickSortedCandidates(List<DanmakuItem> allResults, EpisodeInfo episodeInfo) {
         Map<String, List<DanmakuItem>> grouped = new HashMap<>();
         for (DanmakuItem item : allResults) {
             String groupKey = item.getAnimeTitle() != null ? item.getAnimeTitle() : item.getTitle();
@@ -457,8 +452,9 @@ public class LeoDanmakuService {
         String episodeTag = buildEpisodeMatchTag(episodeInfo);
         TitleMatchInfo targetInfo = TitleNormalizer.parse(searchKeyword + " " + episodeTag);
 
-        GroupPickResult best = null;
-        GroupPickResult bestOfficial = null;
+        List<GroupPickResult> officialList = new ArrayList<>();
+        List<GroupPickResult> allList = new ArrayList<>();
+
         for (Map.Entry<String, List<DanmakuItem>> entry : grouped.entrySet()) {
             String groupKey = entry.getKey();
             List<DanmakuItem> items = entry.getValue();
@@ -489,28 +485,24 @@ public class LeoDanmakuService {
                 }
             }
 
-            // Leodanmu.log("📦 标题组候选: " + groupKey + " (结构分: " + structuredScore + ", 特殊分: " + specialScore + ", 相似度: " + legacySimilarity + ", 组分: " + groupScore + ", 最佳组内分: " + bestItemScore + (isOfficial ? ", 官源: true" : "") + ")");
-
             if (!isGroupItemMatchAcceptable(episodeInfo, bestItemScore, bestItem, isOfficial)) {
-                // Leodanmu.log("⚠️ 标题组淘汰：组内无有效分集匹配 - " + groupKey + (bestItem == null ? "" : "，候选=" + bestItem.getEpTitle()) + (isOfficial ? " (官源)" : ""));
                 continue;
             }
 
-            if (best == null || (groupScore + bestItemScore) > (best.groupScore + best.itemScore)) {
-                GroupPickResult candidate = new GroupPickResult(groupKey, items, groupScore, bestItemScore, bestItem);
-                best = candidate;
-                if (isOfficial && bestOfficial == null) bestOfficial = candidate;
-            } else if (isOfficial && bestOfficial == null) {
-                bestOfficial = new GroupPickResult(groupKey, items, groupScore, bestItemScore, bestItem);
-            }
+            GroupPickResult candidate = new GroupPickResult(groupKey, items, groupScore, bestItemScore, bestItem);
+            (isOfficial ? officialList : allList).add(candidate);
         }
-        // 优先使用官源结果（即使非官源总分更高）
-        if (bestOfficial != null) {
-            Leodanmu.log("🎯 官源组选中: " + bestOfficial.groupKey + " (组分: " + bestOfficial.groupScore + ", 组内分: " + bestOfficial.itemScore + ")");
-            return bestOfficial;
-        }
-        if (best != null) Leodanmu.log("🎯 组选中: " + best.groupKey + " (组分: " + best.groupScore + ", 组内分: " + best.itemScore + ")");
-        return best;
+
+        // 官源按总分降序，非官源按总分降序
+        officialList.sort((a, b) -> Double.compare(b.groupScore + b.itemScore, a.groupScore + a.itemScore));
+        allList.sort((a, b) -> Double.compare(b.groupScore + b.itemScore, a.groupScore + a.itemScore));
+
+        // 官源优先：所有官源排在非官源前面
+        List<GroupPickResult> result = new ArrayList<>();
+        result.addAll(officialList);
+        result.addAll(allList);
+
+        return result;
     }
 
     private static double calculateItemScore(DanmakuItem item, EpisodeInfo episodeInfo, String searchKeyword, TitleMatchInfo targetInfo) {
@@ -521,10 +513,27 @@ public class LeoDanmakuService {
         int episodeScore = calculateEpisodeScore(episodeInfo, item);
         int specialScore = calculateSpecialScore(episodeInfo, item.getTitle(), item.getEpTitle());
         double legacySimilarity = calculateSimilarity(titleToCompare, searchKeyword);
-        double finalScore = structuredScore + episodeScore + specialScore + legacySimilarity;
+        double prefixPenalty = calculateTitlePrefixPenalty(titleToCompare, searchKeyword);
+        double finalScore = structuredScore + episodeScore + specialScore + legacySimilarity + prefixPenalty;
         // Leodanmu.log("🤔 组内比较: " + item.getTitle() + " - " + item.getEpTitle()
-        //         + " (结构分: " + structuredScore + ", 集分: " + episodeScore + ", 特殊分: " + specialScore + ", 相似度: " + legacySimilarity + ", 最终分: " + finalScore + ")");
+        //         + " (结构分: " + structuredScore + ", 集分: " + episodeScore + ", 特殊分: " + specialScore + ", 相似度: " + legacySimilarity + ", 前缀惩罚: " + prefixPenalty + ", 最终分: " + finalScore + ")");
         return finalScore;
+    }
+
+    // 搜索词不是标题前缀时扣分（例如"我的家业"搜索"家业"）
+    private static double calculateTitlePrefixPenalty(String title, String keyword) {
+        if (TextUtils.isEmpty(title) || TextUtils.isEmpty(keyword)) return 0;
+        String lowerTitle = title.toLowerCase().trim();
+        String lowerKeyword = keyword.toLowerCase().trim();
+        if (!lowerTitle.contains(lowerKeyword)) return 0;
+        // 关键词在标题开头 → 完美匹配，不减分
+        if (lowerTitle.startsWith(lowerKeyword)) return 0;
+        // 关键词不在开头 → 按前缀冗余长度比例扣分
+        int kwIdx = lowerTitle.indexOf(lowerKeyword);
+        String prefixBeforeKw = lowerTitle.substring(0, kwIdx).trim();
+        if (prefixBeforeKw.isEmpty()) return 0;
+        double ratio = (double) prefixBeforeKw.length() / lowerTitle.length();
+        return -(ratio * 30); // 最多扣30分
     }
 
     private static boolean isGroupItemMatchAcceptable(EpisodeInfo episodeInfo, double itemScore, DanmakuItem bestItem, boolean isOfficial) {
@@ -663,37 +672,75 @@ public class LeoDanmakuService {
             public void run() {
                 try {
                     long autoSearchStart = System.currentTimeMillis();
-                    SearchResult result = autoSearchForResult(episodeInfo, activity);
-                    // Leodanmu.log("autoSearchForResult完成 found=" + result.found + ", similarity=" + result.similarity + ", cost=" + (System.currentTimeMillis() - autoSearchStart) + "ms");
-                    if (result.found) {
-                        Leodanmu.log("🎯 自动搜索找到结果: " + result.item);
+                    List<DanmakuItem> allResults = new ArrayList<>();
+                    for (String name : episodeInfo.getEpisodeNames()) {
+                        if (TextUtils.isEmpty(name)) continue;
+                        allResults.addAll(searchDanmaku(name, activity));
+                    }
 
-                        // 立即记录弹幕URL（在推送前）
-                        Leodanmu.recordDanmakuUrl(result.item, true);
-                        DanmakuScanner.syncResolvedDanmakuState(episodeInfo, result.item);
-
-                        found[0] = true;
-
-                        pushDanmakuDirect(result.item, activity, true);
-                    } else {
+                    if (allResults.isEmpty()) {
                         Leodanmu.log("自动搜索未找到任何结果");
-                        // 显示提示
                         activity.runOnUiThread(new Runnable() {
                             @Override
                             public void run() {
                                 Utils.safeShowToast(activity, "自动搜索未找到弹幕，请手动搜索");
                             }
                         });
+                        synchronized (lock) { lock.notify(); }
+                        return;
                     }
 
-                    synchronized (lock) {
-                        lock.notify();
+                    List<GroupPickResult> candidates = pickSortedCandidates(allResults, episodeInfo);
+                    if (candidates.isEmpty()) {
+                        Leodanmu.log("自动搜索未找到任何结果");
+                        activity.runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                Utils.safeShowToast(activity, "自动搜索未找到弹幕，请手动搜索");
+                            }
+                        });
+                        synchronized (lock) { lock.notify(); }
+                        return;
                     }
+
+                    Leodanmu.log("🎯 自动搜索候选数: " + candidates.size());
+                    for (int ci = 0; ci < candidates.size(); ci++) {
+                        GroupPickResult candidate = candidates.get(ci);
+                        DanmakuItem item = candidate.bestItem;
+                        Leodanmu.log("尝试候选 #" + (ci + 1) + ": " + item.title + " - " + item.epTitle);
+
+                        // 先获取弹幕数据校验
+                        int danmakuCount = fetchValidDanmakuCount(item, 3);
+                        if (danmakuCount <= 0) {
+                            Leodanmu.log("⚠️ 候选 #" + (ci + 1) + " 弹幕数据无效，尝试下一个");
+                            if (ci < candidates.size() - 1) {
+                                try { Thread.sleep(500); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
+                            }
+                            continue;
+                        }
+
+                        // 校验通过，推送
+                        Leodanmu.log("🎯 自动搜索选择: " + item.title + " - " + item.epTitle + " (组分: " + candidate.groupScore + ", 组内分: " + candidate.itemScore + ")");
+                        Leodanmu.recordDanmakuUrl(item, true);
+                        DanmakuScanner.syncResolvedDanmakuState(episodeInfo, item);
+                        found[0] = true;
+                        pushDanmakuDirect(item, activity, true);
+                        break;
+                    }
+
+                    if (!found[0]) {
+                        activity.runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                Utils.safeShowToast(activity, "自动搜索未找到有效弹幕，请手动搜索");
+                            }
+                        });
+                    }
+
+                    synchronized (lock) { lock.notify(); }
                 } catch (Exception e) {
                     Leodanmu.log("自动搜索异常: " + e.getMessage());
-                    synchronized (lock) {
-                        lock.notify();
-                    }
+                    synchronized (lock) { lock.notify(); }
                 }
             }
         }).start();
