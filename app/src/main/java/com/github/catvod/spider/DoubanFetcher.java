@@ -199,6 +199,15 @@ public class DoubanFetcher {
         initCache();
     }
 
+    public static void clearCache() {
+        pageCache.clear();
+        Leodanmu.log("DoubanFetcher: cache cleared");
+    }
+
+    public static int getCacheSize() {
+        return pageCache.size();
+    }
+
     // ─── Categories ─────────────────────────────────────────────────────────
     public static JSONArray getCategories() throws Exception {
         JSONArray arr = new JSONArray();
