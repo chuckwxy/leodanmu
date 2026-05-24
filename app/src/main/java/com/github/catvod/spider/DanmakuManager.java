@@ -47,28 +47,7 @@ public class DanmakuManager {
         DanmakuItem nextDanmakuItem = lastDanmakuItemMap.get(nextId);
         if (nextDanmakuItem != null) {
             Leodanmu.log("✅ 获取到下一个弹幕弹幕信息: " + nextDanmakuItem.toString());
-            lastDanmakuId = nextId;
             return nextDanmakuItem;
-        }
-
-        if (nextId < 100000) {
-            Leodanmu.log("⚠️ ID递增结果异常，跳过构造: nextId=" + nextId + " (lastDanmakuId=" + lastDanmakuId + ")");
-            return null;
-        }
-        DanmakuItem currentItem = lastDanmakuItemMap.get(lastDanmakuId);
-        if (currentItem != null && currentItem.getApiBase() != null) {
-            DanmakuItem constructed = new DanmakuItem();
-            constructed.setEpId(nextId);
-            constructed.setApiBase(currentItem.getApiBase());
-            constructed.setFrom(currentItem.getFrom());
-            constructed.setTitle(currentItem.getTitle());
-            constructed.setEpTitle("第" + newEpisodeNum + "集");
-            constructed.setShortTitle("第" + newEpisodeNum + "集");
-            constructed.setAnimeTitle(currentItem.getAnimeTitle());
-            Leodanmu.log("🛠️ 构造 ID 递增条目: epId=" + nextId + " apiBase=" + currentItem.getApiBase());
-            lastDanmakuItemMap.put(nextId, constructed);
-            lastDanmakuId = nextId;
-            return constructed;
         }
 
         return null;

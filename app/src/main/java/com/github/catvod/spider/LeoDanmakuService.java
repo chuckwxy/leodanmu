@@ -721,12 +721,12 @@ public class LeoDanmakuService {
             new Thread(new Runnable() {
                 @Override
                 public void run() {
-                    pushDanmakuInThread(danmakuItem, activity, fastPushThenVerify, isAuto);
+                    pushDanmakuInThread(danmakuItem, activity, fastPushThenVerify);
                 }
             }).start();
         } else {
             Leodanmu.log("已经在子线程，直接执行弹幕推送");
-            pushDanmakuInThread(danmakuItem, activity, fastPushThenVerify, isAuto);
+            pushDanmakuInThread(danmakuItem, activity, fastPushThenVerify);
         }
     }
 
@@ -742,10 +742,6 @@ public class LeoDanmakuService {
     }
 
     private static void pushDanmakuInThread(DanmakuItem danmakuItem, Activity activity, boolean fastPushThenVerify) {
-        pushDanmakuInThread(danmakuItem, activity, fastPushThenVerify, true);
-    }
-
-    private static void pushDanmakuInThread(DanmakuItem danmakuItem, Activity activity, boolean fastPushThenVerify, boolean isAuto) {
         try {
             if (TextUtils.isEmpty(danmakuItem.getDanmakuUrl())) {
                 Leodanmu.log("推送弹幕URL为空");
