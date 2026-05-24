@@ -758,20 +758,7 @@ public class LeoDanmakuService {
                 DanmakuConfig config = DanmakuConfigManager.getConfig(activity);
                 int offsetMs = config != null ? config.getDanmakuTimeOffsetMs() : 0;
                 String refreshPath = buildDanmakuRefreshPath(danmakuItem, localIp, offsetMs);
-                String cachedXml = DanmakuManager.getCachedXml(danmakuItem);
-                String cacheKey = DanmakuManager.encodeCacheKey(danmakuItem);
-                boolean isUsingPreCache = DanmakuManager.isUsingPreCache();
-                Leodanmu.log("🔍 预缓存诊断: key=" + cacheKey + " hasCachedXml=" + (cachedXml != null) + " isUsingPreCache=" + isUsingPreCache + " isAuto=" + isAuto);
-                if (isAuto && cachedXml != null) {
-                    refreshPath = "http://" + localIp + ":" + getWebServerPort() + "/danmaku-cache?key=" + cacheKey + "&t=" + System.currentTimeMillis();
-                    Leodanmu.log("⚡ 预缓存命中，使用本地缓存URL: " + refreshPath);
-                } else {
-                    if (isUsingPreCache) {
-                        Leodanmu.log("⚠️ 预缓存标志残留但XML已丢失，回退原始代理URL");
-                        DanmakuManager.clearPreCache();
-                    }
-                    Leodanmu.log("📡 推送原始代理URL: " + refreshPath);
-                }
+                Leodanmu.log("📡 推送代理URL: " + refreshPath);
                 if (offsetMs != 0) {
                     Leodanmu.log("启用弹幕时间偏移: " + DanmakuUtils.formatOffsetLabel(offsetMs) + "，通过本地代理推送");
                 }
@@ -808,14 +795,7 @@ public class LeoDanmakuService {
                 return;
             }
 
-            int danmakuCount;
-            String preCachedXml = DanmakuManager.consumePreCachedXmlForPush();
-            if (preCachedXml != null) {
-                danmakuCount = countDanmakuItems(preCachedXml);
-                Leodanmu.log("⚡ 预缓存弹幕数据直接使用: " + danmakuCount + " 条");
-            } else {
-                danmakuCount = fetchValidDanmakuCount(danmakuItem, 3);
-            }
+            int danmakuCount = fetchValidDanmakuCount(danmakuItem, 3);
             if (danmakuCount <= 0) {
                 Leodanmu.log("❌ 无法获取有效的弹幕数据（或弹幕为空），取消推送");
                 return;
@@ -826,20 +806,7 @@ public class LeoDanmakuService {
             DanmakuConfig config = DanmakuConfigManager.getConfig(activity);
             int offsetMs = config != null ? config.getDanmakuTimeOffsetMs() : 0;
             String refreshPath = buildDanmakuRefreshPath(danmakuItem, localIp, offsetMs);
-            String cachedXml = DanmakuManager.getCachedXml(danmakuItem);
-            String cacheKey = DanmakuManager.encodeCacheKey(danmakuItem);
-            boolean isUsingPreCache = DanmakuManager.isUsingPreCache();
-            Leodanmu.log("🔍 预缓存诊断: key=" + cacheKey + " hasCachedXml=" + (cachedXml != null) + " isUsingPreCache=" + isUsingPreCache + " isAuto=" + isAuto);
-            if (isAuto && cachedXml != null) {
-                refreshPath = "http://" + localIp + ":" + getWebServerPort() + "/danmaku-cache?key=" + cacheKey + "&t=" + System.currentTimeMillis();
-                Leodanmu.log("⚡ 预缓存命中，使用本地缓存URL: " + refreshPath);
-            } else {
-                if (isUsingPreCache) {
-                    Leodanmu.log("⚠️ 预缓存标志残留但XML已丢失，回退原始代理URL");
-                    DanmakuManager.clearPreCache();
-                }
-                Leodanmu.log("📡 推送原始代理URL: " + refreshPath);
-            }
+            Leodanmu.log("📡 推送代理URL: " + refreshPath);
 
             if (offsetMs != 0) {
                 Leodanmu.log("启用弹幕时间偏移: " + DanmakuUtils.formatOffsetLabel(offsetMs) + "，通过本地代理推送");
@@ -971,8 +938,6 @@ public class LeoDanmakuService {
                                     finalDanmakuCount);
                             Utils.safeShowToast(activity, message);
                             Leodanmu.log(message);
-                            // 推送成功后预缓存下一集
-                            triggerPreCacheNextEpisode(danmakuItem, activity);
                         } else {
                             Utils.safeShowToast(activity, "推送失败: 无响应或响应异常");
                             Leodanmu.log("❌ 推送失败，响应: " + finalPushResp);
@@ -983,8 +948,6 @@ public class LeoDanmakuService {
                                     danmakuItem.getTitle(),
                                     danmakuItem.getEpTitle(),
                                     finalDanmakuCount));
-                            // 静默模式下也触发预缓存
-                            triggerPreCacheNextEpisode(danmakuItem, activity);
                         } else {
                             Leodanmu.log("❌ 推送失败，响应: " + finalPushResp);
                         }
@@ -994,67 +957,7 @@ public class LeoDanmakuService {
         }
     }
 
-    private static void triggerPreCacheNextEpisode(DanmakuItem currentItem, Activity activity) {
-        if (currentItem == null || currentItem.getEpId() == null || currentItem.getEpId() <= 0) return;
-        if (TextUtils.isEmpty(currentItem.getApiBase())) return;
-        // 已经缓存了该 id 则跳过（按复合 key 完全匹配，防止跨剧集污染）
-        if (DanmakuManager.getPreCachedEpId() == currentItem.getEpId() + 1) {
-            // 构造一个候选 item 来查复合 key
-            DanmakuItem probe = new DanmakuItem();
-            probe.setEpId(currentItem.getEpId() + 1);
-            probe.setAnimeTitle(currentItem.getAnimeTitle());
-            probe.setFrom(currentItem.getFrom());
-            if (TextUtils.isEmpty(currentItem.getAnimeTitle())) {
-                probe.setTitle(currentItem.getTitle());
-            }
-            String cachedXml = DanmakuManager.getCachedXml(probe);
-            if (cachedXml == null) {
-                // 复合 key 不匹配或不存在，强制刷新
-                Leodanmu.log("⚠️ 预缓存复合 key 不匹配，强制刷新");
-            } else {
-                return;
-            }
-        }
-
-        final int nextEpId = currentItem.getEpId() + 1;
-        final String apiBase = currentItem.getApiBase();
-        final String from = currentItem.getFrom();
-        final String title = currentItem.getTitle();
-
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    DanmakuItem candidate = new DanmakuItem();
-                    candidate.setEpId(nextEpId);
-                    candidate.setApiBase(apiBase);
-                    candidate.setFrom(from);
-                    candidate.setTitle(title);
-                    candidate.setAnimeTitle(currentItem.getAnimeTitle());
-                    candidate.setShortTitle(currentItem.getShortTitle());
-                    candidate.setEpTitle("预缓存#" + nextEpId);
-
-                    String xml = NetworkUtils.robustHttpGet(candidate.getDanmakuUrl());
-                    if (TextUtils.isEmpty(xml)) {
-                        Leodanmu.log("⏭️ 预缓存跳过: epId=" + nextEpId + " 无数据");
-                        return;
-                    }
-                    int count = countDanmakuItems(xml);
-                    if (count <= 0) {
-                        Leodanmu.log("⏭️ 预缓存跳过: epId=" + nextEpId + " 弹幕为空");
-                        return;
-                    }
-
-                    DanmakuManager.cachePreCachedItem(nextEpId, candidate, xml);
-                    Leodanmu.log("⚡ 预缓存下一集成功: epId=" + nextEpId + " (" + count + "条)");
-                } catch (Exception e) {
-                    Leodanmu.log("⏭️ 预缓存异常: " + e.getMessage());
-                }
-            }
-        }).start();
-    }
-
-    // ========== 新增：构建弹幕刷新路径（支持时间偏移本地代理）==========
+    // ========== 构建弹幕刷新路径（支持时间偏移本地代理）==========
     private static String buildDanmakuRefreshPath(DanmakuItem danmakuItem, String localIp, int offsetMs) throws Exception {
         String rawUrl = danmakuItem.getDanmakuUrl();
         if (offsetMs == 0) return rawUrl;
