@@ -4,7 +4,6 @@ import android.app.Activity;
 import android.os.Handler;
 import android.os.Looper;
 
-import com.github.catvod.bean.Result;
 import com.github.catvod.crawler.Spider;
 
 import org.json.JSONArray;
@@ -81,53 +80,76 @@ public class ConfigCenter extends Spider {
     }
 
     @Override
-    public String action(String action) {
-        try {
-            Activity ctx = Utils.getTopActivity();
-            if (ctx == null || ctx.isFinishing()) return Result.notify("无可用界面");
-            DanmakuConfig config = DanmakuConfigManager.getConfig(ctx);
-            switch (action) {
-                case "config":
-                    runOnUiThread(ctx, () -> DanmakuUIHelper.showCombinedConfigDialog(ctx));
-                    break;
-                case "auto_push":
-                    config.setAutoPushEnabled(!config.isAutoPushEnabled());
-                    DanmakuConfigManager.saveConfig(ctx, config);
-                    Leodanmu.log("ConfigCenter: 自动推送状态切换: " + config.isAutoPushEnabled());
-                    return Result.notify(config.isAutoPushEnabled() ? "自动推送已开启" : "自动推送已关闭");
-                case "lp_config":
-                    runOnUiThread(ctx, () -> DanmakuUIHelper.showLpConfigDialog(ctx));
-                    break;
-                case "log":
-                    runOnUiThread(ctx, () -> DanmakuUIHelper.showLogDialog(ctx));
-                    break;
-                case "douban_cache":
-                    runOnUiThread(ctx, () -> {
-                        DoubanFetcher.clearCache();
-                        Utils.safeShowToast(ctx, "豆瓣缓存已清除");
-                    });
-                    break;
-                case "douban_prewarm":
-                    runOnUiThread(ctx, () -> {
-                        DoubanFetcher.prewarm();
-                        Utils.safeShowToast(ctx, "豆瓣预热已触发");
-                    });
-                    break;
-                default:
-                    runOnUiThread(ctx, () -> Utils.safeShowToast(ctx, "功能开发中"));
-                    break;
-            }
-            return Result.notify("已打开设置");
-        } catch (Exception e) {
-            Leodanmu.log("ConfigCenter action异常: " + e.getMessage());
-            return Result.notify("打开失败");
-        }
-    }
-
-    @Override
     public String detailContent(List<String> ids) {
         if (ids == null || ids.isEmpty()) return "";
-        return action(ids.get(0));
+        final String id = ids.get(0);
+
+        new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                final Activity ctx = Utils.getTopActivity();
+                if (ctx == null || ctx.isFinishing()) return;
+                ctx.runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            DanmakuConfig config = DanmakuConfigManager.getConfig(ctx);
+                            switch (id) {
+                                case "config":
+                                    DanmakuUIHelper.showCombinedConfigDialog(ctx);
+                                    break;
+                                case "auto_push":
+                                    config.setAutoPushEnabled(!config.isAutoPushEnabled());
+                                    DanmakuConfigManager.saveConfig(ctx, config);
+                                    Leodanmu.log("ConfigCenter: 自动推送状态切换: " + config.isAutoPushEnabled());
+                                    Utils.safeShowToast(ctx,
+                                            config.isAutoPushEnabled() ? "自动推送已开启" : "自动推送已关闭");
+                                    break;
+                                case "lp_config":
+                                    DanmakuUIHelper.showLpConfigDialog(ctx);
+                                    break;
+                                case "log":
+                                    DanmakuUIHelper.showLogDialog(ctx);
+                                    break;
+                                case "douban_cache":
+                                    DoubanFetcher.clearCache();
+                                    Utils.safeShowToast(ctx, "豆瓣缓存已清除");
+                                    break;
+                                case "douban_prewarm":
+                                    DoubanFetcher.prewarm();
+                                    Utils.safeShowToast(ctx, "豆瓣预热已触发");
+                                    break;
+                                default:
+                                    Utils.safeShowToast(ctx, "功能开发中");
+                                    break;
+                            }
+                        } catch (Exception e) {
+                            Leodanmu.log("ConfigCenter 详情异常: " + e.getMessage());
+                            Utils.safeShowToast(ctx, "请稍后再试");
+                        }
+                    }
+                });
+            }
+        }, 100);
+
+        try {
+            Activity activity = Utils.getTopActivity();
+            DanmakuConfig config = activity != null ? DanmakuConfigManager.getConfig(activity) : new DanmakuConfig();
+            JSONObject vod = new JSONObject();
+            vod.put("vod_id", id);
+            vod.put("vod_name", getItemName(id));
+            vod.put("vod_pic", "");
+            vod.put("vod_remarks", getItemRemark(id, config));
+            vod.put("vod_play_url", "");
+            vod.put("vod_play_from", "");
+            JSONObject result = new JSONObject();
+            JSONArray list = new JSONArray();
+            list.put(vod);
+            result.put("list", list);
+            return result.toString();
+        } catch (Exception e) {
+            return "";
+        }
     }
 
     @Override
@@ -162,12 +184,34 @@ public class ConfigCenter extends Spider {
         return "";
     }
 
-    private void runOnUiThread(Activity activity, Runnable runnable) {
-        if (activity == null || activity.isFinishing()) return;
-        if (Looper.myLooper() == Looper.getMainLooper()) {
-            runnable.run();
-        } else {
-            new Handler(Looper.getMainLooper()).post(runnable);
+    @Override
+    public String action(String action) {
+        List<String> ids = new java.util.ArrayList<>();
+        ids.add(action);
+        return detailContent(ids);
+    }
+
+    private String getItemName(String id) {
+        switch (id) {
+            case "config": return "弹幕配置";
+            case "auto_push": return "自动推送弹幕";
+            case "lp_config": return "布局配置";
+            case "log": return "查看日志";
+            case "douban_cache": return "豆瓣缓存";
+            case "douban_prewarm": return "豆瓣预热";
+            default: return "配置中心";
+        }
+    }
+
+    private String getItemRemark(String id, DanmakuConfig config) {
+        switch (id) {
+            case "config": return "配置弹幕API地址、推送参数";
+            case "auto_push": return config.isAutoPushEnabled() ? "已开启" : "已关闭";
+            case "lp_config": return "调整弹窗大小和透明度";
+            case "log": return "查看运行日志与Hook诊断";
+            case "douban_cache": return "已缓存 " + DoubanFetcher.getCacheSize() + " 个分类，点击清除";
+            case "douban_prewarm": return "强制后台刷新所有分类缓存";
+            default: return "";
         }
     }
 
