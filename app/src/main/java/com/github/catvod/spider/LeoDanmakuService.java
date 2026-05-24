@@ -540,9 +540,19 @@ public class LeoDanmakuService {
         if (bestItem == null) return false;
         if (!TextUtils.isEmpty(episodeInfo.getEpisodeNum())) {
             boolean epMatch = calculateEpisodeScore(episodeInfo, bestItem) > 0;
-            if (epMatch) return true;
-            if (isOfficial) return false; // 官源必须匹配集数
-            return itemScore >= 50;
+            if (!epMatch) {
+                if (isOfficial) return false;
+                return itemScore >= 50;
+            }
+            // 集数匹配时也要求标题不是完全无关的（前缀扣分不能太重）
+            String rawTitle = bestItem.getAnimeTitle() != null ? bestItem.getAnimeTitle() : bestItem.getTitle();
+            String titleToCompare = rawTitle.split("【")[0].trim();
+            String kw = episodeInfo.getSearchKeyword();
+            if (!TextUtils.isEmpty(kw)) {
+                double namePenalty = calculateTitlePrefixPenalty(titleToCompare, kw);
+                if (namePenalty < -15) return false; // 前缀冗余太多→不同作品
+            }
+            return true;
         }
         if (!TextUtils.isEmpty(episodeInfo.getSpecialTag())) {
             return calculateSpecialScore(episodeInfo, bestItem.getTitle(), bestItem.getEpTitle()) > 0 || itemScore >= 40;
@@ -841,93 +851,57 @@ public class LeoDanmakuService {
                 return;
             }
 
-            if (fastPushThenVerify) {
-                Leodanmu.log("⚡ 命中已验证链路，先推送后异步校验: " + danmakuItem.getEpTitle());
-                String localIp = NetworkUtils.getLocalIpAddress();
-                DanmakuConfig config = DanmakuConfigManager.getConfig(activity);
-                int offsetMs = config != null ? config.getDanmakuTimeOffsetMs() : 0;
-                String refreshPath = buildDanmakuRefreshPath(danmakuItem, localIp, offsetMs);
-                Leodanmu.log("📡 推送代理URL: " + refreshPath);
-                if (offsetMs != 0) {
-                    Leodanmu.log("启用弹幕时间偏移: " + DanmakuUtils.formatOffsetLabel(offsetMs) + "，通过本地代理推送");
-                }
-                String pushResult = null;
-                boolean reflectionPushed = activity != null && tryPushDanmakuByReflection(danmakuItem, activity, refreshPath);
-                if (reflectionPushed) {
-                    pushResult = "OK";
-                    Leodanmu.log("✅ 快速推送已通过反射发送: " + buildDanmakuDisplayName(danmakuItem));
-                } else {
-                    Leodanmu.log("反射推送不可用，快速推送回退到HTTP");
-                    String pushUrl = "http://" + localIp + ":" + Utils.getPort() + "/action?do=refresh&type=danmaku&path=" +
-                            URLEncoder.encode(refreshPath, "UTF-8");
-                    for (int i = 0; i < 3; i++) {
-                        pushResult = NetworkUtils.robustHttpGet(pushUrl);
-                        Leodanmu.log("快速推送尝试 " + (i + 1) + "/3: " + (!TextUtils.isEmpty(pushResult) ? "成功" : "失败"));
-                        if (!TextUtils.isEmpty(pushResult) && pushResult.toLowerCase().contains("ok")) {
-                            Leodanmu.log("✅ 快速推送已发送");
-                            break;
-                        }
-                        if (i < 2) {
-                            try {
-                                Thread.sleep(1000);
-                            } catch (InterruptedException ie) {
-                                Thread.currentThread().interrupt();
-                            }
-                        }
-                    }
-                }
-                if (!TextUtils.isEmpty(pushResult) && pushResult.toLowerCase().contains("ok")) {
-                    verifyDanmakuAfterPushAsync(danmakuItem, activity);
-                } else {
-                    Leodanmu.log("❌ 快速推送失败，响应: " + pushResult);
-                }
-                return;
-            }
-
-            int danmakuCount = fetchValidDanmakuCount(danmakuItem, 3);
-            if (danmakuCount <= 0) {
-                Leodanmu.log("❌ 无法获取有效的弹幕数据（或弹幕为空），取消推送");
-                return;
-            }
-
-            String pushResp;
             String localIp = NetworkUtils.getLocalIpAddress();
             DanmakuConfig config = DanmakuConfigManager.getConfig(activity);
             int offsetMs = config != null ? config.getDanmakuTimeOffsetMs() : 0;
             String refreshPath = buildDanmakuRefreshPath(danmakuItem, localIp, offsetMs);
             Leodanmu.log("📡 推送代理URL: " + refreshPath);
-
             if (offsetMs != 0) {
                 Leodanmu.log("启用弹幕时间偏移: " + DanmakuUtils.formatOffsetLabel(offsetMs) + "，通过本地代理推送");
             }
 
+            // 1. 反射方式设置弹幕（快速内部设置）
             boolean reflectionPushed = activity != null && tryPushDanmakuByReflection(danmakuItem, activity, refreshPath);
             if (reflectionPushed) {
-                pushResp = "OK";
                 Leodanmu.log("✅ 已通过反射方式推送弹幕: " + buildDanmakuDisplayName(danmakuItem));
             } else {
-                String pushUrl = "http://" + localIp + ":" + Utils.getPort() + "/action?do=refresh&type=danmaku&path=" +
-                        URLEncoder.encode(refreshPath, "UTF-8");
-                Leodanmu.log("反射推送不可用，回退到HTTP推送: " + pushUrl);
-                pushResp = "";
-                for (int i = 0; i < 3; i++) {
-                    pushResp = NetworkUtils.robustHttpGet(pushUrl);
-                    Leodanmu.log("推送尝试 " + (i + 1) + "/3: " + (!TextUtils.isEmpty(pushResp) ? "成功" : "失败"));
-                    if (!TextUtils.isEmpty(pushResp) && pushResp.toLowerCase().contains("ok")) {
-                        Leodanmu.log("✅ 推送成功");
-                        break;
-                    }
-                    if (i < 2) {
-                        try {
-                            Thread.sleep(1000);
-                        } catch (InterruptedException ie) {
-                            Thread.currentThread().interrupt();
-                        }
-                    }
+                Leodanmu.log("反射推送不可用");
+            }
+
+            // 2. HTTP方式推送弹幕（可靠激活播放器弹幕层），不论反射是否成功都执行
+            boolean httpPushed = false;
+            String pushUrl = "http://" + localIp + ":" + Utils.getPort() + "/action?do=refresh&type=danmaku&path=" +
+                    URLEncoder.encode(refreshPath, "UTF-8");
+            String pushResp = "";
+            for (int i = 0; i < 3; i++) {
+                pushResp = NetworkUtils.robustHttpGet(pushUrl);
+                Leodanmu.log("HTTP推送尝试 " + (i + 1) + "/3: " + (!TextUtils.isEmpty(pushResp) ? "成功" : "失败"));
+                if (!TextUtils.isEmpty(pushResp) && pushResp.toLowerCase().contains("ok")) {
+                    httpPushed = true;
+                    Leodanmu.log("✅ HTTP推送成功");
+                    break;
+                }
+                if (i < 2) {
+                    try { Thread.sleep(1000); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
                 }
             }
 
-            notifyPushResult(activity, danmakuItem, danmakuCount, pushResp);
+            boolean anyPushed = reflectionPushed || httpPushed;
+
+            if (fastPushThenVerify) {
+                if (anyPushed) {
+                    verifyDanmakuAfterPushAsync(danmakuItem, activity);
+                } else {
+                    Leodanmu.log("❌ 快速推送失败，反射和HTTP均无响应");
+                }
+            } else {
+                int danmakuCount = fetchValidDanmakuCount(danmakuItem, 1);
+                if (danmakuCount <= 0 && !httpPushed) {
+                    Leodanmu.log("❌ 无法获取有效的弹幕数据（或弹幕为空），取消推送");
+                    return;
+                }
+                notifyPushResult(activity, danmakuItem, danmakuCount, pushResp);
+            }
         } catch (Exception e) {
             Leodanmu.log("推送异常: " + e.getMessage());
         }
