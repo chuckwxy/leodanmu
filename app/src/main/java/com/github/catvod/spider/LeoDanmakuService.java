@@ -28,6 +28,14 @@ public class LeoDanmakuService {
     private static final Map<String, Long> lastPushTimes = new ConcurrentHashMap<>();
     private static final long PUSH_MIN_INTERVAL = 3000; // 3秒内不重复推送
 
+    // 官源弹幕站点列表（优先匹配）
+    private static final Set<String> OFFICIAL_SOURCES = new HashSet<>(Arrays.asList(
+            "bahamut", "animeko", "iqiyi", "youku", "tencent",
+            "bilibili", "imgo", "tmdb", "renren", "hanjutv",
+            "migu", "maiduidui", "sohu", "leshi", "xigua",
+            "custom", "aiyifan"
+    ));
+
     // 在 LeoDanmakuService 类中添加缓存相关字段
     private static final long CACHE_EXPIRE_TIME = 30 * 60 * 1000; // 30分钟
 
@@ -450,17 +458,30 @@ public class LeoDanmakuService {
         TitleMatchInfo targetInfo = TitleNormalizer.parse(searchKeyword + " " + episodeTag);
 
         GroupPickResult best = null;
+        GroupPickResult bestOfficial = null;
         for (Map.Entry<String, List<DanmakuItem>> entry : grouped.entrySet()) {
             String groupKey = entry.getKey();
+            List<DanmakuItem> items = entry.getValue();
+
+            boolean isOfficial = false;
+            for (DanmakuItem item : items) {
+                if (isOfficialSource(item.getFrom())) {
+                    isOfficial = true;
+                    break;
+                }
+            }
+
             TitleMatchInfo candidateInfo = TitleNormalizer.parse(groupKey);
             int structuredScore = TitleNormalizer.score(targetInfo, candidateInfo);
             int specialScore = calculateSpecialScore(episodeInfo, groupKey, groupKey);
             double legacySimilarity = calculateSimilarity(groupKey.split("【")[0].trim(), searchKeyword);
             double groupScore = structuredScore + specialScore + legacySimilarity;
+            if (isOfficial) groupScore += 500;
+
             DanmakuItem bestItem = null;
             double bestItemScore = -9999;
 
-            for (DanmakuItem item : entry.getValue()) {
+            for (DanmakuItem item : items) {
                 double itemScore = calculateItemScore(item, episodeInfo, searchKeyword, targetInfo);
                 if (itemScore > bestItemScore) {
                     bestItemScore = itemScore;
@@ -468,16 +489,25 @@ public class LeoDanmakuService {
                 }
             }
 
-            // Leodanmu.log("📦 标题组候选: " + groupKey + " (结构分: " + structuredScore + ", 特殊分: " + specialScore + ", 相似度: " + legacySimilarity + ", 组分: " + groupScore + ", 最佳组内分: " + bestItemScore + ")");
+            // Leodanmu.log("📦 标题组候选: " + groupKey + " (结构分: " + structuredScore + ", 特殊分: " + specialScore + ", 相似度: " + legacySimilarity + ", 组分: " + groupScore + ", 最佳组内分: " + bestItemScore + (isOfficial ? ", 官源: true" : "") + ")");
 
-            if (!isGroupItemMatchAcceptable(episodeInfo, bestItemScore, bestItem)) {
-                // Leodanmu.log("⚠️ 标题组淘汰：组内无有效分集匹配 - " + groupKey + (bestItem == null ? "" : "，候选=" + bestItem.getEpTitle()));
+            if (!isGroupItemMatchAcceptable(episodeInfo, bestItemScore, bestItem, isOfficial)) {
+                // Leodanmu.log("⚠️ 标题组淘汰：组内无有效分集匹配 - " + groupKey + (bestItem == null ? "" : "，候选=" + bestItem.getEpTitle()) + (isOfficial ? " (官源)" : ""));
                 continue;
             }
 
             if (best == null || (groupScore + bestItemScore) > (best.groupScore + best.itemScore)) {
-                best = new GroupPickResult(groupKey, entry.getValue(), groupScore, bestItemScore, bestItem);
+                GroupPickResult candidate = new GroupPickResult(groupKey, items, groupScore, bestItemScore, bestItem);
+                best = candidate;
+                if (isOfficial && bestOfficial == null) bestOfficial = candidate;
+            } else if (isOfficial && bestOfficial == null) {
+                bestOfficial = new GroupPickResult(groupKey, items, groupScore, bestItemScore, bestItem);
             }
+        }
+        // 优先使用官源结果（即使非官源总分更高）
+        if (bestOfficial != null) {
+            Leodanmu.log("🎯 官源组选中: " + bestOfficial.groupKey + " (组分: " + bestOfficial.groupScore + ", 组内分: " + bestOfficial.itemScore + ")");
+            return bestOfficial;
         }
         if (best != null) Leodanmu.log("🎯 组选中: " + best.groupKey + " (组分: " + best.groupScore + ", 组内分: " + best.itemScore + ")");
         return best;
@@ -497,15 +527,25 @@ public class LeoDanmakuService {
         return finalScore;
     }
 
-    private static boolean isGroupItemMatchAcceptable(EpisodeInfo episodeInfo, double itemScore, DanmakuItem bestItem) {
+    private static boolean isGroupItemMatchAcceptable(EpisodeInfo episodeInfo, double itemScore, DanmakuItem bestItem, boolean isOfficial) {
         if (bestItem == null) return false;
         if (!TextUtils.isEmpty(episodeInfo.getEpisodeNum())) {
-            return calculateEpisodeScore(episodeInfo, bestItem) > 0 || itemScore >= 50;
+            boolean epMatch = calculateEpisodeScore(episodeInfo, bestItem) > 0;
+            if (epMatch) return true;
+            if (isOfficial) return false; // 官源必须匹配集数
+            return itemScore >= 50;
         }
         if (!TextUtils.isEmpty(episodeInfo.getSpecialTag())) {
             return calculateSpecialScore(episodeInfo, bestItem.getTitle(), bestItem.getEpTitle()) > 0 || itemScore >= 40;
         }
         return itemScore >= 20;
+    }
+
+    // 判断 from 是否属于官源
+    private static boolean isOfficialSource(String from) {
+        if (TextUtils.isEmpty(from)) return false;
+        String clean = from.replaceAll("[】】\\[\\]()（）\\s]", "").toLowerCase();
+        return OFFICIAL_SOURCES.contains(clean);
     }
 
     private static String buildEpisodeMatchTag(EpisodeInfo episodeInfo) {
@@ -530,11 +570,17 @@ public class LeoDanmakuService {
                     String.format("_%d", epNum),
                     String.format("第%d期", epNum),
                     String.format("第%02d集", epNum),
-                    String.format("第%02d期", epNum)
+                    String.format("第%02d期", epNum),
+                    String.format("第%d話", epNum),
+                    String.format("第%d话", epNum)
             };
             for (String fmt : formats) {
                 if (epTitle.contains(fmt)) return 50;
             }
+            // 精确匹配纯数字或 EP/Episode 前缀
+            if (epTitle.equals(Integer.toString(epNum))) return 50;
+            if (epTitle.matches("(?i)(?:ep|episode)\\s*" + epNum + "(?:\\b|$).*")) return 50;
+            if (epTitle.matches(".*\\b" + epNum + "\\b")) return 50;
             return -25;
         } catch (NumberFormatException e) {
             return 0;

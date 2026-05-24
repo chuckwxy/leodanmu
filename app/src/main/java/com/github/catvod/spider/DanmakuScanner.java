@@ -232,7 +232,6 @@ public class DanmakuScanner {
         Leodanmu.log("🚀 启动Hook监控");
         isMonitoring = true;
         isFirstDetection = true;
-        DanmakuManager.resetAutoSearch();
 
         hookTimer = new Timer("DanmakuHookTimer", true);
         hookTimer.schedule(new TimerTask() {
@@ -832,8 +831,6 @@ public class DanmakuScanner {
         // 【新增】清理UIHelper的资源
         DanmakuUIHelper.cleanupAllResources();
 
-        DanmakuManager.resetAutoSearch();
-
         Leodanmu.log("🛑 Hook监控已停止");
     }
 
@@ -1254,7 +1251,17 @@ public class DanmakuScanner {
         // 如果上下文中有明显的非集数关键词，减分
         boolean hasNonEpisodeKeyword = context.matches(".*(?i)(gb|mb|kb|size|大小|分辨率|fps|bitrate|码率).*");
 
-        return hasEpisodeKeyword || (!hasNonEpisodeKeyword && numValue >= 1 && numValue <= 99);
+        // 1-99 正常集数范围
+        if (numValue >= 1 && numValue <= 99) {
+            return !hasNonEpisodeKeyword;
+        }
+
+        // 100-999：有集数关键词，或位于标题末尾（无歧义后缀）即接受
+        if (hasEpisodeKeyword) {
+            return true;
+        }
+        String after = end < title.length() ? title.substring(end).trim() : "";
+        return after.isEmpty() || after.matches("[\\]\\)】）.。\\-\\s]+.*");
     }
 
     /**
@@ -1613,8 +1620,7 @@ public class DanmakuScanner {
                 LeoDanmakuService.autoSearch(lastEpisodeInfo, activity);
             }
         } else {
-            // 不同的剧集系列，清空旧缓存并更新记录
-            DanmakuManager.resetAutoSearch();
+            // 不同的剧集系列，更新记录
             String episodeName = lastEpisodeInfo.getEpisodeNames() != null && !lastEpisodeInfo.getEpisodeNames().isEmpty() ?
                     lastEpisodeInfo.getEpisodeNames().get(0) : lastEpisodeInfo.getEpisodeName();
             Leodanmu.log("🎬 剧集名: " + episodeName +
