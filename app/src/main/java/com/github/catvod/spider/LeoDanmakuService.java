@@ -34,6 +34,9 @@ public class LeoDanmakuService {
             "imgo", "migu", "sohu", "leshi", "xigua"
     ));
 
+    // 自动搜索并发锁
+    private static volatile boolean autoSearchInProgress = false;
+
     // 在 LeoDanmakuService 类中添加缓存相关字段
     private static final long CACHE_EXPIRE_TIME = 30 * 60 * 1000; // 30分钟
 
@@ -639,6 +642,12 @@ public class LeoDanmakuService {
     public static boolean autoSearch(EpisodeInfo episodeInfo, Activity activity) {
         if (TextUtils.isEmpty(episodeInfo.getEpisodeName())) return false;
 
+        if (autoSearchInProgress) {
+            Leodanmu.log("⏭️ 自动搜索正在进行中，跳过重复触发");
+            return false;
+        }
+        autoSearchInProgress = true;
+
         final boolean[] found = {false};
         final Object lock = new Object();
 
@@ -860,25 +869,17 @@ public class LeoDanmakuService {
                 Leodanmu.log("启用弹幕时间偏移: " + DanmakuUtils.formatOffsetLabel(offsetMs) + "，通过本地代理推送");
             }
 
-            // 1. 反射方式设置弹幕（快速内部设置）
-            boolean reflectionPushed = activity != null && tryPushDanmakuByReflection(danmakuItem, activity, refreshPath);
-            if (reflectionPushed) {
-                Leodanmu.log("✅ 已通过反射方式推送弹幕: " + buildDanmakuDisplayName(danmakuItem));
-            } else {
-                Leodanmu.log("反射推送不可用");
-            }
-
-            // 2. HTTP方式推送弹幕（可靠激活播放器弹幕层），不论反射是否成功都执行
+            // HTTP方式推送弹幕
             boolean httpPushed = false;
             String pushUrl = "http://" + localIp + ":" + Utils.getPort() + "/action?do=refresh&type=danmaku&path=" +
                     URLEncoder.encode(refreshPath, "UTF-8");
             String pushResp = "";
             for (int i = 0; i < 3; i++) {
                 pushResp = NetworkUtils.robustHttpGet(pushUrl);
-                Leodanmu.log("HTTP推送尝试 " + (i + 1) + "/3: " + (!TextUtils.isEmpty(pushResp) ? "成功" : "失败"));
+                Leodanmu.log("推送尝试 " + (i + 1) + "/3: " + (!TextUtils.isEmpty(pushResp) ? "成功" : "失败"));
                 if (!TextUtils.isEmpty(pushResp) && pushResp.toLowerCase().contains("ok")) {
                     httpPushed = true;
-                    Leodanmu.log("✅ HTTP推送成功");
+                    Leodanmu.log("✅ 推送成功");
                     break;
                 }
                 if (i < 2) {
@@ -886,13 +887,11 @@ public class LeoDanmakuService {
                 }
             }
 
-            boolean anyPushed = reflectionPushed || httpPushed;
-
             if (fastPushThenVerify) {
-                if (anyPushed) {
+                if (httpPushed) {
                     verifyDanmakuAfterPushAsync(danmakuItem, activity);
                 } else {
-                    Leodanmu.log("❌ 快速推送失败，反射和HTTP均无响应");
+                    Leodanmu.log("❌ 推送失败");
                 }
             } else {
                 int danmakuCount = fetchValidDanmakuCount(danmakuItem, 1);
