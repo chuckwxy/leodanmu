@@ -869,6 +869,19 @@ public class LeoDanmakuService {
                 Leodanmu.log("启用弹幕时间偏移: " + DanmakuUtils.formatOffsetLabel(offsetMs) + "，通过本地代理推送");
             }
 
+            // 先尝试反射推送，成功则跳过HTTP
+            if (tryPushDanmakuByReflection(danmakuItem, activity, refreshPath)) {
+                Leodanmu.log("✅ 反射推送成功，跳过HTTP");
+                if (fastPushThenVerify) {
+                    verifyDanmakuAfterPushAsync(danmakuItem, activity);
+                } else {
+                    int danmakuCount = fetchValidDanmakuCount(danmakuItem, 1);
+                    notifyPushResult(activity, danmakuItem, danmakuCount, "");
+                }
+                return;
+            }
+            Leodanmu.log("反射推送不可用或失败，回退到HTTP推送");
+
             // HTTP方式推送弹幕
             boolean httpPushed = false;
             String pushUrl = "http://" + localIp + ":" + Utils.getPort() + "/action?do=refresh&type=danmaku&path=" +
