@@ -242,7 +242,7 @@ public class DoubanFetcher {
         sRealTimeHotCacheTime = 0;
         sCachedHomeList = null;
         sHomeListCacheTime = 0;
-        Leodanmu.log("DoubanFetcher: cache cleared");
+        // Leodanmu.log("DoubanFetcher: cache cleared");
     }
 
     public static int getCacheSize() {
@@ -743,7 +743,7 @@ public class DoubanFetcher {
                 // 实时抓取返回空 → 尝试返回过期缓存（降级）
                 PageCacheEntry stale = pageCache.get(cacheKey);
                 if (stale != null) {
-                    Leodanmu.log("[豆瓣缓存] 降级返回过期缓存: " + cacheKey);
+                    // Leodanmu.log("[豆瓣缓存] 降级返回过期缓存: " + cacheKey);
                     return stale.data;
                 }
             }
@@ -753,7 +753,7 @@ public class DoubanFetcher {
             // 降级：返回过期缓存
             PageCacheEntry stale = pageCache.get(cacheKey);
             if (stale != null) {
-                Leodanmu.log("[豆瓣缓存] 异常降级返回过期缓存: " + cacheKey);
+                // Leodanmu.log("[豆瓣缓存] 异常降级返回过期缓存: " + cacheKey);
                 return stale.data;
             }
             return null;

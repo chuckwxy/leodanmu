@@ -67,7 +67,7 @@ public class PlatformFetcher {
             if (TextUtils.isEmpty(body)) return null;
             return new JSONObject(body);
         } catch (Exception e) {
-            Leodanmu.log("平台请求失败: " + url + " -> " + e.getMessage());
+            // Leodanmu.log("平台请求失败: " + url + " -> " + e.getMessage());
             return null;
         }
     }
@@ -76,15 +76,15 @@ public class PlatformFetcher {
         try {
             String body = OkHttp.post(url, bodyJson, headers).getBody();
             if (TextUtils.isEmpty(body)) {
-                Leodanmu.log("platform POST body empty: " + url);
+                // Leodanmu.log("platform POST body empty: " + url);
                 return null;
             }
             return new JSONObject(body);
         } catch (JSONException e) {
-            Leodanmu.log("platform POST JSON err: " + url + " -> " + e.getMessage().substring(0, Math.min(100, e.getMessage().length())));
+            // Leodanmu.log("platform POST JSON err: " + url + " -> " + e.getMessage().substring(0, Math.min(100, e.getMessage().length())));
             return null;
         } catch (Exception e) {
-            Leodanmu.log("platform POST err: " + url + " -> " + e.getMessage());
+            // Leodanmu.log("platform POST err: " + url + " -> " + e.getMessage());
             return null;
         }
     }
@@ -106,11 +106,11 @@ public class PlatformFetcher {
             headers.put("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36 Edg/114.0.1823.82");
             headers.put("Cookie", "video_platform=2;");
             OkResult res = OkHttp.post(urlStr, json, headers);
-            Leodanmu.log("tencentPost HTTP " + res.getCode() + " body=" + (res.getBody().length() > 200 ? res.getBody().substring(0, 200) : res.getBody()));
+            // Leodanmu.log("tencentPost HTTP " + res.getCode() + " body=" + (res.getBody().length() > 200 ? res.getBody().substring(0, 200) : res.getBody()));
             if (res.getCode() != 200 || TextUtils.isEmpty(res.getBody())) return null;
             return new JSONObject(res.getBody());
         } catch (Exception e) {
-            Leodanmu.log("tencentPost err: " + e.getMessage());
+            // Leodanmu.log("tencentPost err: " + e.getMessage());
             return null;
         }
     }
@@ -160,7 +160,7 @@ public class PlatformFetcher {
         String cacheKey = "tencent_" + type + "_" + page + "_" + sourceKey;
         synchronized (tencentCache) {
             JSONArray cached = tencentCache.get(cacheKey);
-            if (cached != null) { Leodanmu.log("腾缓存 hit"); return cached; }
+            if (cached != null) { // Leodanmu.log("腾缓存 hit"); return cached; }
         }
         try {
             String url = "https://pbaccess.video.qq.com/trpc.vector_layout.page_view.PageService/getPage?video_appid=3000010";
@@ -196,14 +196,14 @@ public class PlatformFetcher {
             body.put("page_params", pageParams);
             body.put("page_bypass_params", bypassParams);
 
-            Leodanmu.log("腾请求 type=" + type + " page=" + page + " sourceKey=" + sourceKey);
+            // Leodanmu.log("腾请求 type=" + type + " page=" + page + " sourceKey=" + sourceKey);
             JSONObject data = tencentPost(url, body.toString());
             if (data == null) return items;
 
             JSONObject dataObj = data.optJSONObject("data");
-            if (dataObj == null) { Leodanmu.log("腾data null"); return items; }
+            if (dataObj == null) { // Leodanmu.log("腾data null"); return items; }
             JSONArray cardList = dataObj.optJSONArray("CardList");
-            if (cardList == null || cardList.length() == 0) { Leodanmu.log("腾CardList empty"); return items; }
+            if (cardList == null || cardList.length() == 0) { // Leodanmu.log("腾CardList empty"); return items; }
             for (int ci = 0; ci < cardList.length(); ci++) {
                 JSONObject card = cardList.optJSONObject(ci);
                 if (card == null) continue;
@@ -229,13 +229,13 @@ public class PlatformFetcher {
                     } catch (JSONException ignored) {}
                 }
             }
-            Leodanmu.log("腾结果 items=" + items.length());
+            // Leodanmu.log("腾结果 items=" + items.length());
             synchronized (tencentCache) {
                 tencentCache.put(cacheKey, items);
             }
             return items;
         } catch (Exception e) {
-            Leodanmu.log("腾出错: " + e.getMessage());
+            // Leodanmu.log("腾出错: " + e.getMessage());
             return items;
         }
     }
@@ -281,7 +281,7 @@ public class PlatformFetcher {
                 } catch (JSONException ignored) {}
             }
         } catch (Exception e) {
-            Leodanmu.log("爱奇艺请求失败: " + e.getMessage());
+            // Leodanmu.log("爱奇艺请求失败: " + e.getMessage());
         }
         return items;
     }
@@ -355,7 +355,7 @@ public class PlatformFetcher {
                 } catch (JSONException ignored) {}
             }
         } catch (Exception e) {
-            Leodanmu.log("优酷请求失败: " + e.getMessage());
+            // Leodanmu.log("优酷请求失败: " + e.getMessage());
         }
         return items;
     }
@@ -393,7 +393,7 @@ public class PlatformFetcher {
                 } catch (JSONException ignored) {}
             }
         } catch (Exception e) {
-            Leodanmu.log("芒果TV请求失败: " + e.getMessage());
+            // Leodanmu.log("芒果TV请求失败: " + e.getMessage());
         }
         return items;
     }
@@ -445,7 +445,7 @@ public class PlatformFetcher {
                 } catch (JSONException ignored) {}
             }
         } catch (Exception e) {
-            Leodanmu.log("360kan请求失败: " + e.getMessage());
+            // Leodanmu.log("360kan请求失败: " + e.getMessage());
         }
         return items;
     }
@@ -492,7 +492,7 @@ public class PlatformFetcher {
                 } catch (JSONException ignored) {}
             }
         } catch (Exception e) {
-            Leodanmu.log("搜狗视频请求失败: " + e.getMessage());
+            // Leodanmu.log("搜狗视频请求失败: " + e.getMessage());
         }
         return items;
     }
@@ -523,7 +523,7 @@ public class PlatformFetcher {
                 }
             }
         } catch (Exception e) {
-            Leodanmu.log("腾讯榜单请求失败: " + e.getMessage());
+            // Leodanmu.log("腾讯榜单请求失败: " + e.getMessage());
         }
         return items;
     }
@@ -560,7 +560,7 @@ public class PlatformFetcher {
                 } catch (JSONException ignored) {}
             }
         } catch (Exception e) {
-            Leodanmu.log("爱奇艺榜单请求失败: " + e.getMessage());
+            // Leodanmu.log("爱奇艺榜单请求失败: " + e.getMessage());
         }
         return items;
     }
@@ -630,7 +630,7 @@ public class PlatformFetcher {
                 }
             }
         } catch (Exception e) {
-            Leodanmu.log("优酷榜单请求失败: " + e.getMessage());
+            // Leodanmu.log("优酷榜单请求失败: " + e.getMessage());
         }
         return items;
     }
@@ -655,7 +655,7 @@ public class PlatformFetcher {
                 }
             }
         } catch (Exception e) {
-            Leodanmu.log("360kan榜单请求失败: " + e.getMessage());
+            // Leodanmu.log("360kan榜单请求失败: " + e.getMessage());
         }
         return items;
     }
