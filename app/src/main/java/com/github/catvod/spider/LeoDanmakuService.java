@@ -460,6 +460,10 @@ public class LeoDanmakuService {
             String groupKey = entry.getKey();
             List<DanmakuItem> items = entry.getValue();
 
+            // 标题前缀不匹配 → 整组淘汰，不参与后续任何评分
+            String groupTitle = groupKey.split("【")[0].trim();
+            if (calculateTitlePrefixPenalty(groupTitle, searchKeyword) < 0) continue;
+
             boolean isOfficial = false;
             for (DanmakuItem item : items) {
                 if (isOfficialSource(item.getFrom())) {
@@ -471,10 +475,9 @@ public class LeoDanmakuService {
             TitleMatchInfo candidateInfo = TitleNormalizer.parse(groupKey);
             int structuredScore = TitleNormalizer.score(targetInfo, candidateInfo);
             int specialScore = calculateSpecialScore(episodeInfo, groupKey, groupKey);
-            double legacySimilarity = calculateSimilarity(groupKey.split("【")[0].trim(), searchKeyword);
-            double prefixPenalty = calculateTitlePrefixPenalty(groupKey.split("【")[0].trim(), searchKeyword);
-            double groupScore = structuredScore + specialScore + legacySimilarity + prefixPenalty;
-            if (isOfficial && prefixPenalty >= -60) groupScore += 200;
+            double legacySimilarity = calculateSimilarity(groupTitle, searchKeyword);
+            double groupScore = structuredScore + specialScore + legacySimilarity;
+            if (isOfficial) groupScore += 200;
 
             DanmakuItem bestItem = null;
             double bestItemScore = -9999;
@@ -544,7 +547,7 @@ public class LeoDanmakuService {
             String kw = episodeInfo.getSearchKeyword();
             if (!TextUtils.isEmpty(kw)) {
                 double namePenalty = calculateTitlePrefixPenalty(titleToCompare, kw);
-                if (namePenalty < -60) return false;
+                if (namePenalty < 0) return false;
             }
             return true;
         }
