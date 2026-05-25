@@ -222,6 +222,8 @@ public class DanmakuScanner {
     // 启动Hook监控
     public static void startHookMonitor() {
 
+        DanmakuManager.resetAutoSearch();
+
         claimActiveInstance();
 
         if (hookTimer != null || isMonitoring) {
@@ -830,6 +832,7 @@ public class DanmakuScanner {
 
         // 【新增】清理UIHelper的资源
         DanmakuUIHelper.cleanupAllResources();
+        DanmakuManager.resetAutoSearch();
 
         Leodanmu.log("🛑 Hook监控已停止");
     }

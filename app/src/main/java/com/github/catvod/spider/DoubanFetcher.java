@@ -45,6 +45,41 @@ public class DoubanFetcher {
 
     private static boolean sDebugLogged = false;
 
+    // ─── TMDB ───────────────────────────────────────────────────────────────
+    private static final String TMDB_API_KEY = "c2d8bcc1ff01b54ee5039d5b70f2b67e";
+    private static final String TMDB_IMAGE_BASE = "https://image.tmdb.org/t/p/w500";
+
+    // ─── 熔断器（TMDB 用）──────────────────────────────────────────────────
+    private static class CircuitBreaker {
+        int failures = 0;
+        final int threshold;
+        final long timeoutMs;
+        long openedAt = 0;
+
+        CircuitBreaker(int threshold, long timeoutMs) {
+            this.threshold = threshold;
+            this.timeoutMs = timeoutMs;
+        }
+
+        boolean isOpen() {
+            if (openedAt == 0) return false;
+            if (System.currentTimeMillis() - openedAt >= timeoutMs) {
+                reset();
+                return false;
+            }
+            return true;
+        }
+
+        void onSuccess() { reset(); }
+        void onFailure() {
+            failures++;
+            if (failures >= threshold) openedAt = System.currentTimeMillis();
+        }
+        private void reset() { failures = 0; openedAt = 0; }
+    }
+
+    private static final CircuitBreaker tmdbBreaker = new CircuitBreaker(5, 5 * 60 * 1000);
+
     // ─── 分页缓存 ──────────────────────────────────────────────────────────
     private static final long CACHE_CLEAN_INTERVAL = 24 * 60 * 60 * 1000;
     private static final ConcurrentHashMap<String, PageCacheEntry> pageCache = new ConcurrentHashMap<>();
@@ -109,7 +144,8 @@ public class DoubanFetcher {
             String[][] coreTargets = {
                 {"movie", "U"}, {"tv", "U"}, {"show", "U"}, {"anime", "U"},
                 {"hot_movie", null}, {"hot_tv", null}, {"hot_show", null},
-                {"douban_anime", null}, {"top_250", null}
+                {"douban_anime", null}, {"top_250", null},
+                {"anime_tmdb", null}
             };
             for (String[] target : coreTargets) {
                 try {
@@ -134,7 +170,8 @@ public class DoubanFetcher {
     private static final Set<String> CATEGORIES = new HashSet<>(Arrays.asList(
             "latest", "douban_hot", "movie", "tv", "show", "anime", "douban_anime",
             "hot_movie", "hot_tv", "hot_show",
-            "movie_filter", "tv_filter", "top_250", "douban_playlist"
+            "movie_filter", "tv_filter", "top_250", "douban_playlist",
+            "anime_tmdb"
     ));
 
     // ─── JS tag ↔ sort map ─────────────────────────────────────────────────
@@ -225,6 +262,7 @@ public class DoubanFetcher {
         arr.put(classObj("tv_filter", "\u7535\u89c6\u7b5b\u9009"));
         arr.put(classObj("top_250", "\u8c46\u74e3\u7535\u5f71Top250"));
         arr.put(classObj("douban_playlist", "\u8c46\u74e3\u7247\u5355"));
+        arr.put(classObj("anime_tmdb", "\ud83c\udf1f TMDB\u52a8\u6f2b\u699c"));
         return arr;
     }
 
@@ -511,6 +549,20 @@ public class DoubanFetcher {
                 })
         ));
 
+        // ── TMDB 动漫榜 ─────────────────────────────────────────────────
+        root.put("anime_tmdb", buildFilters(
+                filter("榜单", "榜单", "hot_following", new String[][]{
+                        {"全球趋势", "global_trending"},
+                        {"高热追更", "hot_following"},
+                        {"最新首播", "latest_premiere"},
+                        {"热门口碑", "popular_reputation"}
+                }),
+                filter("年份", "年份", "all", buildYearFilterValues()),
+                filter("地区", "地区", "all", new String[][]{
+                        {"全部", "all"}, {"中国", "cn"}, {"日本", "jp"}, {"美国", "us"}, {"其他", "other"}
+                })
+        ));
+
         // ── 豆瓣动漫（合并动漫剧集+动漫电影）────────────────────────────
         root.put("douban_anime", buildFilters(
                 filter("榜单", "榜单", "anime_recent", new String[][]{
@@ -646,6 +698,9 @@ public class DoubanFetcher {
         if (merged.length() < 200) mergeItems(merged, PlatformFetcher.fetch360kan("1", 1), seen, 200);
         if (merged.length() < 200) mergeItems(merged, PlatformFetcher.fetch360kan("2", 1), seen, 200);
 
+        // 首页追加 TMDB 集数信息
+        batchAppendTmdbEpisodeInfo(merged);
+
         return merged;
     }
 
@@ -662,10 +717,23 @@ public class DoubanFetcher {
             JSONObject data = fetchCategoryInternal(id, page, filters);
             if (data != null) {
                 pageCache.put(cacheKey, new PageCacheEntry(data, System.currentTimeMillis()));
+            } else {
+                // 实时抓取返回空 → 尝试返回过期缓存（降级）
+                PageCacheEntry stale = pageCache.get(cacheKey);
+                if (stale != null) {
+                    Leodanmu.log("[豆瓣缓存] 降级返回过期缓存: " + cacheKey);
+                    return stale.data;
+                }
             }
             return data;
         } catch (Exception e) {
             // Leodanmu.log("[豆瓣缓存] 抓取异常: " + e.getMessage());
+            // 降级：返回过期缓存
+            PageCacheEntry stale = pageCache.get(cacheKey);
+            if (stale != null) {
+                Leodanmu.log("[豆瓣缓存] 异常降级返回过期缓存: " + cacheKey);
+                return stale.data;
+            }
             return null;
         }
     }
@@ -912,6 +980,12 @@ public class DoubanFetcher {
             }
             total = items.length() + COUNT;
 
+        // ── TMDB 动漫榜 ─────────────────────────────────────────────────
+        } else if ("anime_tmdb".equals(id)) {
+            fetchTmdbAnimeRanking(pg, filters, items);
+            total = items.length() + 20;
+            if (total < COUNT) total = COUNT;
+
         // ── 豆瓣片单 ────────────────────────────────────────────────────
         } else if ("douban_playlist".equals(id)) {
             String type = getFilter(filters, "类型", "");
@@ -987,6 +1061,12 @@ public class DoubanFetcher {
         }
 
         JSONArray mapped = mapItems(items);
+
+        // 剧集/动漫/综艺分类追加 TMDB 集数信息
+        if (TV_CATEGORIES.contains(id)) {
+            batchAppendTmdbEpisodeInfo(mapped);
+        }
+
         Set<String> seen = new HashSet<>();
         JSONArray finalList = new JSONArray();
         for (int i = 0; i < mapped.length(); i++) {
@@ -1436,4 +1516,283 @@ public class DoubanFetcher {
             return null;
         }
     }
+
+    // ===================== TMDB API =====================
+
+    private static JSONObject requestTmdb(String endpoint, Map<String, String> params) {
+        if (tmdbBreaker.isOpen()) {
+            Leodanmu.log("[TMDB] 熔断已开启，跳过请求: " + endpoint);
+            return null;
+        }
+        try {
+            StringBuilder url = new StringBuilder("https://api.themoviedb.org/3");
+            url.append(endpoint);
+            url.append(endpoint.contains("?") ? "&" : "?");
+            url.append("api_key=").append(TMDB_API_KEY);
+            url.append("&language=zh-CN");
+            if (params != null) {
+                for (Map.Entry<String, String> e : params.entrySet()) {
+                    if (!TextUtils.isEmpty(e.getValue())) {
+                        url.append("&").append(URLEncoder.encode(e.getKey(), "UTF-8"))
+                                .append("=").append(URLEncoder.encode(e.getValue(), "UTF-8"));
+                    }
+                }
+            }
+            String body = OkHttp.string(url.toString());
+            if (TextUtils.isEmpty(body)) {
+                tmdbBreaker.onFailure();
+                return null;
+            }
+            JSONObject data = new JSONObject(body);
+            if (data.has("success") && !data.optBoolean("success", true)) {
+                tmdbBreaker.onFailure();
+                return null;
+            }
+            tmdbBreaker.onSuccess();
+            return data;
+        } catch (Exception e) {
+            tmdbBreaker.onFailure();
+            Leodanmu.log("[TMDB] 请求异常: " + e.getMessage());
+            return null;
+        }
+    }
+
+    private static void fetchTmdbAnimeRanking(int pg, Map<String, String> filters, JSONArray items) throws Exception {
+        String sortKey = getFilter(filters, "榜单", "hot_following");
+        String yearFilter = getFilter(filters, "年份", "all");
+        String regionFilter = getFilter(filters, "地区", "all");
+
+        Map<String, String> params = new HashMap<>();
+        params.put("with_genres", "16");
+        params.put("include_adult", "false");
+        params.put("page", String.valueOf(pg));
+
+        switch (sortKey) {
+            case "latest_premiere":
+                params.put("sort_by", "first_air_date.desc");
+                break;
+            case "popular_reputation":
+                params.put("sort_by", "vote_average.desc");
+                params.put("vote_count.gte", "cn".equals(regionFilter) ? "50" : "200");
+                break;
+            case "global_trending":
+                params.put("sort_by", "popularity.desc");
+                params.put("first_air_date.gte", (java.util.Calendar.getInstance().get(java.util.Calendar.YEAR) - 2) + "-01-01");
+                params.put("vote_count.gte", "100");
+                break;
+            default: // hot_following
+                params.put("sort_by", "popularity.desc");
+                break;
+        }
+
+        if (!"all".equals(yearFilter)) {
+            params.put("first_air_date.gte", yearFilter + "-01-01");
+            params.put("first_air_date.lte", yearFilter + "-12-31");
+        }
+        if ("cn".equals(regionFilter)) params.put("with_origin_country", "CN");
+        else if ("jp".equals(regionFilter)) params.put("with_origin_country", "JP");
+        else if ("us".equals(regionFilter)) params.put("with_origin_country", "US");
+
+        JSONObject data = requestTmdb("/discover/tv", params);
+        if (data == null) return;
+
+        JSONArray results = data.optJSONArray("results");
+        if (results == null) return;
+
+        // 过滤"其他"地区
+        if ("other".equals(regionFilter)) {
+            JSONArray filtered = new JSONArray();
+            for (int i = 0; i < results.length(); i++) {
+                JSONObject item = results.optJSONObject(i);
+                if (item != null) {
+                    JSONArray countries = item.optJSONArray("origin_country");
+                    if (countries == null || countries.length() == 0) continue;
+                    String first = countries.optString(0, "");
+                    if (!"CN".equals(first) && !"JP".equals(first) && !"US".equals(first)) {
+                        filtered.put(item);
+                    }
+                }
+            }
+            results = filtered;
+        }
+
+        for (int i = 0; i < results.length(); i++) {
+            JSONObject item = results.optJSONObject(i);
+            if (item != null) items.put(toVodFromTmdbItem(item));
+        }
+    }
+
+    private static JSONObject toVodFromTmdbItem(JSONObject item) {
+        JSONObject vod = new JSONObject();
+        try {
+            String id = String.valueOf(item.optInt("id", 0));
+            String name = item.optString("name", item.optString("original_name", "未知"));
+            String posterPath = item.optString("poster_path", "");
+            String pic = TextUtils.isEmpty(posterPath) ? "" : TMDB_IMAGE_BASE + posterPath;
+            String firstAirDate = item.optString("first_air_date", "");
+            String year = firstAirDate.length() >= 4 ? firstAirDate.substring(0, 4) : "未知";
+            double voteAvg = item.optDouble("vote_average", 0);
+            int totalEpisodes = item.optInt("number_of_episodes", 0);
+            JSONObject lastEp = item.optJSONObject("last_episode_to_air");
+            JSONObject nextEp = item.optJSONObject("next_episode_to_air");
+            String status = item.optString("status", "");
+
+            String remarks;
+            if (voteAvg > 0) {
+                remarks = String.format(Locale.US, "%.1f分", voteAvg);
+            } else {
+                remarks = "暂无评分";
+            }
+
+            if ("Ended".equals(status) || "Canceled".equals(status)) {
+                if (totalEpisodes > 0) remarks += "(全" + totalEpisodes + "集)";
+                else remarks += "(已完结)";
+            } else if ("Returning Series".equals(status)) {
+                if (nextEp != null) {
+                    int nextEpNum = nextEp.optInt("episode_number", 0);
+                    if (nextEpNum > 1) remarks += "(更至" + (nextEpNum - 1) + "集)";
+                    else remarks += "(连载中)";
+                } else if (lastEp != null) {
+                    remarks += "(更至" + lastEp.optInt("episode_number", 0) + "集)";
+                } else if (totalEpisodes > 0) {
+                    remarks += "(共" + totalEpisodes + "集)";
+                } else {
+                    remarks += "(连载中)";
+                }
+            } else {
+                if (totalEpisodes > 0) remarks += "(共" + totalEpisodes + "集)";
+            }
+
+            vod.put("vod_id", "tmdb_" + id);
+            vod.put("vod_name", name);
+            vod.put("vod_pic", pic);
+            vod.put("vod_year", year);
+            vod.put("vod_remarks", remarks);
+            vod.put("vod_content", item.optString("overview", ""));
+            vod.put("goSearch", true);
+        } catch (Exception ignored) {}
+        return vod;
+    }
+
+    private static String[][] buildYearFilterValues() {
+        int currentYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR);
+        String[][] values = new String[12][2];
+        values[0] = new String[]{"全部", "all"};
+        for (int i = 0; i < 10; i++) {
+            String y = String.valueOf(currentYear - i);
+            values[i + 1] = new String[]{y, y};
+        }
+        values[11] = new String[]{"更早", "older"};
+        return values;
+    }
+
+    // ===================== TMDB 集数追加 =====================
+
+    private static boolean isTvCategory(String id) {
+        return !"movie".equals(id) && !"hot_movie".equals(id) && !"movie_filter".equals(id) && !"top_250".equals(id);
+    }
+
+    private static Integer searchTmdbTV(String name, String year) {
+        if (TextUtils.isEmpty(name)) return null;
+        String cleanName = name.replaceAll("\\s*[\\-—]\\s*第[一二三四五六七八九十百千万\\d]+季\\s*$", "")
+                .replaceAll("[（(][^）)]*[）)]", "").trim();
+        if (TextUtils.isEmpty(cleanName)) cleanName = name;
+
+        Map<String, String> params = new HashMap<>();
+        params.put("query", cleanName);
+        if (!TextUtils.isEmpty(year)) params.put("first_air_date_year", year);
+
+        JSONObject data = requestTmdb("/search/tv", params);
+        if (data != null) {
+            JSONArray results = data.optJSONArray("results");
+            if (results != null && results.length() > 0) {
+                return results.optJSONObject(0).optInt("id", 0);
+            }
+        }
+        // 不带年份再试一次
+        if (!TextUtils.isEmpty(year)) {
+            params.remove("first_air_date_year");
+            data = requestTmdb("/search/tv", params);
+            if (data != null) {
+                JSONArray results = data.optJSONArray("results");
+                if (results != null && results.length() > 0) {
+                    return results.optJSONObject(0).optInt("id", 0);
+                }
+            }
+        }
+        return null;
+    }
+
+    private static String getEpisodeTextFromTmdbDetail(JSONObject detail) {
+        String status = detail.optString("status", "");
+        int totalEpisodes = detail.optInt("number_of_episodes", 0);
+        JSONObject lastEp = detail.optJSONObject("last_episode_to_air");
+        JSONObject nextEp = detail.optJSONObject("next_episode_to_air");
+
+        if ("Ended".equals(status) || "Canceled".equals(status)) {
+            if (totalEpisodes > 0) return "(全" + totalEpisodes + "集)";
+            return "(已完结)";
+        }
+        if ("Returning Series".equals(status)) {
+            if (nextEp != null) {
+                int nextEpNum = nextEp.optInt("episode_number", 0);
+                if (nextEpNum > 1) return "(更至" + (nextEpNum - 1) + "集)";
+                return "(连载中)";
+            }
+            if (lastEp != null) return "(更至" + lastEp.optInt("episode_number", 0) + "集)";
+            if (totalEpisodes > 0) return "(共" + totalEpisodes + "集)";
+            return "(连载中)";
+        }
+        if (totalEpisodes > 0) return "(共" + totalEpisodes + "集)";
+        return "";
+    }
+
+    private static void batchAppendTmdbEpisodeInfo(JSONArray items) {
+        if (items == null || items.length() == 0) return;
+        Leodanmu.log("[TMDB集数] 开始批量查询，共" + items.length() + "条");
+        long batchStart = System.currentTimeMillis();
+
+        List<JSONObject> toProcess = new ArrayList<>();
+        for (int i = 0; i < items.length(); i++) {
+            JSONObject item = items.optJSONObject(i);
+            if (item == null) continue;
+            String remarks = item.optString("vod_remarks", "");
+            if (remarks.contains("集") || remarks.contains("更至") || remarks.contains("全")) continue;
+            toProcess.add(item);
+        }
+
+        int batchSize = 5;
+        int matched = 0;
+        for (int start = 0; start < toProcess.size(); start += batchSize) {
+            int end = Math.min(start + batchSize, toProcess.size());
+            for (int i = start; i < end; i++) {
+                JSONObject item = toProcess.get(i);
+                try {
+                    String name = item.optString("vod_name", "");
+                    String year = item.optString("vod_year", "");
+                    if (TextUtils.isEmpty(name)) continue;
+                    Integer tmdbId = searchTmdbTV(name, year);
+                    if (tmdbId == null || tmdbId == 0) continue;
+                    JSONObject detail = requestTmdb("/tv/" + tmdbId, null);
+                    if (detail == null) continue;
+                    String epText = getEpisodeTextFromTmdbDetail(detail);
+                    if (!TextUtils.isEmpty(epText)) {
+                        String currentRemarks = item.optString("vod_remarks", "");
+                        item.put("vod_remarks", currentRemarks + epText);
+                        matched++;
+                    }
+                } catch (Exception ignored) {}
+            }
+            if (end < toProcess.size()) {
+                try { Thread.sleep(300); } catch (InterruptedException e) { break; }
+            }
+        }
+        Leodanmu.log("[TMDB集数] 完成，匹配" + matched + "/" + toProcess.size() + "条，耗时" + (System.currentTimeMillis() - batchStart) + "ms");
+    }
+
+    private static final Set<String> TV_CATEGORIES = new HashSet<>(Arrays.asList(
+            "latest", "douban_hot", "tv", "show", "anime", "douban_anime",
+            "hot_tv", "hot_show", "tv_filter", "douban_playlist",
+            "anime_tmdb"
+    ));
 }
