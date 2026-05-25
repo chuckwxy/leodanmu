@@ -79,12 +79,15 @@ public class DoubanFetcher {
         private void reset() { failures = 0; openedAt = 0; }
     }
 
-    private static final CircuitBreaker tmdbBreaker = new CircuitBreaker(5, 5 * 60 * 1000);
+    private static final CircuitBreaker tmdbBreaker = new CircuitBreaker(2, 30 * 1000);
 
     // ─── 分页缓存 ──────────────────────────────────────────────────────────
     private static final long CACHE_CLEAN_INTERVAL = 24 * 60 * 60 * 1000;
+    private static final long HOME_LIST_CACHE_TTL = 5 * 60 * 1000;
     private static final ConcurrentHashMap<String, PageCacheEntry> pageCache = new ConcurrentHashMap<>();
     private static volatile boolean sCacheInitialized = false;
+    private static JSONArray sCachedHomeList = null;
+    private static long sHomeListCacheTime = 0;
 
     private static class PageCacheEntry {
         final JSONObject data;
@@ -114,14 +117,10 @@ public class DoubanFetcher {
             @Override
             public void run() {
                 try {
-                    Thread.sleep(5000);
+                    backgroundRefreshTask();
                     while (true) {
-                        try {
-                            backgroundRefreshTask();
-                        } catch (Exception e) {
-                            // Leodanmu.log("[豆瓣缓存] 线程异常: " + e.getMessage());
-                        }
                         Thread.sleep(CACHE_CLEAN_INTERVAL);
+                        backgroundRefreshTask();
                     }
                 } catch (InterruptedException ignored) {
                 }
@@ -134,38 +133,49 @@ public class DoubanFetcher {
     private static void backgroundRefreshTask() {
         try {
             long now = System.currentTimeMillis();
-            // clean stale entries
             for (Map.Entry<String, PageCacheEntry> e : pageCache.entrySet()) {
                 if (now - e.getValue().lastAccess > CACHE_CLEAN_INTERVAL) {
                     pageCache.remove(e.getKey());
                 }
             }
-            // Leodanmu.log("[豆瓣缓存] 开始后台预热...");
-            int refreshed = 0;
             String[][] coreTargets = {
-                {"movie", "U"}, {"tv", "U"}, {"show", "U"}, {"anime", "U"},
                 {"hot_movie", null}, {"hot_tv", null}, {"hot_show", null},
-                {"douban_anime", null}, {"top_250", null},
-                {"anime_tmdb", null}
+                {"movie", "U"}, {"tv", "U"}, {"show", "U"}, {"anime", "U"},
+                {"douban_anime", null}, {"top_250", null}
             };
-            for (String[] target : coreTargets) {
+            // 前3个并行预热（最常用的榜单）
+            List<Thread> workers = new ArrayList<>();
+            for (int i = 0; i < 3 && i < coreTargets.length; i++) {
+                String[] target = coreTargets[i];
+                Thread t = new Thread(() -> {
+                    try {
+                        String id = target[0];
+                        Map<String, String> f = new HashMap<>();
+                        if ("U".equals(target[1])) f.put("排序", "U");
+                        JSONObject data = fetchCategoryInternal(id, 1, f);
+                        if (data != null) {
+                            pageCache.put(getPageCacheKey(id, 1, f), new PageCacheEntry(data, System.currentTimeMillis()));
+                        }
+                    } catch (Exception ignored) {}
+                });
+                t.start();
+                workers.add(t);
+            }
+            for (Thread t : workers) t.join();
+            // 剩余分类串行，间隔300ms
+            for (int i = 3; i < coreTargets.length; i++) {
                 try {
-                    String id = target[0];
+                    String id = coreTargets[i][0];
                     Map<String, String> f = new HashMap<>();
-                    if ("U".equals(target[1])) f.put("排序", "U");
+                    if ("U".equals(coreTargets[i][1])) f.put("排序", "U");
                     JSONObject data = fetchCategoryInternal(id, 1, f);
                     if (data != null) {
-                        String key = getPageCacheKey(id, 1, f);
-                        pageCache.put(key, new PageCacheEntry(data, System.currentTimeMillis()));
-                        refreshed++;
+                        pageCache.put(getPageCacheKey(id, 1, f), new PageCacheEntry(data, System.currentTimeMillis()));
                     }
-                    Thread.sleep(2000);
+                    Thread.sleep(300);
                 } catch (Exception ignored) {}
             }
-            // Leodanmu.log("[豆瓣缓存] 后台预热完成，刷新 " + refreshed + " 个分类");
-        } catch (Exception e) {
-            // Leodanmu.log("[豆瓣缓存] 预热异常: " + e.getMessage());
-        }
+        } catch (Exception e) {}
     }
 
     private static final Set<String> CATEGORIES = new HashSet<>(Arrays.asList(
@@ -609,6 +619,10 @@ public class DoubanFetcher {
     }
 
     public static JSONArray fetchHomeList() {
+        long now = System.currentTimeMillis();
+        if (sCachedHomeList != null && now - sHomeListCacheTime < HOME_LIST_CACHE_TTL) {
+            return sCachedHomeList;
+        }
         JSONArray merged = new JSONArray();
         Set<String> seen = new HashSet<>();
 
@@ -700,8 +714,12 @@ public class DoubanFetcher {
         if (merged.length() < 200) mergeItems(merged, PlatformFetcher.fetch360kan("2", 1), seen, 200);
 
         // 首页追加 TMDB 集数信息
-        batchAppendTmdbEpisodeInfo(merged);
+        if (!tmdbBreaker.isOpen()) {
+            batchAppendTmdbEpisodeInfo(merged);
+        }
 
+        sCachedHomeList = merged;
+        sHomeListCacheTime = System.currentTimeMillis();
         return merged;
     }
 
@@ -1064,7 +1082,7 @@ public class DoubanFetcher {
         JSONArray mapped = mapItems(items);
 
         // 剧集/动漫/综艺分类追加 TMDB 集数信息
-        if (TV_CATEGORIES.contains(id)) {
+        if (TV_CATEGORIES.contains(id) && !tmdbBreaker.isOpen()) {
             batchAppendTmdbEpisodeInfo(mapped);
         }
 
@@ -1539,7 +1557,7 @@ public class DoubanFetcher {
                     }
                 }
             }
-            String body = OkHttp.string(url.toString());
+            String body = OkHttp.string(url.toString(), 5000);
             if (TextUtils.isEmpty(body)) {
                 tmdbBreaker.onFailure();
                 return null;
@@ -1764,6 +1782,7 @@ public class DoubanFetcher {
 
         int batchSize = 5;
         int matched = 0;
+        int consecutiveFails = 0;
         for (int start = 0; start < toProcess.size(); start += batchSize) {
             int end = Math.min(start + batchSize, toProcess.size());
             for (int i = start; i < end; i++) {
@@ -1773,16 +1792,22 @@ public class DoubanFetcher {
                     String year = item.optString("vod_year", "");
                     if (TextUtils.isEmpty(name)) continue;
                     Integer tmdbId = searchTmdbTV(name, year);
-                    if (tmdbId == null || tmdbId == 0) continue;
+                    if (tmdbId == null || tmdbId == 0) { consecutiveFails++; continue; }
                     JSONObject detail = requestTmdb("/tv/" + tmdbId, null);
-                    if (detail == null) continue;
+                    if (detail == null) { consecutiveFails++; continue; }
+                    consecutiveFails = 0;
                     String epText = getEpisodeTextFromTmdbDetail(detail);
                     if (!TextUtils.isEmpty(epText)) {
                         String currentRemarks = item.optString("vod_remarks", "");
                         item.put("vod_remarks", currentRemarks + epText);
                         matched++;
                     }
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) { consecutiveFails++; }
+            }
+            // 连续10次失败 → TMDB不可达，提前退出
+            if (consecutiveFails >= 10) {
+                Leodanmu.log("[TMDB集数] 连续10次失败，提前退出");
+                break;
             }
             if (end < toProcess.size()) {
                 try { Thread.sleep(300); } catch (InterruptedException e) { break; }
