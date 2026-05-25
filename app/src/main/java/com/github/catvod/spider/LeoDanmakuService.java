@@ -453,8 +453,8 @@ public class LeoDanmakuService {
         String episodeTag = buildEpisodeMatchTag(episodeInfo);
         TitleMatchInfo targetInfo = TitleNormalizer.parse(searchKeyword + " " + episodeTag);
 
-        List<GroupPickResult> officialList = new ArrayList<>();
-        List<GroupPickResult> allList = new ArrayList<>();
+        List<GroupPickResult> exactList = new ArrayList<>();
+        List<GroupPickResult> fuzzyList = new ArrayList<>();
 
         for (Map.Entry<String, List<DanmakuItem>> entry : grouped.entrySet()) {
             String groupKey = entry.getKey();
@@ -473,6 +473,9 @@ public class LeoDanmakuService {
             }
 
             TitleMatchInfo candidateInfo = TitleNormalizer.parse(groupKey);
+            boolean isExactTitle = !TextUtils.isEmpty(targetInfo.coreTitle)
+                    && targetInfo.coreTitle.equals(candidateInfo.coreTitle);
+
             int structuredScore = TitleNormalizer.score(targetInfo, candidateInfo);
             int specialScore = calculateSpecialScore(episodeInfo, groupKey, groupKey);
             double legacySimilarity = calculateSimilarity(groupTitle, searchKeyword);
@@ -495,15 +498,15 @@ public class LeoDanmakuService {
             }
 
             GroupPickResult candidate = new GroupPickResult(groupKey, items, groupScore, bestItemScore, bestItem);
-            (isOfficial ? officialList : allList).add(candidate);
+            (isExactTitle ? exactList : fuzzyList).add(candidate);
         }
 
-        Collections.sort(officialList, (a, b) -> Double.compare(b.groupScore + b.itemScore, a.groupScore + a.itemScore));
-        Collections.sort(allList, (a, b) -> Double.compare(b.groupScore + b.itemScore, a.groupScore + a.itemScore));
+        Collections.sort(exactList, (a, b) -> Double.compare(b.groupScore + b.itemScore, a.groupScore + a.itemScore));
+        Collections.sort(fuzzyList, (a, b) -> Double.compare(b.groupScore + b.itemScore, a.groupScore + a.itemScore));
 
         List<GroupPickResult> result = new ArrayList<>();
-        result.addAll(officialList);
-        result.addAll(allList);
+        result.addAll(exactList);
+        result.addAll(fuzzyList);
 
         return result;
     }

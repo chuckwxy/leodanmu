@@ -160,7 +160,7 @@ public class PlatformFetcher {
         String cacheKey = "tencent_" + type + "_" + page + "_" + sourceKey;
         synchronized (tencentCache) {
             JSONArray cached = tencentCache.get(cacheKey);
-            if (cached != null) { // Leodanmu.log("腾缓存 hit"); return cached; }
+            if (cached != null) { return cached; }
         }
         try {
             String url = "https://pbaccess.video.qq.com/trpc.vector_layout.page_view.PageService/getPage?video_appid=3000010";
@@ -201,9 +201,9 @@ public class PlatformFetcher {
             if (data == null) return items;
 
             JSONObject dataObj = data.optJSONObject("data");
-            if (dataObj == null) { // Leodanmu.log("腾data null"); return items; }
+            if (dataObj == null) { return items; }
             JSONArray cardList = dataObj.optJSONArray("CardList");
-            if (cardList == null || cardList.length() == 0) { // Leodanmu.log("腾CardList empty"); return items; }
+            if (cardList == null || cardList.length() == 0) { return items; }
             for (int ci = 0; ci < cardList.length(); ci++) {
                 JSONObject card = cardList.optJSONObject(ci);
                 if (card == null) continue;
