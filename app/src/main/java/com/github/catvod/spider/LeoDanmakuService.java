@@ -870,13 +870,13 @@ public class LeoDanmakuService {
             }
 
             // 先尝试反射推送，成功则跳过HTTP
-            if (tryPushDanmakuByReflection(danmakuItem, activity, refreshPath)) {
+                if (tryPushDanmakuByReflection(danmakuItem, activity, refreshPath)) {
                 Leodanmu.log("✅ 反射推送成功，跳过HTTP");
                 if (fastPushThenVerify) {
                     verifyDanmakuAfterPushAsync(danmakuItem, activity);
                 } else {
                     int danmakuCount = fetchValidDanmakuCount(danmakuItem, 1);
-                    notifyPushResult(activity, danmakuItem, danmakuCount, "");
+                    notifyPushResult(activity, danmakuItem, danmakuCount, "ok");
                 }
                 return;
             }
