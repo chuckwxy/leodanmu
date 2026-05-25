@@ -222,8 +222,6 @@ public class DanmakuScanner {
     // 启动Hook监控
     public static void startHookMonitor() {
 
-        DanmakuManager.resetAutoSearch();
-
         claimActiveInstance();
 
         if (hookTimer != null || isMonitoring) {
@@ -234,6 +232,7 @@ public class DanmakuScanner {
         Leodanmu.log("🚀 启动Hook监控");
         isMonitoring = true;
         isFirstDetection = true;
+        DanmakuManager.clearPreCache();
 
         hookTimer = new Timer("DanmakuHookTimer", true);
         hookTimer.schedule(new TimerTask() {
@@ -832,7 +831,9 @@ public class DanmakuScanner {
 
         // 【新增】清理UIHelper的资源
         DanmakuUIHelper.cleanupAllResources();
-        DanmakuManager.resetAutoSearch();
+
+        // 清空预缓存
+        DanmakuManager.clearPreCache();
 
         Leodanmu.log("🛑 Hook监控已停止");
     }
@@ -1254,17 +1255,7 @@ public class DanmakuScanner {
         // 如果上下文中有明显的非集数关键词，减分
         boolean hasNonEpisodeKeyword = context.matches(".*(?i)(gb|mb|kb|size|大小|分辨率|fps|bitrate|码率).*");
 
-        // 1-99 正常集数范围
-        if (numValue >= 1 && numValue <= 99) {
-            return !hasNonEpisodeKeyword;
-        }
-
-        // 100-999：有集数关键词，或位于标题末尾（无歧义后缀）即接受
-        if (hasEpisodeKeyword) {
-            return true;
-        }
-        String after = end < title.length() ? title.substring(end).trim() : "";
-        return after.isEmpty() || after.matches("[\\]\\)】）.。\\-\\s]+.*");
+        return hasEpisodeKeyword || (!hasNonEpisodeKeyword && numValue >= 1 && numValue <= 99);
     }
 
     /**
@@ -1620,11 +1611,14 @@ public class DanmakuScanner {
                 scheduleDelayedPush(nextDanmakuItem, activity, title, pushKey, true);
             } else {
                 Leodanmu.log("⚠️ 无法直接获取下一个弹幕URL，重新查询");
+                if (tryPushFromPreCache(activity, targetEpisodeNumValue, currentEpisodeNumValue)) {
+                    return;
+                }
                 LeoDanmakuService.autoSearch(lastEpisodeInfo, activity);
             }
         } else {
             // 不同的剧集系列，清空旧缓存并更新记录
-            DanmakuManager.resetAutoSearch();
+            DanmakuManager.clearPreCache();
             String episodeName = lastEpisodeInfo.getEpisodeNames() != null && !lastEpisodeInfo.getEpisodeNames().isEmpty() ?
                     lastEpisodeInfo.getEpisodeNames().get(0) : lastEpisodeInfo.getEpisodeName();
             Leodanmu.log("🎬 剧集名: " + episodeName +
@@ -2137,6 +2131,24 @@ public class DanmakuScanner {
         }
 
         return true;
+    }
+
+    // 预缓存兜底：ID递增未命中时检查预缓存并直接推送
+    private static boolean tryPushFromPreCache(Activity activity, int targetEpisodeNum, int currentEpisodeNum) {
+        int predictedEpId = DanmakuManager.lastDanmakuId + (targetEpisodeNum - currentEpisodeNum);
+        if (predictedEpId == DanmakuManager.getPreCachedEpId() && DanmakuManager.getPreCachedEpId() > 0) {
+            DanmakuItem item = DanmakuManager.getNextDanmakuItem(currentEpisodeNum, targetEpisodeNum);
+            if (item != null) {
+                // 直接从预缓存推送（网络验证已在预缓存阶段完成）
+                Leodanmu.log("⚡ 预缓存兜底命中: epId=" + predictedEpId);
+                String pushKey = generateSignature(lastEpisodeInfo);
+                String title = lastEpisodeInfo.getEpisodeNames() != null && !lastEpisodeInfo.getEpisodeNames().isEmpty() ?
+                        lastEpisodeInfo.getEpisodeNames().get(0) : lastEpisodeInfo.getEpisodeName();
+                scheduleDelayedPush(item, activity, title, pushKey, true);
+                return true;
+            }
+        }
+        return false;
     }
 
     private static void startAutoSearch(EpisodeInfo episodeInfo, final Activity activity) {

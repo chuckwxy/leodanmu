@@ -17,14 +17,49 @@ public class DanmakuConfig {
     private boolean pushToastEnabled = true;
     private int theme = 0;
     private int danmakuTimeOffsetMs = 0;
+    private String pansouApiUrl = "";
+    private String quarkCookie = "";
+    private String ucCookie = "";
+    private String baiduCookie = "";
 
     public DanmakuConfig() {
-        // 设置默认值
         apiUrls = new HashSet<>();
         lpWidth = 1.0f;
         lpHeight = 1.0f;
         lpAlpha = 1.0f;
         autoPushEnabled = true;
+    }
+
+    public String getPansouApiUrl() {
+        return pansouApiUrl;
+    }
+
+    public void setPansouApiUrl(String pansouApiUrl) {
+        this.pansouApiUrl = pansouApiUrl != null ? pansouApiUrl.trim() : "";
+    }
+
+    public String getQuarkCookie() {
+        return quarkCookie;
+    }
+
+    public void setQuarkCookie(String quarkCookie) {
+        this.quarkCookie = quarkCookie != null ? quarkCookie.trim() : "";
+    }
+
+    public String getUcCookie() {
+        return ucCookie;
+    }
+
+    public void setUcCookie(String ucCookie) {
+        this.ucCookie = ucCookie != null ? ucCookie.trim() : "";
+    }
+
+    public String getBaiduCookie() {
+        return baiduCookie;
+    }
+
+    public void setBaiduCookie(String baiduCookie) {
+        this.baiduCookie = baiduCookie != null ? baiduCookie.trim() : "";
     }
 
     public Set<String> getApiUrls() {
@@ -138,6 +173,18 @@ public class DanmakuConfig {
         }
         if (json.has("danmakuTimeOffsetMs")) {
             setDanmakuTimeOffsetMs(json.optInt("danmakuTimeOffsetMs"));
+        }
+        if (json.has("pansouApiUrl")) {
+            setPansouApiUrl(json.optString("pansouApiUrl"));
+        }
+        if (json.has("quarkCookie")) {
+            setQuarkCookie(json.optString("quarkCookie"));
+        }
+        if (json.has("ucCookie")) {
+            setUcCookie(json.optString("ucCookie"));
+        }
+        if (json.has("baiduCookie")) {
+            setBaiduCookie(json.optString("baiduCookie"));
         }
     }
 }

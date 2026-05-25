@@ -85,7 +85,7 @@ public class Leodanmu extends Spider {
         // 插件退出时清理所有缓存
         try {
             DanmakuScanner.stopHookMonitor();
-            DanmakuManager.resetAutoSearch();
+            DanmakuManager.clearPreCache();
             if (sCacheDir != null && sCacheDir.exists()) {
                 File[] files = sCacheDir.listFiles();
                 if (files != null) {

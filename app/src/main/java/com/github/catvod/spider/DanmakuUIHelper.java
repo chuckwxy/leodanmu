@@ -1343,9 +1343,6 @@ public class DanmakuUIHelper {
                 searchInput.setHint("输入关键词...");
                 String cachedKeyword = SharedPreferencesService.getSearchKeywordCache(activity, initialKeyword);
                 searchInput.setText(cachedKeyword);
-                if (!TextUtils.isEmpty(cachedKeyword)) {
-                    searchInput.setSelection(cachedKeyword.length());
-                }
                 searchInput.setHintTextColor(colors.textTertiary);
                 searchInput.setBackgroundColor(Color.TRANSPARENT);
                 searchInput.setPadding(dpToPx(activity, 12), dpToPx(activity, 10),

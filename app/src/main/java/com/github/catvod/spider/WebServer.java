@@ -227,6 +227,32 @@ public class WebServer extends NanoHTTPD {
             }
             return newFixedLengthResponse(Response.Status.NOT_FOUND, MIME_PLAINTEXT, "Danmaku not found with given epId.");
         }
+        else if (uri.equals("/danmaku-cache")) {
+            Map<String, String> params = session.getParms();
+            String cacheKeyParam = params.get("key");
+            if (TextUtils.isEmpty(cacheKeyParam)) {
+                return newFixedLengthResponse(Response.Status.BAD_REQUEST, MIME_PLAINTEXT, "Missing key.");
+            }
+            String cacheKey = DanmakuManager.decodeCacheKey(cacheKeyParam);
+            if (TextUtils.isEmpty(cacheKey)) {
+                return newFixedLengthResponse(Response.Status.BAD_REQUEST, MIME_PLAINTEXT, "Invalid key.");
+            }
+            String cachedXml = DanmakuManager.getCachedXmlByKey(cacheKey);
+            if (TextUtils.isEmpty(cachedXml)) {
+                Leodanmu.log("本地缓存未命中: key=" + cacheKey);
+                return newFixedLengthResponse(Response.Status.NOT_FOUND, MIME_PLAINTEXT, "Cache not found.");
+            }
+            Activity activity = Utils.getTopActivity();
+            DanmakuConfig config = DanmakuConfigManager.getConfig(activity);
+            int offsetMs = config != null ? config.getDanmakuTimeOffsetMs() : 0;
+            if (offsetMs != 0) {
+                Leodanmu.log("本地缓存弹幕，时间偏移: " + DanmakuUtils.formatOffsetLabel(offsetMs));
+            }
+            String body = DanmakuUtils.applyTimeOffset(cachedXml, offsetMs);
+            Response response = newFixedLengthResponse(Response.Status.OK, "application/xml; charset=utf-8", body);
+            response.addHeader("Access-Control-Allow-Origin", "*");
+            return response;
+        }
         else if (uri.equals("/danmaku")) {
             Map<String, String> params = session.getParms();
             String danmakuUrl = params.get("url");
