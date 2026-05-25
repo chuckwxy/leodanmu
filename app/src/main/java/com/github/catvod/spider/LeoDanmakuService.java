@@ -497,8 +497,8 @@ public class LeoDanmakuService {
         }
 
         // 官源按总分降序，非官源按总分降序
-        officialList.sort((a, b) -> Double.compare(b.groupScore + b.itemScore, a.groupScore + a.itemScore));
-        allList.sort((a, b) -> Double.compare(b.groupScore + b.itemScore, a.groupScore + a.itemScore));
+        Collections.sort(officialList, (a, b) -> Double.compare(b.groupScore + b.itemScore, a.groupScore + a.itemScore));
+        Collections.sort(allList, (a, b) -> Double.compare(b.groupScore + b.itemScore, a.groupScore + a.itemScore));
 
         // 官源优先：所有官源排在非官源前面
         List<GroupPickResult> result = new ArrayList<>();
