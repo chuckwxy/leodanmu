@@ -859,12 +859,12 @@ public class DanmakuUIHelper {
                 Button autoProxyBtn = new Button(activity);
                 Button goProxyBtn = new Button(activity);
                 Button javaProxyBtn = new Button(activity);
-                autoProxyBtn.setText("自动");
+                autoProxyBtn.setText("Au");
                 goProxyBtn.setText("Go");
-                javaProxyBtn.setText("Java");
-                autoProxyBtn.setTextSize(13);
-                goProxyBtn.setTextSize(13);
-                javaProxyBtn.setTextSize(13);
+                javaProxyBtn.setText("Ja");
+                autoProxyBtn.setTextSize(12);
+                goProxyBtn.setTextSize(12);
+                javaProxyBtn.setTextSize(12);
                 autoProxyBtn.setTypeface(null, android.graphics.Typeface.BOLD);
                 goProxyBtn.setTypeface(null, android.graphics.Typeface.BOLD);
                 javaProxyBtn.setTypeface(null, android.graphics.Typeface.BOLD);

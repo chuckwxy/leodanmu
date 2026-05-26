@@ -255,7 +255,7 @@ public class GoProxyManager {
                 dos.writeBytes("sleep 1\n");
                 dos.flush();
                 java.io.File logFile = new java.io.File(context.getCacheDir(), "goproxy_output.log");
-                dos.writeBytes("nohup " + file.getAbsolutePath() + " > " + logFile.getAbsolutePath() + " 2>&1 &\n");
+                dos.writeBytes("nohup " + file.getAbsolutePath() + " --port " + DEFAULT_BACKEND_PORT + " > " + logFile.getAbsolutePath() + " 2>&1 &\n");
                 dos.flush();
                 dos.writeBytes("exit\n");
                 dos.flush();
@@ -264,10 +264,10 @@ public class GoProxyManager {
             Thread.sleep(3000);
 
             if (isProxyHealthy()) {
-                log("[二进制] Go代理启动成功");
+                log("[二进制] Go代理启动成功，端口: " + currentBackendPort);
                 isProxyRunning.set(true);
             } else {
-                log("[二进制] Go代理健康检查失败");
+                log("[二进制] Go代理健康检查失败，端口: " + currentBackendPort);
                 isProxyRunning.set(false);
             }
 
