@@ -208,7 +208,7 @@ public class JavaProxyServer {
             // Phase 3: Auto-tune based on probe speed vs target
             if (autoTune && targetSpeedMBps > 0 && probeSpeedMBps > 0) {
                 double ratio = targetSpeedMBps / Math.max(probeSpeedMBps, 0.1);
-                int tunedThread = clamp((int) Math.round(threadCount * ratio), 2, 64);
+                int tunedThread = clamp((int) Math.round(threadCount * ratio), 2, 16);
                 int tunedChunkKB = clamp((int) Math.round(chunkSizeKB * Math.sqrt(ratio)), 128, 2048);
 
                 if (tunedThread != threadCount || tunedChunkKB != chunkSizeKB) {
@@ -341,8 +341,8 @@ public class JavaProxyServer {
 
                     if (targetSpeedMBps > 0 && curSpeed > 0) {
                         double ratio = curSpeed / targetSpeedMBps;
-                        if (ratio < 0.5 && adaptiveThread < 64) {
-                            adaptiveThread = Math.min(64, (int)(adaptiveThread * 1.5));
+                        if (ratio < 0.5 && adaptiveThread < 16) {
+                            adaptiveThread = Math.min(16, (int)(adaptiveThread * 1.5));
                             int nc = Math.min(2048, (int)(chunkSizeKB * 1.2));
                             chunkSizeKB = nc;
                             chunkSize = (long) chunkSizeKB * 1024;

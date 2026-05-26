@@ -228,6 +228,14 @@ public class ProxyManager {
     }
 
     public static synchronized boolean startJavaProxy(Context context) {
+        if (context != null) {
+            DanmakuConfig config = DanmakuConfigManager.getConfig(context);
+            if (config.getProxyThread() > 16 || config.getProxyChunkSize() > 1024) {
+                if (config.getProxyThread() > 16) config.setProxyThread(16);
+                if (config.getProxyChunkSize() > 1024) config.setProxyChunkSize(1024);
+                DanmakuConfigManager.saveConfig(context, config);
+            }
+        }
         if (isJavaProxyEndpointHealthy()) {
             activeProxyType.set(PROXY_TYPE_JAVA);
             isProxyRunning.set(true);
@@ -346,8 +354,8 @@ public class ProxyManager {
         if (now - lastAutoTuneSaveTime < 5000) return;
         lastAutoTuneSaveTime = now;
         DanmakuConfig config = DanmakuConfigManager.getConfig(context);
-        config.setProxyThread(thread);
-        config.setProxyChunkSize(chunkSize);
+        config.setProxyThread(Math.min(thread, 16));
+        config.setProxyChunkSize(Math.min(chunkSize, 1024));
         DanmakuConfigManager.saveConfig(context, config);
     }
 
@@ -374,7 +382,7 @@ public class ProxyManager {
         lastSourceSaveTime = now;
         DanmakuConfig config = DanmakuConfigManager.getConfig(context);
         Map<String, DanmakuConfig.SourceProxyConfig> map = config.getProxySourceConfig();
-        map.put(source, new DanmakuConfig.SourceProxyConfig(thread, chunkSize));
+        map.put(source, new DanmakuConfig.SourceProxyConfig(Math.min(thread, 16), Math.min(chunkSize, 1024)));
         config.setProxySourceConfig(map);
         DanmakuConfigManager.saveConfig(context, config);
     }
