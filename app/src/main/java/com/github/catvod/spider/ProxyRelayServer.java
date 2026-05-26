@@ -7,8 +7,10 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class ProxyRelayServer {
 
@@ -90,8 +92,14 @@ public class ProxyRelayServer {
             client.setTcpNoDelay(true);
 
             final Socket finalBackend = backend;
-            relayExecutor.execute(() -> pipeQuietly(client, finalBackend));
-            pipeQuietly(finalBackend, client);
+            final CountDownLatch latch = new CountDownLatch(2);
+            relayExecutor.execute(() -> {
+                try { pipeQuietly(client, finalBackend); } finally { latch.countDown(); }
+            });
+            relayExecutor.execute(() -> {
+                try { pipeQuietly(finalBackend, client); } finally { latch.countDown(); }
+            });
+            latch.await(30, TimeUnit.SECONDS);
         } catch (Exception e) {
             ProxyManager.log("[前门] 转发失败: " + e.getMessage());
             writeServiceUnavailable(client, "Backend unavailable");
