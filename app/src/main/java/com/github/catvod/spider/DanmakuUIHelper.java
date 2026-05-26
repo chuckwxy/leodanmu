@@ -826,6 +826,104 @@ public class DanmakuUIHelper {
                 themeRow.addView(darkThemeBtn);
                 themeRow.addView(lightThemeBtn);
                 settingsCard.addView(themeRow);
+
+                // ========== 代理切换行 ==========
+                LinearLayout proxyRow = new LinearLayout(activity);
+                proxyRow.setOrientation(LinearLayout.HORIZONTAL);
+                proxyRow.setGravity(Gravity.CENTER_VERTICAL);
+                proxyRow.setLayoutParams(new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+                proxyRow.setClipChildren(false);
+                proxyRow.setFocusable(false);
+                proxyRow.setFocusableInTouchMode(false);
+
+                LinearLayout.LayoutParams proxyRowParams = new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                proxyRowParams.topMargin = rowGap;
+                proxyRow.setLayoutParams(proxyRowParams);
+                proxyRow.setPadding(0, dpToPx(activity, 2), 0, dpToPx(activity, 2));
+
+                TextView proxyLabel = new TextView(activity);
+                proxyLabel.setText("代理");
+                proxyLabel.setTextSize(14);
+                proxyLabel.setTextColor(colors.textPrimary);
+                proxyLabel.setPadding(dpToPx(activity, 6), 0, dpToPx(activity, 8), 0);
+                proxyLabel.setFocusable(false);
+                LinearLayout.LayoutParams proxyLabelParams = new LinearLayout.LayoutParams(
+                        labelWidth, ViewGroup.LayoutParams.WRAP_CONTENT);
+                proxyLabelParams.gravity = Gravity.CENTER_VERTICAL;
+                proxyLabel.setLayoutParams(proxyLabelParams);
+
+                int currentProxyType = config.getProxyType();
+
+                Button autoProxyBtn = new Button(activity);
+                Button goProxyBtn = new Button(activity);
+                Button javaProxyBtn = new Button(activity);
+                autoProxyBtn.setText("自动");
+                goProxyBtn.setText("Go");
+                javaProxyBtn.setText("Java");
+                autoProxyBtn.setTextSize(13);
+                goProxyBtn.setTextSize(13);
+                javaProxyBtn.setTextSize(13);
+                autoProxyBtn.setTypeface(null, android.graphics.Typeface.BOLD);
+                goProxyBtn.setTypeface(null, android.graphics.Typeface.BOLD);
+                javaProxyBtn.setTypeface(null, android.graphics.Typeface.BOLD);
+                autoProxyBtn.setPadding(dpToPx(activity, 6), 0, dpToPx(activity, 6), 0);
+                goProxyBtn.setPadding(dpToPx(activity, 6), 0, dpToPx(activity, 6), 0);
+                javaProxyBtn.setPadding(dpToPx(activity, 6), 0, dpToPx(activity, 6), 0);
+
+                LinearLayout.LayoutParams proxyBtnParams = new LinearLayout.LayoutParams(
+                        0, dpToPx(activity, 36), 1);
+                proxyBtnParams.setMargins(dpToPx(activity, 4), 0, dpToPx(activity, 4), 0);
+                autoProxyBtn.setLayoutParams(proxyBtnParams);
+                goProxyBtn.setLayoutParams(proxyBtnParams);
+                javaProxyBtn.setLayoutParams(proxyBtnParams);
+
+                setButtonSelected(autoProxyBtn, currentProxyType == 0, colors, activity);
+                setButtonSelected(goProxyBtn, currentProxyType == 1, colors, activity);
+                setButtonSelected(javaProxyBtn, currentProxyType == 2, colors, activity);
+
+                View.OnFocusChangeListener proxyFocusListener = (v, hasFocus) -> {
+                    GradientDrawable drawable = (GradientDrawable) v.getBackground();
+                    if (hasFocus) {
+                        drawable.setStroke(dpToPx(activity, 2), colors.focusBorder);
+                    } else {
+                        drawable.setStroke(0, Color.TRANSPARENT);
+                    }
+                    v.setBackground(drawable);
+                };
+                autoProxyBtn.setOnFocusChangeListener(proxyFocusListener);
+                goProxyBtn.setOnFocusChangeListener(proxyFocusListener);
+                javaProxyBtn.setOnFocusChangeListener(proxyFocusListener);
+
+                autoProxyBtn.setOnClickListener(v -> {
+                    if (config.getProxyType() != 0) {
+                        config.setProxyType(0);
+                        DanmakuConfigManager.saveConfig(activity, config);
+                        dialog.dismiss();
+                        showCombinedConfigDialog(activity);
+                    }
+                });
+                goProxyBtn.setOnClickListener(v -> {
+                    config.setProxyType(1);
+                    DanmakuConfigManager.saveConfig(activity, config);
+                    dialog.dismiss();
+                    showCombinedConfigDialog(activity);
+                    ProxyManager.switchToGoProxy(activity.getApplicationContext());
+                });
+                javaProxyBtn.setOnClickListener(v -> {
+                    config.setProxyType(2);
+                    DanmakuConfigManager.saveConfig(activity, config);
+                    dialog.dismiss();
+                    showCombinedConfigDialog(activity);
+                    ProxyManager.switchToJavaProxy(activity.getApplicationContext());
+                });
+
+                proxyRow.addView(proxyLabel);
+                proxyRow.addView(autoProxyBtn);
+                proxyRow.addView(goProxyBtn);
+                proxyRow.addView(javaProxyBtn);
+                settingsCard.addView(proxyRow);
                 settingsWrap.addView(settingsCard);
 
                 LinearLayout actionWrap = new LinearLayout(activity);
@@ -919,6 +1017,21 @@ public class DanmakuUIHelper {
                     }
                 });
                 actionCard.addView(logBtn);
+
+                // 代理状态显示
+                TextView proxyStatusView = new TextView(activity);
+                String proxyTypeName = ProxyManager.getProxyTypeName();
+                String proxyStatus = ProxyManager.getProxyStatusText();
+                proxyStatusView.setText(proxyTypeName + "：" + proxyStatus);
+                proxyStatusView.setTextSize(12);
+                proxyStatusView.setTextColor(colors.textSecondary);
+                proxyStatusView.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
+                LinearLayout.LayoutParams statusParams = new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(activity, 30));
+                statusParams.topMargin = actionButtonGap;
+                proxyStatusView.setLayoutParams(statusParams);
+                proxyStatusView.setPadding(dpToPx(activity, 6), 0, dpToPx(activity, 6), 0);
+                actionCard.addView(proxyStatusView);
 
                 View actionFill = new View(activity);
                 actionFill.setLayoutParams(new LinearLayout.LayoutParams(
@@ -1207,7 +1320,11 @@ public class DanmakuUIHelper {
                 scrollView.setLayoutParams(scrollParams);
 
                 TextView logView = new TextView(activity);
-                logView.setText(Leodanmu.getLogContent());
+                String logContent = Leodanmu.getLogContent();
+                if (ProxyManager.hasLogs()) {
+                    logContent += "\n\n===== 代理日志 =====\n" + ProxyManager.getLogContent();
+                }
+                logView.setText(logContent);
                 logView.setTextSize(11);
                 logView.setTextColor(colors.textSecondary);
                 logView.setPadding(dpToPx(activity, 16), dpToPx(activity, 16),
@@ -1246,6 +1363,7 @@ public class DanmakuUIHelper {
 
                 clearButton.setOnClickListener(v -> {
                     Leodanmu.clearLogs();
+                    ProxyManager.clearLogs();
                     dialog.dismiss();
                     showLogDialog(ctx);
                 });
