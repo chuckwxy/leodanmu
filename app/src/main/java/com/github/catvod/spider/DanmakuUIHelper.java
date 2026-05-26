@@ -896,29 +896,6 @@ public class DanmakuUIHelper {
                 goProxyBtn.setOnFocusChangeListener(proxyFocusListener);
                 javaProxyBtn.setOnFocusChangeListener(proxyFocusListener);
 
-                autoProxyBtn.setOnClickListener(v -> {
-                    if (config.getProxyType() != 0) {
-                        config.setProxyType(0);
-                        DanmakuConfigManager.saveConfig(activity, config);
-                        dialog.dismiss();
-                        showCombinedConfigDialog(activity);
-                    }
-                });
-                goProxyBtn.setOnClickListener(v -> {
-                    config.setProxyType(1);
-                    DanmakuConfigManager.saveConfig(activity, config);
-                    dialog.dismiss();
-                    showCombinedConfigDialog(activity);
-                    ProxyManager.switchToGoProxy(activity.getApplicationContext());
-                });
-                javaProxyBtn.setOnClickListener(v -> {
-                    config.setProxyType(2);
-                    DanmakuConfigManager.saveConfig(activity, config);
-                    dialog.dismiss();
-                    showCombinedConfigDialog(activity);
-                    ProxyManager.switchToJavaProxy(activity.getApplicationContext());
-                });
-
                 proxyRow.addView(proxyLabel);
                 proxyRow.addView(autoProxyBtn);
                 proxyRow.addView(goProxyBtn);
@@ -1066,6 +1043,30 @@ public class DanmakuUIHelper {
                 builder.setView(rootScroll);
                 AlertDialog dialog = builder.create();
                 dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));
+
+                // 代理按钮点击监听器（必须在此处设置，以便引用 dialog）
+                autoProxyBtn.setOnClickListener(v -> {
+                    if (config.getProxyType() != 0) {
+                        config.setProxyType(0);
+                        DanmakuConfigManager.saveConfig(activity, config);
+                        dialog.dismiss();
+                        showCombinedConfigDialog(activity);
+                    }
+                });
+                goProxyBtn.setOnClickListener(v -> {
+                    config.setProxyType(1);
+                    DanmakuConfigManager.saveConfig(activity, config);
+                    dialog.dismiss();
+                    showCombinedConfigDialog(activity);
+                    ProxyManager.switchToGoProxy(activity.getApplicationContext());
+                });
+                javaProxyBtn.setOnClickListener(v -> {
+                    config.setProxyType(2);
+                    DanmakuConfigManager.saveConfig(activity, config);
+                    dialog.dismiss();
+                    showCombinedConfigDialog(activity);
+                    ProxyManager.switchToJavaProxy(activity.getApplicationContext());
+                });
 
                 // 主题按钮点击监听器
                 darkThemeBtn.setOnClickListener(v -> {
