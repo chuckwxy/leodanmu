@@ -322,7 +322,7 @@ public class JavaProxyServer {
             //        ", 平均: " + String.format("%.1f", avgSpeed) + "MB/s");
 
         } catch (Exception e) {
-            ProxyManager.log("[异常] 代理处理: " + e.getMessage());
+            //ProxyManager.log("[异常] 代理处理: " + e.getMessage());
         }
     }
 
