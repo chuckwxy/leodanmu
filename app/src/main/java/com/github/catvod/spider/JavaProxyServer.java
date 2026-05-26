@@ -195,10 +195,10 @@ public class JavaProxyServer {
                         (targetSpeedMBps > 0 ? " 目标" + String.format("%.1f", targetSpeedMBps) + "MB/s" : ""));
             }
 
-            // Get file size from Content-Range (backend response)
+            // Get file size from Content-Range of actual response (more reliable than HEAD)
             String contentRangeHeader = firstResult.responseHeaders.get("Content-Range");
             if (contentRangeHeader == null) contentRangeHeader = firstResult.responseHeaders.get("content-range");
-            if (fileSize <= 0 && !TextUtils.isEmpty(contentRangeHeader)) {
+            if (!TextUtils.isEmpty(contentRangeHeader)) {
                 Matcher m = CONTENT_RANGE_PATTERN.matcher(contentRangeHeader);
                 if (m.find()) fileSize = Long.parseLong(m.group(3));
             }
