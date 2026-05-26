@@ -133,7 +133,7 @@ public class JavaProxyServer {
         String shortUrl = url != null && url.length() > 80 ? url.substring(0, 80) + "..." : url;
 
         if (TextUtils.isEmpty(threadStr) || TextUtils.isEmpty(chunkSizeStr) || TextUtils.isEmpty(url)) {
-            ProxyManager.log("[拒绝] 参数不完整");
+            //ProxyManager.log("[拒绝] 参数不完整");
             writeSimpleResponse(out, 400, "text/plain", "参数不完整");
             return;
         }
@@ -149,7 +149,7 @@ public class JavaProxyServer {
         }
 
         String rangeHeader = headers.get("range");
-        ProxyManager.log("[请求] " + shortUrl + " Range=" + rangeHeader + " 线程=" + threadStr + " 块=" + chunkSizeStr + "KB");
+        //ProxyManager.log("[请求] " + shortUrl + " Range=" + rangeHeader + " 线程=" + threadStr + " 块=" + chunkSizeStr + "KB");
         long[] range = parseRange(rangeHeader);
         long startPos = range[0];
         long endPos = range[1];
@@ -172,13 +172,13 @@ public class JavaProxyServer {
                     startPos + Math.min(endPos <= 0 ? 100 : endPos + 1, chunkSize), 3);
 
             if (firstResult == null) {
-                ProxyManager.log("[首块] 下载失败, 耗时: " + (System.currentTimeMillis() - t0) + "ms");
+                //ProxyManager.log("[首块] 下载失败, 耗时: " + (System.currentTimeMillis() - t0) + "ms");
                 writeSimpleResponse(out, 500, "text/plain", "首块下载失败");
                 return;
             }
 
             long firstChunkTime = System.currentTimeMillis() - t0;
-            ProxyManager.log("[首块] 完成, 大小: " + firstResult.data.length + "B, 耗时: " + firstChunkTime + "ms, 状态: " + firstResult.statusCode);
+            //ProxyManager.log("[首块] 完成, 大小: " + firstResult.data.length + "B, 耗时: " + firstChunkTime + "ms, 状态: " + firstResult.statusCode);
 
             String contentRangeHeader = firstResult.responseHeaders.get("Content-Range");
             if (contentRangeHeader == null) contentRangeHeader = firstResult.responseHeaders.get("content-range");
@@ -192,7 +192,7 @@ public class JavaProxyServer {
             }
 
             if (fileSize <= 0) {
-                ProxyManager.log("[错误] 未获取到文件总大小, Content-Range: " + contentRangeHeader);
+                //ProxyManager.log("[错误] 未获取到文件总大小, Content-Range: " + contentRangeHeader);
                 writeSimpleResponse(out, 500, "text/plain", "未获取到文件总大小");
                 return;
             }
@@ -204,10 +204,10 @@ public class JavaProxyServer {
             final long finalEndPos = endPos;
             long totalBytes = finalEndPos - startPos + 1;
 
-            ProxyManager.log("[信息] 文件: " + String.format("%.1f", fileSize / 1024.0 / 1024.0) + "MB" +
-                    ", 传输: " + String.format("%.1f", totalBytes / 1024.0 / 1024.0) + "MB" +
-                    ", 线程: " + threadCount + ", 块: " + chunkSizeKB + "KB" +
-                    ", Range: " + startPos + "-" + finalEndPos);
+            //ProxyManager.log("[信息] 文件: " + String.format("%.1f", fileSize / 1024.0 / 1024.0) + "MB" +
+            //        ", 传输: " + String.format("%.1f", totalBytes / 1024.0 / 1024.0) + "MB" +
+            //        ", 线程: " + threadCount + ", 块: " + chunkSizeKB + "KB" +
+            //        ", Range: " + startPos + "-" + finalEndPos);
 
             StringBuilder headerBuilder = new StringBuilder();
             int status = firstResult.statusCode == 206 ? 206 : 200;
@@ -237,7 +237,7 @@ public class JavaProxyServer {
             out.write(headerBuilder.toString().getBytes("UTF-8"));
             out.write(firstResult.data);
             out.flush();
-            ProxyManager.log("[首刷] 首块数据已发送, " + firstResult.data.length + "B");
+            //ProxyManager.log("[首刷] 首块数据已发送, " + firstResult.data.length + "B");
 
             long nextPos = startPos + firstResult.data.length;
             long batchChunkSize = chunkSize * threadCount;
@@ -270,12 +270,12 @@ public class JavaProxyServer {
                             for (int retry = 0; retry < 3; retry++) {
                                 result = downloadChunk(client, url, forwardHeaders, cs, ce, 3);
                                 if (result != null) break;
-                                ProxyManager.log("[重试] 块 " + cs + "-" + (ce - 1) + " 第" + (retry + 1) + "次重试");
+                                //ProxyManager.log("[重试] 块 " + cs + "-" + (ce - 1) + " 第" + (retry + 1) + "次重试");
                                 Thread.sleep((retry + 1) * 1000L);
                             }
                             if (result == null) {
                                 hasError.set(true);
-                                ProxyManager.log("[失败] 块 " + cs + "-" + (ce - 1) + " 下载彻底失败");
+                                //ProxyManager.log("[失败] 块 " + cs + "-" + (ce - 1) + " 下载彻底失败");
                             } else {
                                 results[idx] = result;
                             }
@@ -291,7 +291,7 @@ public class JavaProxyServer {
                 latch.await(120, TimeUnit.SECONDS);
 
                 if (hasError.get()) {
-                    ProxyManager.log("[中止] 批次#" + batchIndex + " 下载失败");
+                    //ProxyManager.log("[中止] 批次#" + batchIndex + " 下载失败");
                     return;
                 }
 
@@ -305,21 +305,21 @@ public class JavaProxyServer {
                 }
 
                 totalSent += batchBytes;
-                long batchTime = System.currentTimeMillis() - batchT0;
-                long elapsed = System.currentTimeMillis() - t0;
-                float speed = elapsed > 0 ? (totalSent / 1024.0f / 1024.0f) / (elapsed / 1000.0f) : 0;
-                float progress = totalBytes > 0 ? (totalSent * 100.0f / totalBytes) : 0;
-                ProxyManager.log("[批次#" + batchIndex + "] " + batchThreads + "线程, " +
-                        String.format("%.1f", batchBytes / 1024.0f) + "KB, " + batchTime + "ms" +
-                        " | 总进度: " + String.format("%.1f", progress) + "%" +
-                        ", " + String.format("%.1f", speed) + "MB/s");
+                //long batchTime = System.currentTimeMillis() - batchT0;
+                //long elapsed = System.currentTimeMillis() - t0;
+                //float speed = elapsed > 0 ? (totalSent / 1024.0f / 1024.0f) / (elapsed / 1000.0f) : 0;
+                //float progress = totalBytes > 0 ? (totalSent * 100.0f / totalBytes) : 0;
+                //ProxyManager.log("[批次#" + batchIndex + "] " + batchThreads + "线程, " +
+                //        String.format("%.1f", batchBytes / 1024.0f) + "KB, " + batchTime + "ms" +
+                //        " | 总进度: " + String.format("%.1f", progress) + "%" +
+                //        ", " + String.format("%.1f", speed) + "MB/s");
             }
 
-            long totalTime = System.currentTimeMillis() - t0;
-            float avgSpeed = totalTime > 0 ? (totalSent / 1024.0f / 1024.0f) / (totalTime / 1000.0f) : 0;
-            ProxyManager.log("[完成] " + String.format("%.1f", totalSent / 1024.0f / 1024.0f) + "MB" +
-                    ", " + batchIndex + "批次, " + totalTime + "ms" +
-                    ", 平均: " + String.format("%.1f", avgSpeed) + "MB/s");
+            //long totalTime = System.currentTimeMillis() - t0;
+            //float avgSpeed = totalTime > 0 ? (totalSent / 1024.0f / 1024.0f) / (totalTime / 1000.0f) : 0;
+            //ProxyManager.log("[完成] " + String.format("%.1f", totalSent / 1024.0f / 1024.0f) + "MB" +
+            //        ", " + batchIndex + "批次, " + totalTime + "ms" +
+            //        ", 平均: " + String.format("%.1f", avgSpeed) + "MB/s");
 
         } catch (Exception e) {
             ProxyManager.log("[异常] 代理处理: " + e.getMessage());
@@ -408,7 +408,7 @@ public class JavaProxyServer {
                 }
             }
         }
-        ProxyManager.log("[重试" + maxRetries + "] 块 " + start + "-" + (end - 1) + " 失败: " + (lastErr != null ? lastErr.getMessage() : "unknown"));
+        //ProxyManager.log("[重试" + maxRetries + "] 块 " + start + "-" + (end - 1) + " 失败: " + (lastErr != null ? lastErr.getMessage() : "unknown"));
         return null;
     }
 
