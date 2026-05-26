@@ -147,7 +147,7 @@ public class DanmakuUIHelper {
     private static Button makeProxyIcon(Activity activity, String text, int size, int margin, ThemeColors colors) {
         Button btn = new Button(activity);
         btn.setText(text);
-        btn.setTextSize(11);
+        btn.setTextSize(10);
         btn.setTextColor(colors.textPrimary);
         btn.setTypeface(null, android.graphics.Typeface.BOLD);
         btn.setFocusable(true);
@@ -155,7 +155,7 @@ public class DanmakuUIHelper {
         btn.setClickable(true);
         btn.setPadding(0, 0, 0, 0);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(size, size);
-        lp.setMargins(margin, dpToPx(activity, 6), margin, dpToPx(activity, 6));
+        lp.setMargins(margin, dpToPx(activity, 4), margin, dpToPx(activity, 4));
         btn.setLayoutParams(lp);
         GradientDrawable bg = new GradientDrawable();
         bg.setShape(GradientDrawable.OVAL);
@@ -171,7 +171,7 @@ public class DanmakuUIHelper {
         GradientDrawable bg = new GradientDrawable();
         bg.setShape(GradientDrawable.OVAL);
         if (selected) {
-            bg.setColor(colors.focusBorder);
+            bg.setColor(LIGHT_THEME.focusBorder);
             btn.setTextColor(Color.WHITE);
         } else {
             bg.setColor(colors.bgSecondary);
@@ -891,8 +891,8 @@ public class DanmakuUIHelper {
                 proxyLabel.setLayoutParams(proxyLabelParams);
 
                 int currentProxyType = config.getProxyType();
-                int proxyIconSize = dpToPx(activity, 30);
-                int proxyIconMargin = dpToPx(activity, 3);
+                int proxyIconSize = dpToPx(activity, 22);
+                int proxyIconMargin = dpToPx(activity, 2);
 
                 // 标签右方 spacer 把按钮推到右侧（类似时移行）
                 View proxySpacer = new View(activity);
@@ -914,7 +914,7 @@ public class DanmakuUIHelper {
                     boolean selected = btn.getTag() != null && (boolean) btn.getTag();
                     GradientDrawable proxyIconBg = new GradientDrawable();
                     proxyIconBg.setShape(GradientDrawable.OVAL);
-                    proxyIconBg.setColor(selected ? colors.focusBorder : colors.bgSecondary);
+                    proxyIconBg.setColor(selected ? LIGHT_THEME.focusBorder : colors.bgSecondary);
                     proxyIconBg.setStroke(hasFocus ? dpToPx(activity, 2) : dpToPx(activity, 1),
                             hasFocus ? colors.focusBorder : colors.divider);
                     if (hasFocus) {
