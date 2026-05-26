@@ -232,6 +232,7 @@ public class ProxyManager {
             return true;
         }
         stopJavaProxy();
+        waitForPortReleased(1000);
         try {
             javaProxyServer = new JavaProxyServer(JAVA_BACKEND_PORT, context);
             boolean success = javaProxyServer.startServer();
@@ -333,8 +334,13 @@ public class ProxyManager {
         return DanmakuConfigManager.getConfig(context).isEnableAutoTune();
     }
 
+    private static long lastAutoTuneSaveTime = 0;
+
     public static void saveAutoTuneConfig(Context context, int thread, int chunkSize) {
         if (context == null) return;
+        long now = System.currentTimeMillis();
+        if (now - lastAutoTuneSaveTime < 5000) return;
+        lastAutoTuneSaveTime = now;
         DanmakuConfig config = DanmakuConfigManager.getConfig(context);
         config.setProxyThread(thread);
         config.setProxyChunkSize(chunkSize);
@@ -355,8 +361,13 @@ public class ProxyManager {
         return sc != null ? sc.chunkSize : config.getProxyChunkSize();
     }
 
+    private static long lastSourceSaveTime = 0;
+
     public static void saveSourceConfig(Context context, String source, int thread, int chunkSize) {
         if (context == null || source == null) return;
+        long now = System.currentTimeMillis();
+        if (now - lastSourceSaveTime < 5000) return;
+        lastSourceSaveTime = now;
         DanmakuConfig config = DanmakuConfigManager.getConfig(context);
         Map<String, DanmakuConfig.SourceProxyConfig> map = config.getProxySourceConfig();
         map.put(source, new DanmakuConfig.SourceProxyConfig(thread, chunkSize));
@@ -468,20 +479,12 @@ public class ProxyManager {
     private static boolean performHealthCheck() {
         int currentType = activeProxyType.get();
 
-        if (currentType == PROXY_TYPE_JAVA && javaProxyServer != null) {
-            boolean alive = javaProxyServer.isRunning();
-            if (!alive) {
+        if (currentType == PROXY_TYPE_JAVA) {
+            if (javaProxyServer != null && !javaProxyServer.isRunning()) {
                 log("[健康] Java代理: 服务未运行");
                 return false;
             }
-            try {
-                String url = JAVA_HEALTH_CHECK_URL;
-                String response = com.github.catvod.net.OkHttp.string(url, 1000);
-                return parseHealthResponse(response);
-            } catch (Exception e) {
-                log("[健康] Java代理异常: " + e.getMessage());
-                return alive;
-            }
+            return isJavaProxyBackendHealthy();
         }
 
         if (currentType == PROXY_TYPE_GO) return isGoProxyBackendHealthy();
@@ -540,6 +543,10 @@ public class ProxyManager {
 
     private static synchronized void ensureRelayServer() {
         if (relayServer != null && relayServer.isRunning()) return;
+        if (isRelayHealthy()) {
+            log("[前门] 端口" + PROXY_PORT + "已有健康服务，直接复用");
+            return;
+        }
         relayServer = new ProxyRelayServer(PROXY_PORT, ProxyManager::resolveBackendPort);
         relayServer.startServer();
     }

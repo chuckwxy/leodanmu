@@ -78,24 +78,11 @@ public class DanmakuConfigManager {
             config.setApiUrls(existing.getApiUrls());
         }
         sDanmakuConfig = config;
-        Leodanmu.log("DanmakuConfigManager.saveConfig: prefsName=" + PREFS_NAME
-                + ", ctx=" + context.getClass().getName()
-                + ", pkg=" + context.getPackageName());
+        Leodanmu.log("cfg saved: proxyThread=" + config.getProxyThread() + " chunk=" + config.getProxyChunkSize() + " autoTune=" + config.isEnableAutoTune() + " type=" + config.getProxyType());
         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         String json = gson.toJson(config);
-        Leodanmu.log("DanmakuConfigManager.saveConfig: 即将保存 json=" + json);
-        Leodanmu.log("DanmakuConfigManager.saveConfig: 保存摘要 apiUrls=" + config.getApiUrls()
-                + ", autoPush=" + config.isAutoPushEnabled()
-                + ", pushToast=" + config.isPushToastEnabled()
-                + ", theme=" + config.getTheme()
-                + ", lpWidth=" + config.getLpWidth()
-                + ", lpHeight=" + config.getLpHeight()
-                + ", lpAlpha=" + config.getLpAlpha());
         prefs.edit().putString(KEY_CONFIG_JSON, json).apply();
         Leodanmu.refreshRuntimeConfig(context, config);
-        Leodanmu.log("DanmakuConfigManager.saveConfig: apply ok");
-        String savedJson = prefs.getString(KEY_CONFIG_JSON, null);
-        Leodanmu.log("DanmakuConfigManager.saveConfig: 保存后 prefs json=" + savedJson);
     }
 
     private static DanmakuConfig migrateOldConfig(Context context) {
