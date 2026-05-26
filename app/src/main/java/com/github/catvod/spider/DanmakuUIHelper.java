@@ -134,13 +134,52 @@ public class DanmakuUIHelper {
         drawable.setShape(GradientDrawable.RECTANGLE);
         drawable.setCornerRadius(dpToPx(activity, 6));
         if (selected) {
-            // 选中状态统一使用浅色主题的焦点边框色（蓝色）
             drawable.setColor(LIGHT_THEME.focusBorder);
             button.setTextColor(Color.WHITE);
         } else {
             drawable.setColor(Color.TRANSPARENT);
             button.setTextColor(colors.textPrimary);
         }
+        drawable.setStroke(0, Color.TRANSPARENT);
+        button.setBackground(drawable);
+    }
+
+    private static Button makeProxyIcon(Activity activity, String text, int size, int margin, ThemeColors colors) {
+        Button btn = new Button(activity);
+        btn.setText(text);
+        btn.setTextSize(11);
+        btn.setTextColor(colors.textPrimary);
+        btn.setTypeface(null, android.graphics.Typeface.BOLD);
+        btn.setFocusable(true);
+        btn.setFocusableInTouchMode(true);
+        btn.setClickable(true);
+        btn.setPadding(0, 0, 0, 0);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(size, size);
+        lp.setMargins(margin, dpToPx(activity, 6), margin, dpToPx(activity, 6));
+        btn.setLayoutParams(lp);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setShape(GradientDrawable.OVAL);
+        bg.setColor(colors.bgSecondary);
+        bg.setStroke(dpToPx(activity, 1), colors.divider);
+        btn.setBackground(bg);
+        btn.setTag(false);
+        return btn;
+    }
+
+    private static void setProxyIconSelected(Button btn, boolean selected, ThemeColors colors, Activity activity) {
+        btn.setTag(selected);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setShape(GradientDrawable.OVAL);
+        if (selected) {
+            bg.setColor(colors.focusBorder);
+            btn.setTextColor(Color.WHITE);
+        } else {
+            bg.setColor(colors.bgSecondary);
+            btn.setTextColor(colors.textPrimary);
+        }
+        bg.setStroke(dpToPx(activity, 1), colors.divider);
+        btn.setBackground(bg);
+    }
         drawable.setStroke(0, Color.TRANSPARENT);
         button.setBackground(drawable);
     }
@@ -855,48 +894,43 @@ public class DanmakuUIHelper {
                 proxyLabel.setLayoutParams(proxyLabelParams);
 
                 int currentProxyType = config.getProxyType();
+                int iconSize = dpToPx(activity, 30);
+                int iconMargin = dpToPx(activity, 3);
 
-                Button autoProxyBtn = new Button(activity);
-                Button goProxyBtn = new Button(activity);
-                Button javaProxyBtn = new Button(activity);
-                autoProxyBtn.setText("Au");
-                goProxyBtn.setText("Go");
-                javaProxyBtn.setText("Ja");
-                autoProxyBtn.setTextSize(12);
-                goProxyBtn.setTextSize(12);
-                javaProxyBtn.setTextSize(12);
-                autoProxyBtn.setTypeface(null, android.graphics.Typeface.BOLD);
-                goProxyBtn.setTypeface(null, android.graphics.Typeface.BOLD);
-                javaProxyBtn.setTypeface(null, android.graphics.Typeface.BOLD);
-                autoProxyBtn.setPadding(dpToPx(activity, 6), 0, dpToPx(activity, 6), 0);
-                goProxyBtn.setPadding(dpToPx(activity, 6), 0, dpToPx(activity, 6), 0);
-                javaProxyBtn.setPadding(dpToPx(activity, 6), 0, dpToPx(activity, 6), 0);
-
-                LinearLayout.LayoutParams proxyBtnParams = new LinearLayout.LayoutParams(
-                        0, dpToPx(activity, 36), 1);
-                proxyBtnParams.setMargins(dpToPx(activity, 4), 0, dpToPx(activity, 4), 0);
-                autoProxyBtn.setLayoutParams(proxyBtnParams);
-                goProxyBtn.setLayoutParams(proxyBtnParams);
-                javaProxyBtn.setLayoutParams(proxyBtnParams);
-
-                setButtonSelected(autoProxyBtn, currentProxyType == 0, colors, activity);
-                setButtonSelected(goProxyBtn, currentProxyType == 1, colors, activity);
-                setButtonSelected(javaProxyBtn, currentProxyType == 2, colors, activity);
-
-                View.OnFocusChangeListener proxyFocusListener = (v, hasFocus) -> {
-                    GradientDrawable drawable = (GradientDrawable) v.getBackground();
-                    if (hasFocus) {
-                        drawable.setStroke(dpToPx(activity, 2), colors.focusBorder);
-                    } else {
-                        drawable.setStroke(0, Color.TRANSPARENT);
-                    }
-                    v.setBackground(drawable);
-                };
-                autoProxyBtn.setOnFocusChangeListener(proxyFocusListener);
-                goProxyBtn.setOnFocusChangeListener(proxyFocusListener);
-                javaProxyBtn.setOnFocusChangeListener(proxyFocusListener);
-
+                // 标签右方 spacer 把按钮推到右侧（类似时移行）
+                View proxySpacer = new View(activity);
+                proxySpacer.setLayoutParams(new LinearLayout.LayoutParams(0, 0, 1));
                 proxyRow.addView(proxyLabel);
+                proxyRow.addView(proxySpacer);
+
+                // 三个圆形图标按钮，参考 ± 按钮样式
+                Button autoProxyBtn = makeProxyIcon(activity, "Au", iconSize, iconMargin, colors);
+                Button goProxyBtn = makeProxyIcon(activity, "Go", iconSize, iconMargin, colors);
+                Button javaProxyBtn = makeProxyIcon(activity, "Ja", iconSize, iconMargin, colors);
+
+                setProxyIconSelected(autoProxyBtn, currentProxyType == 0, colors, activity);
+                setProxyIconSelected(goProxyBtn, currentProxyType == 1, colors, activity);
+                setProxyIconSelected(javaProxyBtn, currentProxyType == 2, colors, activity);
+
+                View.OnFocusChangeListener proxyIconFocus = (v, hasFocus) -> {
+                    Button btn = (Button) v;
+                    boolean selected = btn.getTag() != null && (boolean) btn.getTag();
+                    GradientDrawable bg = new GradientDrawable();
+                    bg.setShape(GradientDrawable.OVAL);
+                    bg.setColor(selected ? colors.focusBorder : colors.bgSecondary);
+                    bg.setStroke(hasFocus ? dpToPx(activity, 2) : dpToPx(activity, 1),
+                            hasFocus ? colors.focusBorder : colors.divider);
+                    if (hasFocus) {
+                        v.animate().scaleX(1.1f).scaleY(1.1f).setDuration(150).start();
+                    } else {
+                        v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start();
+                    }
+                    btn.setBackground(bg);
+                };
+                autoProxyBtn.setOnFocusChangeListener(proxyIconFocus);
+                goProxyBtn.setOnFocusChangeListener(proxyIconFocus);
+                javaProxyBtn.setOnFocusChangeListener(proxyIconFocus);
+
                 proxyRow.addView(autoProxyBtn);
                 proxyRow.addView(goProxyBtn);
                 proxyRow.addView(javaProxyBtn);
