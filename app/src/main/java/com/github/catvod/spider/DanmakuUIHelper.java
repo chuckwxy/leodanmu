@@ -180,9 +180,6 @@ public class DanmakuUIHelper {
         bg.setStroke(dpToPx(activity, 1), colors.divider);
         btn.setBackground(bg);
     }
-        drawable.setStroke(0, Color.TRANSPARENT);
-        button.setBackground(drawable);
-    }
 
     // ========== 资源清理 ==========
     public static void cleanupAllResources() {
