@@ -1,5 +1,6 @@
 package com.github.catvod.spider;
 
+import android.content.Context;
 import android.text.TextUtils;
 
 import java.io.*;
@@ -24,9 +25,11 @@ public class JavaProxyServer {
     private final ExecutorService acceptExecutor;
     private final ExecutorService downloadExecutor;
     private final int port;
+    private final Context appContext;
 
-    public JavaProxyServer(int port) {
+    public JavaProxyServer(int port, Context context) {
         this.port = port;
+        this.appContext = context;
         this.acceptExecutor = Executors.newSingleThreadExecutor();
         this.downloadExecutor = Executors.newCachedThreadPool();
     }
@@ -126,30 +129,20 @@ public class JavaProxyServer {
 
     private void handleProxy(OutputStream out, Map<String, String> headers,
                               Map<String, String> params) {
-        String threadStr = params.get("thread");
-        String chunkSizeStr = params.get("chunkSize");
         String url = params.get("url");
-
-        String shortUrl = url != null && url.length() > 80 ? url.substring(0, 80) + "..." : url;
-
-        if (TextUtils.isEmpty(threadStr) || TextUtils.isEmpty(chunkSizeStr) || TextUtils.isEmpty(url)) {
-            //ProxyManager.log("[拒绝] 参数不完整");
-            writeSimpleResponse(out, 400, "text/plain", "参数不完整");
+        if (TextUtils.isEmpty(url)) {
+            writeSimpleResponse(out, 400, "text/plain", "url参数缺失");
             return;
         }
 
-        int threadCount;
-        int chunkSizeKB;
-        try {
-            threadCount = Integer.parseInt(threadStr);
-            chunkSizeKB = Integer.parseInt(chunkSizeStr);
-        } catch (NumberFormatException e) {
-            writeSimpleResponse(out, 400, "text/plain", "参数格式错误");
-            return;
-        }
+        String source = params.get("source");
+        int threadCount = parseIntParam(params.get("thread"),
+                source != null ? ProxyManager.getSourceThread(appContext, source) : ProxyManager.getDefaultThread(appContext), 8);
+        int chunkSizeKB = parseIntParam(params.get("chunkSize"),
+                source != null ? ProxyManager.getSourceChunkSize(appContext, source) : ProxyManager.getDefaultChunkSize(appContext), 256);
+        boolean autoTune = ProxyManager.isAutoTuneEnabled(appContext);
 
         String rangeHeader = headers.get("range");
-        //ProxyManager.log("[请求] " + shortUrl + " Range=" + rangeHeader + " 线程=" + threadStr + " 块=" + chunkSizeStr + "KB");
         long[] range = parseRange(rangeHeader);
         long startPos = range[0];
         long endPos = range[1];
@@ -164,95 +157,111 @@ public class JavaProxyServer {
         String referer = headers.get("referer");
         if (!TextUtils.isEmpty(referer)) forwardHeaders.put("Referer", referer);
 
-        long chunkSize = (long) chunkSizeKB * 1024;
-
         try {
-            long t0 = System.currentTimeMillis();
-            ChunkResult firstResult = downloadChunk(client, url, forwardHeaders, startPos,
-                    startPos + Math.min(endPos <= 0 ? 100 : endPos + 1, chunkSize), 3);
+            // Phase 1: HEAD probe for file size
+            long fileSize = -1;
+            double targetSpeedMBps = -1;
+            if (autoTune) {
+                fileSize = probeFileSize(client, url);
+                if (fileSize > 0) {
+                    targetSpeedMBps = calcTargetSpeed(fileSize);
+                }
+            }
+
+            // Phase 2: Download first chunk (larger for a better speed sample)
+            int probeChunk = (autoTune && chunkSizeKB < 512) ? 512 * 1024 : chunkSizeKB * 1024;
+            long probeEnd = startPos + Math.min(endPos <= 0 ? 100 : endPos + 1, probeChunk);
+
+            long t1 = System.currentTimeMillis();
+            ChunkResult firstResult = downloadChunk(client, url, forwardHeaders, startPos, probeEnd, 3);
 
             if (firstResult == null) {
-                //ProxyManager.log("[首块] 下载失败, 耗时: " + (System.currentTimeMillis() - t0) + "ms");
                 writeSimpleResponse(out, 500, "text/plain", "首块下载失败");
                 return;
             }
 
-            long firstChunkTime = System.currentTimeMillis() - t0;
-            //ProxyManager.log("[首块] 完成, 大小: " + firstResult.data.length + "B, 耗时: " + firstChunkTime + "ms, 状态: " + firstResult.statusCode);
+            long firstChunkTime = System.currentTimeMillis() - t1;
+            double probeSpeedMBps = firstChunkTime > 0 ?
+                    (firstResult.data.length / 1024.0 / 1024.0) / (firstChunkTime / 1000.0) : 0;
 
+            // Get file size from Content-Range (backend response)
             String contentRangeHeader = firstResult.responseHeaders.get("Content-Range");
             if (contentRangeHeader == null) contentRangeHeader = firstResult.responseHeaders.get("content-range");
-            long fileSize = -1;
-
-            if (!TextUtils.isEmpty(contentRangeHeader)) {
+            if (fileSize <= 0 && !TextUtils.isEmpty(contentRangeHeader)) {
                 Matcher m = CONTENT_RANGE_PATTERN.matcher(contentRangeHeader);
-                if (m.find()) {
-                    fileSize = Long.parseLong(m.group(3));
-                }
+                if (m.find()) fileSize = Long.parseLong(m.group(3));
             }
-
             if (fileSize <= 0) {
-                //ProxyManager.log("[错误] 未获取到文件总大小, Content-Range: " + contentRangeHeader);
                 writeSimpleResponse(out, 500, "text/plain", "未获取到文件总大小");
                 return;
             }
 
-            if (endPos <= 0) {
-                endPos = fileSize - 1;
+            if (endPos <= 0) endPos = fileSize - 1;
+            final long finalEndPos = endPos;
+
+            // Phase 3: Auto-tune based on probe speed vs target
+            if (autoTune && targetSpeedMBps > 0 && probeSpeedMBps > 0) {
+                double ratio = targetSpeedMBps / Math.max(probeSpeedMBps, 0.1);
+                int tunedThread = clamp((int) Math.round(threadCount * ratio), 2, 64);
+                int tunedChunkKB = clamp((int) Math.round(chunkSizeKB * Math.sqrt(ratio)), 128, 2048);
+
+                if (tunedThread != threadCount || tunedChunkKB != chunkSizeKB) {
+                    threadCount = tunedThread;
+                    chunkSizeKB = tunedChunkKB;
+                }
+                // Persist the tuned config so future requests start closer to optimal
+                if (appContext != null) {
+                    if (source != null) {
+                        ProxyManager.saveSourceConfig(appContext, source, threadCount, chunkSizeKB);
+                    } else {
+                        ProxyManager.saveAutoTuneConfig(appContext, threadCount, chunkSizeKB);
+                    }
+                }
             }
 
-            final long finalEndPos = endPos;
-            long totalBytes = finalEndPos - startPos + 1;
+            long chunkSize = (long) chunkSizeKB * 1024;
+            long batchChunkSize = chunkSize * threadCount;
 
-            //ProxyManager.log("[信息] 文件: " + String.format("%.1f", fileSize / 1024.0 / 1024.0) + "MB" +
-            //        ", 传输: " + String.format("%.1f", totalBytes / 1024.0 / 1024.0) + "MB" +
-            //        ", 线程: " + threadCount + ", 块: " + chunkSizeKB + "KB" +
-            //        ", Range: " + startPos + "-" + finalEndPos);
-
+            // Build & write response header
             StringBuilder headerBuilder = new StringBuilder();
             int status = firstResult.statusCode == 206 ? 206 : 200;
             headerBuilder.append("HTTP/1.1 ").append(status).append(status == 206 ? " Partial Content" : " OK").append("\r\n");
             headerBuilder.append("Content-Range: bytes ").append(startPos).append("-").append(finalEndPos).append("/").append(fileSize).append("\r\n");
             headerBuilder.append("Accept-Ranges: bytes\r\n");
-
             String contentType = firstResult.responseHeaders.get("Content-Type");
             if (contentType == null) contentType = firstResult.responseHeaders.get("content-type");
             if (contentType == null) contentType = "application/octet-stream";
             headerBuilder.append("Content-Type: ").append(contentType).append("\r\n");
-
             for (Map.Entry<String, String> entry : firstResult.responseHeaders.entrySet()) {
                 String key = entry.getKey();
                 if ("Content-Range".equalsIgnoreCase(key) || "Content-Length".equalsIgnoreCase(key)
-                        || "Content-Type".equalsIgnoreCase(key) || "content-range".equalsIgnoreCase(key)
-                        || "content-length".equalsIgnoreCase(key) || "content-type".equalsIgnoreCase(key)
-                        || "Transfer-Encoding".equalsIgnoreCase(key) || "transfer-encoding".equalsIgnoreCase(key)) {
-                    continue;
-                }
+                        || "Content-Type".equalsIgnoreCase(key) || "Transfer-Encoding".equalsIgnoreCase(key)
+                        || "transfer-encoding".equalsIgnoreCase(key)) continue;
                 headerBuilder.append(key).append(": ").append(entry.getValue()).append("\r\n");
             }
-
-            headerBuilder.append("Connection: close\r\n");
-            headerBuilder.append("\r\n");
-
+            headerBuilder.append("Connection: close\r\n\r\n");
             out.write(headerBuilder.toString().getBytes("UTF-8"));
             out.write(firstResult.data);
             out.flush();
-            //ProxyManager.log("[首刷] 首块数据已发送, " + firstResult.data.length + "B");
 
+            // Phase 4: Batch download loop with dynamic monitoring
             long nextPos = startPos + firstResult.data.length;
-            long batchChunkSize = chunkSize * threadCount;
-            long totalSent = firstResult.data.length;
-            int batchIndex = 0;
+            int adaptiveThread = threadCount;
+
+            // Rolling speed window for re-tuning
+            long[] winTimes = new long[5];
+            int[] winBytes = new int[5];
+            int winIdx = 0;
+            int consecutiveErrors = 0;
 
             for (long batchStart = nextPos; batchStart <= finalEndPos; batchStart += batchChunkSize) {
                 long remaining = finalEndPos - batchStart + 1;
                 if (remaining <= 0) break;
 
-                int batchThreads = (int) Math.min(threadCount, (remaining + chunkSize - 1) / chunkSize);
+                int batchThreads = (int) Math.min(adaptiveThread, (remaining + chunkSize - 1) / chunkSize);
                 if (batchThreads <= 0) batchThreads = 1;
 
                 long batchT0 = System.currentTimeMillis();
-                batchIndex++;
 
                 ChunkResult[] results = new ChunkResult[batchThreads];
                 AtomicBoolean hasError = new AtomicBoolean(false);
@@ -262,23 +271,17 @@ public class JavaProxyServer {
                     long cs = batchStart + (long) i * chunkSize;
                     long ce = Math.min(cs + chunkSize, finalEndPos + 1);
                     if (cs > finalEndPos) break;
-
                     final int idx = i;
                     downloadExecutor.execute(() -> {
                         try {
-                            ChunkResult result = null;
+                            ChunkResult r = null;
                             for (int retry = 0; retry < 3; retry++) {
-                                result = downloadChunk(client, url, forwardHeaders, cs, ce, 3);
-                                if (result != null) break;
-                                //ProxyManager.log("[重试] 块 " + cs + "-" + (ce - 1) + " 第" + (retry + 1) + "次重试");
+                                r = downloadChunk(client, url, forwardHeaders, cs, ce, 3);
+                                if (r != null) break;
                                 Thread.sleep((retry + 1) * 1000L);
                             }
-                            if (result == null) {
-                                hasError.set(true);
-                                //ProxyManager.log("[失败] 块 " + cs + "-" + (ce - 1) + " 下载彻底失败");
-                            } else {
-                                results[idx] = result;
-                            }
+                            if (r == null) hasError.set(true);
+                            else results[idx] = r;
                         } catch (InterruptedException e) {
                             Thread.currentThread().interrupt();
                             hasError.set(true);
@@ -291,9 +294,18 @@ public class JavaProxyServer {
                 latch.await(120, TimeUnit.SECONDS);
 
                 if (hasError.get()) {
-                    //ProxyManager.log("[中止] 批次#" + batchIndex + " 下载失败");
-                    return;
+                    consecutiveErrors++;
+                    if (consecutiveErrors >= 3 && adaptiveThread > 2) {
+                        adaptiveThread = Math.max(2, adaptiveThread / 2);
+                        int rc = Math.max(128, chunkSizeKB / 2);
+                        chunkSizeKB = rc;
+                        chunkSize = (long) chunkSizeKB * 1024;
+                        batchChunkSize = chunkSize * adaptiveThread;
+                    }
+                    if (consecutiveErrors >= 5) return;
+                    continue;
                 }
+                consecutiveErrors = 0;
 
                 int batchBytes = 0;
                 for (int i = 0; i < batchThreads; i++) {
@@ -304,26 +316,73 @@ public class JavaProxyServer {
                     }
                 }
 
-                totalSent += batchBytes;
-                //long batchTime = System.currentTimeMillis() - batchT0;
-                //long elapsed = System.currentTimeMillis() - t0;
-                //float speed = elapsed > 0 ? (totalSent / 1024.0f / 1024.0f) / (elapsed / 1000.0f) : 0;
-                //float progress = totalBytes > 0 ? (totalSent * 100.0f / totalBytes) : 0;
-                //ProxyManager.log("[批次#" + batchIndex + "] " + batchThreads + "线程, " +
-                //        String.format("%.1f", batchBytes / 1024.0f) + "KB, " + batchTime + "ms" +
-                //        " | 总进度: " + String.format("%.1f", progress) + "%" +
-                //        ", " + String.format("%.1f", speed) + "MB/s");
+                long batchTime = System.currentTimeMillis() - batchT0;
+
+                winTimes[winIdx % 5] = batchTime;
+                winBytes[winIdx % 5] = batchBytes;
+                winIdx++;
+
+                // Every 5 batches, re-evaluate speed
+                if (autoTune && winIdx % 5 == 0) {
+                    long sumT = 0;
+                    int sumB = 0;
+                    for (int i = 0; i < 5; i++) { sumT += winTimes[i]; sumB += winBytes[i]; }
+                    double curSpeed = sumT > 0 ? (sumB / 1024.0 / 1024.0) / (sumT / 1000.0) : 0;
+
+                    if (targetSpeedMBps > 0 && curSpeed > 0) {
+                        double ratio = curSpeed / targetSpeedMBps;
+                        if (ratio < 0.5 && adaptiveThread < 64) {
+                            adaptiveThread = Math.min(64, (int)(adaptiveThread * 1.5));
+                            int nc = Math.min(2048, (int)(chunkSizeKB * 1.2));
+                            chunkSizeKB = nc;
+                            chunkSize = (long) chunkSizeKB * 1024;
+                            batchChunkSize = chunkSize * adaptiveThread;
+                        } else if (ratio > 2.0 && adaptiveThread > 4) {
+                            adaptiveThread = Math.max(4, adaptiveThread / 2);
+                        }
+                    }
+                }
             }
 
-            //long totalTime = System.currentTimeMillis() - t0;
-            //float avgSpeed = totalTime > 0 ? (totalSent / 1024.0f / 1024.0f) / (totalTime / 1000.0f) : 0;
-            //ProxyManager.log("[完成] " + String.format("%.1f", totalSent / 1024.0f / 1024.0f) + "MB" +
-            //        ", " + batchIndex + "批次, " + totalTime + "ms" +
-            //        ", 平均: " + String.format("%.1f", avgSpeed) + "MB/s");
-
         } catch (Exception e) {
-            //ProxyManager.log("[异常] 代理处理: " + e.getMessage());
+            String em = e.getMessage();
+            if (em == null || !em.contains("ECONNRESET") && !em.contains("EPIPE")
+                    && !em.contains("Broken pipe") && !em.contains("Socket closed")) {
+                ProxyManager.log("[异常] 代理处理: " + em);
+            }
         }
+    }
+
+    // ---- Auto-tuning helpers ----
+
+    private long probeFileSize(okhttp3.OkHttpClient client, String url) {
+        try {
+            okhttp3.Request req = new okhttp3.Request.Builder().url(url).head().build();
+            okhttp3.Response resp = client.newCall(req).execute();
+            String cl = resp.header("Content-Length");
+            resp.close();
+            if (cl != null) return Long.parseLong(cl);
+        } catch (Exception ignored) {}
+        return -1;
+    }
+
+    private static double calcTargetSpeed(long fileSize) {
+        long mb = fileSize / (1024L * 1024L);
+        if (mb < 100) return 1.0;
+        if (mb < 500) return 2.0;
+        if (mb < 2000) return 5.0;
+        if (mb < 8000) return 10.0;
+        if (mb < 30000) return 15.0;
+        return 20.0;
+    }
+
+    private static int clamp(int val, int min, int max) {
+        return Math.max(min, Math.min(max, val));
+    }
+
+    private static int parseIntParam(String s, int defaultVal, int fallback) {
+        if (TextUtils.isEmpty(s)) return defaultVal;
+        try { return Integer.parseInt(s); } catch (NumberFormatException e) { return fallback; }
     }
 
     private void writeSimpleResponse(OutputStream out, int status, String contentType, String body) {

@@ -2312,4 +2312,95 @@ public class DanmakuUIHelper {
             }
         }
     }
+
+    // ConfigCenter 使用的网盘代理配置对话框
+    public static void showSourceProxyDialog(Context ctx, DanmakuConfig config, String sourceKey, String displayName) {
+        if (!(ctx instanceof Activity)) return;
+        Activity activity = (Activity) ctx;
+        if (activity.isFinishing() || activity.isDestroyed()) return;
+
+        activity.runOnUiThread(() -> {
+            try {
+                DanmakuConfig.SourceProxyConfig spc = config.getProxySourceConfig().get(sourceKey);
+                int[] curThread = {spc != null ? spc.thread : 8};
+                int[] curChunk = {spc != null ? spc.chunkSize : 256};
+
+                LinearLayout layout = new LinearLayout(activity);
+                layout.setOrientation(LinearLayout.VERTICAL);
+                layout.setPadding(dpToPx(activity, 24), dpToPx(activity, 16),
+                        dpToPx(activity, 24), dpToPx(activity, 16));
+
+                // 线程行
+                LinearLayout threadRow = new LinearLayout(activity);
+                threadRow.setOrientation(LinearLayout.HORIZONTAL);
+                threadRow.setGravity(Gravity.CENTER_VERTICAL);
+
+                TextView threadLabel = new TextView(activity);
+                threadLabel.setText("线程数：");
+                threadLabel.setTextSize(16);
+                threadLabel.setTextColor(Color.BLACK);
+                threadRow.addView(threadLabel);
+
+                EditText threadInput = new EditText(activity);
+                threadInput.setText(String.valueOf(curThread[0]));
+                threadInput.setTextSize(16);
+                threadInput.setGravity(Gravity.CENTER);
+                threadInput.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+                LinearLayout.LayoutParams tip = new LinearLayout.LayoutParams(
+                        dpToPx(activity, 80), ViewGroup.LayoutParams.WRAP_CONTENT);
+                threadInput.setLayoutParams(tip);
+                threadInput.setHint("8");
+                threadRow.addView(threadInput);
+                layout.addView(threadRow);
+
+                // 分块行
+                LinearLayout chunkRow = new LinearLayout(activity);
+                chunkRow.setOrientation(LinearLayout.HORIZONTAL);
+                chunkRow.setGravity(Gravity.CENTER_VERTICAL);
+                LinearLayout.LayoutParams chunkRowParams = new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                chunkRowParams.topMargin = dpToPx(activity, 12);
+                chunkRow.setLayoutParams(chunkRowParams);
+
+                TextView chunkLabel = new TextView(activity);
+                chunkLabel.setText("分块大小(KB)：");
+                chunkLabel.setTextSize(16);
+                chunkLabel.setTextColor(Color.BLACK);
+                chunkRow.addView(chunkLabel);
+
+                EditText chunkInput = new EditText(activity);
+                chunkInput.setText(String.valueOf(curChunk[0]));
+                chunkInput.setTextSize(16);
+                chunkInput.setGravity(Gravity.CENTER);
+                chunkInput.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+                LinearLayout.LayoutParams cip = new LinearLayout.LayoutParams(
+                        dpToPx(activity, 80), ViewGroup.LayoutParams.WRAP_CONTENT);
+                chunkInput.setLayoutParams(cip);
+                chunkInput.setHint("256");
+                chunkRow.addView(chunkInput);
+                layout.addView(chunkRow);
+
+                new AlertDialog.Builder(activity)
+                        .setTitle(displayName + " 代理配置")
+                        .setView(layout)
+                        .setPositiveButton("保存", (dialog, which) -> {
+                            try {
+                                int t = Integer.parseInt(threadInput.getText().toString().trim());
+                                int c = Integer.parseInt(chunkInput.getText().toString().trim());
+                                Map<String, DanmakuConfig.SourceProxyConfig> map = config.getProxySourceConfig();
+                                map.put(sourceKey, new DanmakuConfig.SourceProxyConfig(t, c));
+                                config.setProxySourceConfig(map);
+                                DanmakuConfigManager.saveConfig(activity, config);
+                                Utils.safeShowToast(activity, displayName + "配置已保存");
+                            } catch (NumberFormatException e) {
+                                Utils.safeShowToast(activity, "请输入有效数字");
+                            }
+                        })
+                        .setNegativeButton("取消", null)
+                        .show();
+            } catch (Exception e) {
+                Leodanmu.log("显示网盘代理对话框异常: " + e.getMessage());
+            }
+        });
+    }
 }

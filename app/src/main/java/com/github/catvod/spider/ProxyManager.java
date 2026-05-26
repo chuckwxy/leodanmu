@@ -232,7 +232,7 @@ public class ProxyManager {
         }
         stopJavaProxy();
         try {
-            javaProxyServer = new JavaProxyServer(JAVA_BACKEND_PORT);
+            javaProxyServer = new JavaProxyServer(JAVA_BACKEND_PORT, context);
             boolean success = javaProxyServer.startServer();
             if (success) {
                 activeProxyType.set(PROXY_TYPE_JAVA);
@@ -315,6 +315,52 @@ public class ProxyManager {
 
     public static boolean canSwitchToJavaProxy() {
         return true;
+    }
+
+    public static int getDefaultThread(Context context) {
+        if (context == null) return 8;
+        return DanmakuConfigManager.getConfig(context).getProxyThread();
+    }
+
+    public static int getDefaultChunkSize(Context context) {
+        if (context == null) return 256;
+        return DanmakuConfigManager.getConfig(context).getProxyChunkSize();
+    }
+
+    public static boolean isAutoTuneEnabled(Context context) {
+        if (context == null) return true;
+        return DanmakuConfigManager.getConfig(context).isEnableAutoTune();
+    }
+
+    public static void saveAutoTuneConfig(Context context, int thread, int chunkSize) {
+        if (context == null) return;
+        DanmakuConfig config = DanmakuConfigManager.getConfig(context);
+        config.setProxyThread(thread);
+        config.setProxyChunkSize(chunkSize);
+        DanmakuConfigManager.saveConfig(context, config);
+    }
+
+    public static int getSourceThread(Context context, String source) {
+        if (context == null || source == null) return 8;
+        DanmakuConfig config = DanmakuConfigManager.getConfig(context);
+        DanmakuConfig.SourceProxyConfig sc = config.getProxySourceConfig().get(source);
+        return sc != null ? sc.thread : config.getProxyThread();
+    }
+
+    public static int getSourceChunkSize(Context context, String source) {
+        if (context == null || source == null) return 256;
+        DanmakuConfig config = DanmakuConfigManager.getConfig(context);
+        DanmakuConfig.SourceProxyConfig sc = config.getProxySourceConfig().get(source);
+        return sc != null ? sc.chunkSize : config.getProxyChunkSize();
+    }
+
+    public static void saveSourceConfig(Context context, String source, int thread, int chunkSize) {
+        if (context == null || source == null) return;
+        DanmakuConfig config = DanmakuConfigManager.getConfig(context);
+        Map<String, DanmakuConfig.SourceProxyConfig> map = config.getProxySourceConfig();
+        map.put(source, new DanmakuConfig.SourceProxyConfig(thread, chunkSize));
+        config.setProxySourceConfig(map);
+        DanmakuConfigManager.saveConfig(context, config);
     }
 
     private static void startHealthCheck(Context context) {

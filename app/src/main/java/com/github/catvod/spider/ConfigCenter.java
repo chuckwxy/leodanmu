@@ -15,6 +15,7 @@ import java.util.List;
 public class ConfigCenter extends Spider {
 
     private static final String SECTION_DANMAKU = "danmaku";
+    private static final String SECTION_THREAD = "thread";
     private static final String SECTION_DOUBAN = "douban";
 
     @Override
@@ -24,6 +25,7 @@ public class ConfigCenter extends Spider {
             JSONArray classes = new JSONArray();
 
             classes.put(createClass(SECTION_DANMAKU, "弹幕配置"));
+            classes.put(createClass(SECTION_THREAD, "线程管理"));
             classes.put(createClass(SECTION_DOUBAN, "豆瓣配置"));
 
             result.put("class", classes);
@@ -43,6 +45,9 @@ public class ConfigCenter extends Spider {
             switch (tid) {
                 case SECTION_DANMAKU:
                     buildDanmakuSection(list);
+                    break;
+                case SECTION_THREAD:
+                    buildThreadSection(list);
                     break;
                 case SECTION_DOUBAN:
                     buildDoubanSection(list);
@@ -71,6 +76,20 @@ public class ConfigCenter extends Spider {
         list.put(createActionVod("log", "查看日志", "", "运行日志与Hook诊断"));
     }
 
+    private void buildThreadSection(JSONArray list) throws Exception {
+        Activity activity = Utils.getTopActivity();
+        DanmakuConfig config = activity != null ? DanmakuConfigManager.getConfig(activity) : new DanmakuConfig();
+
+        String[][] sources = {{"ali", "阿里云盘"}, {"quark", "夸克云盘"}, {"uc", "UC云盘"}};
+        for (String[] s : sources) {
+            DanmakuConfig.SourceProxyConfig spc = config.getProxySourceConfig().get(s[0]);
+            int t = spc != null ? spc.thread : 8;
+            int c = spc != null ? spc.chunkSize : 256;
+            list.put(createActionVod(s[0] + "_thread", s[1], "",
+                    "线程 " + t + " / 分块 " + c + "KB"));
+        }
+    }
+
     private void buildDoubanSection(JSONArray list) throws Exception {
         int cacheSize = DoubanFetcher.getCacheSize();
         list.put(createActionVod("douban_cache", "豆瓣缓存", "",
@@ -94,35 +113,44 @@ public class ConfigCenter extends Spider {
                     public void run() {
                         try {
                             DanmakuConfig config = DanmakuConfigManager.getConfig(ctx);
-                            switch (id) {
-                                case "config":
-                                    DanmakuUIHelper.showCombinedConfigDialog(ctx);
-                                    break;
-                                case "auto_push":
-                                    config.setAutoPushEnabled(!config.isAutoPushEnabled());
-                                    DanmakuConfigManager.saveConfig(ctx, config);
-                                    Leodanmu.log("ConfigCenter: 自动推送状态切换: " + config.isAutoPushEnabled());
-                                    Utils.safeShowToast(ctx,
-                                            config.isAutoPushEnabled() ? "自动推送已开启" : "自动推送已关闭");
-                                    break;
-                                case "lp_config":
-                                    DanmakuUIHelper.showLpConfigDialog(ctx);
-                                    break;
-                                case "log":
-                                    DanmakuUIHelper.showLogDialog(ctx);
-                                    break;
-                                case "douban_cache":
-                                    DoubanFetcher.clearCache();
-                                    Utils.safeShowToast(ctx, "豆瓣缓存已清除");
-                                    break;
-                                case "douban_prewarm":
-                                    DoubanFetcher.prewarm();
-                                    Utils.safeShowToast(ctx, "豆瓣预热已触发");
-                                    break;
-                                default:
-                                    Utils.safeShowToast(ctx, "功能开发中");
-                                    break;
-                            }
+                    switch (id) {
+                        case "config":
+                            DanmakuUIHelper.showCombinedConfigDialog(ctx);
+                            break;
+                        case "auto_push":
+                            config.setAutoPushEnabled(!config.isAutoPushEnabled());
+                            DanmakuConfigManager.saveConfig(ctx, config);
+                            Leodanmu.log("ConfigCenter: 自动推送状态切换: " + config.isAutoPushEnabled());
+                            Utils.safeShowToast(ctx,
+                                    config.isAutoPushEnabled() ? "自动推送已开启" : "自动推送已关闭");
+                            break;
+                        case "lp_config":
+                            DanmakuUIHelper.showLpConfigDialog(ctx);
+                            break;
+                        case "log":
+                            DanmakuUIHelper.showLogDialog(ctx);
+                            break;
+                        case "ali_thread":
+                            DanmakuUIHelper.showSourceProxyDialog(ctx, config, "ali", "阿里云盘");
+                            break;
+                        case "quark_thread":
+                            DanmakuUIHelper.showSourceProxyDialog(ctx, config, "quark", "夸克云盘");
+                            break;
+                        case "uc_thread":
+                            DanmakuUIHelper.showSourceProxyDialog(ctx, config, "uc", "UC云盘");
+                            break;
+                        case "douban_cache":
+                            DoubanFetcher.clearCache();
+                            Utils.safeShowToast(ctx, "豆瓣缓存已清除");
+                            break;
+                        case "douban_prewarm":
+                            DoubanFetcher.prewarm();
+                            Utils.safeShowToast(ctx, "豆瓣预热已触发");
+                            break;
+                        default:
+                            Utils.safeShowToast(ctx, "功能开发中");
+                            break;
+                    }
                         } catch (Exception e) {
                             Leodanmu.log("ConfigCenter 详情异常: " + e.getMessage());
                             Utils.safeShowToast(ctx, "请稍后再试");
@@ -165,8 +193,8 @@ public class ConfigCenter extends Spider {
     private String searchContentShell(String key) {
         if (key == null || key.isEmpty()) return "";
         try {
-            String[] ids = {"config", "auto_push", "lp_config", "log"};
-            String[] names = {"弹幕配置", "自动推送弹幕", "布局配置", "查看日志"};
+            String[] ids = {"config", "auto_push", "lp_config", "log", "ali_thread", "quark_thread", "uc_thread"};
+            String[] names = {"弹幕配置", "自动推送弹幕", "布局配置", "查看日志", "阿里云盘", "夸克云盘", "UC云盘"};
             for (int i = 0; i < ids.length; i++) {
                 if (!key.equals(names[i])) continue;
                 JSONObject vod = new JSONObject();
@@ -197,6 +225,9 @@ public class ConfigCenter extends Spider {
             case "auto_push": return "自动推送弹幕";
             case "lp_config": return "布局配置";
             case "log": return "查看日志";
+            case "ali_thread": return "阿里云盘";
+            case "quark_thread": return "夸克云盘";
+            case "uc_thread": return "UC云盘";
             case "douban_cache": return "豆瓣缓存";
             case "douban_prewarm": return "豆瓣预热";
             default: return "配置中心";
@@ -209,6 +240,12 @@ public class ConfigCenter extends Spider {
             case "auto_push": return config.isAutoPushEnabled() ? "已开启" : "已关闭";
             case "lp_config": return "调整弹窗大小和透明度";
             case "log": return "查看运行日志与Hook诊断";
+            case "ali_thread": case "quark_thread": case "uc_thread": {
+                DanmakuConfig.SourceProxyConfig spc = config.getProxySourceConfig().get(id.replace("_thread", ""));
+                int t = spc != null ? spc.thread : 8;
+                int c = spc != null ? spc.chunkSize : 256;
+                return "线程 " + t + " / 分块 " + c + "KB";
+            }
             case "douban_cache": return "已缓存 " + DoubanFetcher.getCacheSize() + " 个分类，点击清除";
             case "douban_prewarm": return "强制后台刷新所有分类缓存";
             default: return "";

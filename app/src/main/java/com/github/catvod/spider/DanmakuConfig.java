@@ -2,7 +2,9 @@ package com.github.catvod.spider;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -22,6 +24,20 @@ public class DanmakuConfig {
     private String ucCookie = "";
     private String baiduCookie = "";
     private int proxyType = 0; // 0=自动 1=Go代理 2=Java代理
+    private boolean enableAutoTune = true;
+    private int proxyThread = 8;
+    private int proxyChunkSize = 256;
+    private Map<String, SourceProxyConfig> proxySourceConfig = new HashMap<>();
+
+    public static class SourceProxyConfig {
+        public int thread = 8;
+        public int chunkSize = 256;
+        public SourceProxyConfig() {}
+        public SourceProxyConfig(int thread, int chunkSize) {
+            this.thread = thread;
+            this.chunkSize = chunkSize;
+        }
+    }
 
     public DanmakuConfig() {
         apiUrls = new HashSet<>();
@@ -29,6 +45,12 @@ public class DanmakuConfig {
         lpHeight = 1.0f;
         lpAlpha = 1.0f;
         autoPushEnabled = true;
+        SourceProxyConfig ali = new SourceProxyConfig(8, 256);
+        proxySourceConfig.put("ali", ali);
+        SourceProxyConfig quark = new SourceProxyConfig(10, 256);
+        proxySourceConfig.put("quark", quark);
+        SourceProxyConfig uc = new SourceProxyConfig(10, 256);
+        proxySourceConfig.put("uc", uc);
     }
 
     public String getPansouApiUrl() {
@@ -135,6 +157,38 @@ public class DanmakuConfig {
         this.proxyType = proxyType;
     }
 
+    public boolean isEnableAutoTune() {
+        return enableAutoTune;
+    }
+
+    public void setEnableAutoTune(boolean enableAutoTune) {
+        this.enableAutoTune = enableAutoTune;
+    }
+
+    public int getProxyThread() {
+        return proxyThread;
+    }
+
+    public void setProxyThread(int proxyThread) {
+        this.proxyThread = proxyThread;
+    }
+
+    public int getProxyChunkSize() {
+        return proxyChunkSize;
+    }
+
+    public void setProxyChunkSize(int proxyChunkSize) {
+        this.proxyChunkSize = proxyChunkSize;
+    }
+
+    public Map<String, SourceProxyConfig> getProxySourceConfig() {
+        return proxySourceConfig;
+    }
+
+    public void setProxySourceConfig(Map<String, SourceProxyConfig> proxySourceConfig) {
+        this.proxySourceConfig = proxySourceConfig != null ? proxySourceConfig : new HashMap<>();
+    }
+
     /**
      * 从JSON对象更新配置
      * @param json JSON对象，可包含 apiUrls、autoPushEnabled、lpWidth、lpHeight、lpAlpha、pushToastEnabled、theme
@@ -197,6 +251,33 @@ public class DanmakuConfig {
         }
         if (json.has("proxyType")) {
             setProxyType(json.optInt("proxyType", 0));
+        }
+        if (json.has("enableAutoTune")) {
+            setEnableAutoTune(json.optBoolean("enableAutoTune"));
+        }
+        if (json.has("proxyThread")) {
+            setProxyThread(json.optInt("proxyThread", 8));
+        }
+        if (json.has("proxyChunkSize")) {
+            setProxyChunkSize(json.optInt("proxyChunkSize", 256));
+        }
+        if (json.has("proxySourceConfig")) {
+            JSONObject srcObj = json.optJSONObject("proxySourceConfig");
+            if (srcObj != null) {
+                Map<String, SourceProxyConfig> map = new HashMap<>();
+                for (String key : new String[]{"ali", "quark", "uc"}) {
+                    if (srcObj.has(key)) {
+                        JSONObject sc = srcObj.optJSONObject(key);
+                        if (sc != null) {
+                            map.put(key, new SourceProxyConfig(
+                                    sc.optInt("thread", 8),
+                                    sc.optInt("chunkSize", 256)
+                            ));
+                        }
+                    }
+                }
+                if (!map.isEmpty()) setProxySourceConfig(map);
+            }
         }
     }
 }
