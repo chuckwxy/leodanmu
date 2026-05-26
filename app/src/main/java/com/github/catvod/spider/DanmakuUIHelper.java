@@ -892,18 +892,11 @@ public class DanmakuUIHelper {
 
                 int currentProxyType = config.getProxyType();
                 int proxyIconSize = dpToPx(activity, 22);
-                int proxyIconMargin = dpToPx(activity, 2);
 
-                // 标签右方 spacer 把按钮推到右侧（类似时移行）
-                View proxySpacer = new View(activity);
-                proxySpacer.setLayoutParams(new LinearLayout.LayoutParams(0, 0, 1));
-                proxyRow.addView(proxyLabel);
-                proxyRow.addView(proxySpacer);
-
-                // 三个圆形图标按钮，参考 ± 按钮样式
-                Button autoProxyBtn = makeProxyIcon(activity, "Au", proxyIconSize, proxyIconMargin, colors);
-                Button goProxyBtn = makeProxyIcon(activity, "Go", proxyIconSize, proxyIconMargin, colors);
-                Button javaProxyBtn = makeProxyIcon(activity, "Ja", proxyIconSize, proxyIconMargin, colors);
+                // 三个圆形图标按钮，各占 1/3 宽度，居中（与上方主题按钮对齐）
+                Button autoProxyBtn = makeProxyIcon(activity, "Au", proxyIconSize, 0, colors);
+                Button goProxyBtn = makeProxyIcon(activity, "Go", proxyIconSize, 0, colors);
+                Button javaProxyBtn = makeProxyIcon(activity, "Ja", proxyIconSize, 0, colors);
 
                 setProxyIconSelected(autoProxyBtn, currentProxyType == 0, colors, activity);
                 setProxyIconSelected(goProxyBtn, currentProxyType == 1, colors, activity);
@@ -928,9 +921,26 @@ public class DanmakuUIHelper {
                 goProxyBtn.setOnFocusChangeListener(proxyIconFocus);
                 javaProxyBtn.setOnFocusChangeListener(proxyIconFocus);
 
-                proxyRow.addView(autoProxyBtn);
-                proxyRow.addView(goProxyBtn);
-                proxyRow.addView(javaProxyBtn);
+                proxyRow.addView(proxyLabel);
+                LinearLayout.LayoutParams proxySlotParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
+
+                LinearLayout slot1 = new LinearLayout(activity);
+                slot1.setLayoutParams(proxySlotParams);
+                slot1.setGravity(Gravity.CENTER);
+                slot1.addView(autoProxyBtn);
+                proxyRow.addView(slot1);
+
+                LinearLayout slot2 = new LinearLayout(activity);
+                slot2.setLayoutParams(proxySlotParams);
+                slot2.setGravity(Gravity.CENTER);
+                slot2.addView(goProxyBtn);
+                proxyRow.addView(slot2);
+
+                LinearLayout slot3 = new LinearLayout(activity);
+                slot3.setLayoutParams(proxySlotParams);
+                slot3.setGravity(Gravity.CENTER);
+                slot3.addView(javaProxyBtn);
+                proxyRow.addView(slot3);
                 settingsCard.addView(proxyRow);
                 settingsWrap.addView(settingsCard);
 
