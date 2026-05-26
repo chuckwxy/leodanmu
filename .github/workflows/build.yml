@@ -10,8 +10,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout leodanmu
         uses: actions/checkout@v4
+
+      - name: Checkout GoProxyAndroid
+        uses: actions/checkout@v4
+        with:
+          repository: leotvgo/GoProxyAndroid
+          path: go-proxy-android
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -19,53 +25,30 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Set up Go 1.22
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r26d
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Grant execute permission for gradlew
+      - name: Grant execute permission
         run: chmod +x gradlew
 
       - name: Build Release APK
         run: ./gradlew assembleRelease
 
-      - name: Generate leodm.jar
+      - name: Generate leodm.jar (Go + smali)
         run: |
-          cd jar
-          rm -f leodm.jar
-          rm -rf Smali_classes
-
-          APK_PATH="../app/build/outputs/apk/release/app-release-unsigned.apk"
-          APKTOOL_PATH="3rd/apktool_2.11.0.jar"
-
-          echo "反编译 APK..."
-          java -jar "$APKTOOL_PATH" d -f --only-main-classes "$APK_PATH" -o Smali_classes
-
-          rm -rf spider.jar/smali/com/github/catvod/spider
-          rm -rf spider.jar/smali/com/github/catvod/js
-          rm -rf spider.jar/smali/com/github/catvod/net
-          rm -rf spider.jar/smali/org/slf4j
-
-          mkdir -p spider.jar/smali/com/github/catvod/
-          mkdir -p spider.jar/smali/org/slf4j/
-
-          [ -d "Smali_classes/smali/com/github/catvod/spider" ] && mv Smali_classes/smali/com/github/catvod/spider spider.jar/smali/com/github/catvod/
-          [ -d "Smali_classes/smali/com/github/catvod/js" ]     && mv Smali_classes/smali/com/github/catvod/js     spider.jar/smali/com/github/catvod/
-          [ -d "Smali_classes/smali/com/github/catvod/net" ]    && mv Smali_classes/smali/com/github/catvod/net    spider.jar/smali/com/github/catvod/
-          [ -d "Smali_classes/smali/org/slf4j" ]                && mv Smali_classes/smali/org/slf4j                spider.jar/smali/org/
-
-          rm -rf spider.jar/assets
-
-          echo "重新打包..."
-          java -jar "$APKTOOL_PATH" b spider.jar -c
-
-          mv spider.jar/dist/dex.jar leodm.jar
-          md5sum leodm.jar | awk '{print $1}' > leodm.jar.md5
-
-          rm -rf spider.jar/build spider.jar/smali spider.jar/dist Smali_classes
-
-          echo "leodm.jar 生成成功"
-          ls -lh leodm.jar
-          echo "MD5: $(cat leodm.jar.md5)"
+          export GO_SOURCE_DIR="$GITHUB_WORKSPACE/go-proxy-android"
+          export NDK_ROOT="$ANDROID_NDK_HOME"
+          bash jar/danmu.sh
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
