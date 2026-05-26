@@ -294,7 +294,9 @@ public class DanmakuScanner {
                                 if (TextUtils.equals(stateSignature, lastMonitorStateSignature)) {
                                     return;
                                 }
-                                lastMonitorStateSignature = stateSignature;
+                                if (!TextUtils.isEmpty(media.getTitle())) {
+                                    lastMonitorStateSignature = stateSignature;
+                                }
 
                                 if (isVideoPlaying) {
                                     // 获取媒体信息
