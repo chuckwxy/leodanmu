@@ -7,12 +7,11 @@ import java.io.*;
 import java.net.*;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -258,7 +257,7 @@ public class JavaProxyServer {
             out.write(firstResult.data);
             out.flush();
 
-            // Phase 4: Streaming batch download with per-chunk write
+            // Phase 4: Batch download loop (small batches, write after all complete)
             long nextPos = startPos + firstResult.data.length;
             int adaptiveThread = threadCount;
 
@@ -266,10 +265,8 @@ public class JavaProxyServer {
             int[] winBytes = new int[5];
             int winIdx = 0;
             int consecutiveErrors = 0;
-            ConcurrentHashMap<Integer, byte[]> done = new ConcurrentHashMap<>();
-            long batchStart = nextPos;
 
-            while (batchStart <= finalEndPos) {
+            for (long batchStart = nextPos; batchStart <= finalEndPos; batchStart += batchChunkSize) {
                 long remaining = finalEndPos - batchStart + 1;
                 if (remaining <= 0) break;
 
@@ -277,7 +274,9 @@ public class JavaProxyServer {
                 if (batchThreads <= 0) batchThreads = 1;
 
                 long batchT0 = System.currentTimeMillis();
-                AtomicInteger errors = new AtomicInteger(0);
+
+                ChunkResult[] results = new ChunkResult[batchThreads];
+                AtomicBoolean hasError = new AtomicBoolean(false);
                 CountDownLatch latch = new CountDownLatch(batchThreads);
 
                 for (int i = 0; i < batchThreads; i++) {
@@ -295,37 +294,20 @@ public class JavaProxyServer {
                                 if (r != null) break;
                                 Thread.sleep((retry + 1) * 1000L);
                             }
-                            if (r == null) { errors.incrementAndGet(); }
-                            else { done.put(idx, r.data); }
+                            if (r == null) hasError.set(true);
+                            else results[idx] = r;
                         } catch (InterruptedException e) {
                             Thread.currentThread().interrupt();
-                            errors.incrementAndGet();
+                            hasError.set(true);
                         } finally {
                             latch.countDown();
                         }
                     });
                 }
 
-                // Write chunks to output as they complete in order
-                int written = 0;
-                int nextIdx = 0;
-                long deadline = System.currentTimeMillis() + 120000;
-                while (nextIdx < batchThreads && System.currentTimeMillis() < deadline) {
-                    byte[] data = done.remove(nextIdx);
-                    if (data != null) {
-                        out.write(data);
-                        out.flush();
-                        written++;
-                        nextIdx++;
-                    } else if (latch.getCount() == 0) {
-                        break;
-                    } else {
-                        try { Thread.sleep(50); } catch (InterruptedException e) { break; }
-                    }
-                }
-                try { latch.await(200, TimeUnit.MILLISECONDS); } catch (InterruptedException ignored) {}
+                latch.await(120, TimeUnit.SECONDS);
 
-                if (errors.get() > 0) {
+                if (hasError.get()) {
                     consecutiveErrors++;
                     if (consecutiveErrors >= 3 && adaptiveThread > 2) {
                         int oldT = adaptiveThread;
@@ -337,15 +319,23 @@ public class JavaProxyServer {
                         batchChunkSize = chunkSize * adaptiveThread;
                     }
                     if (consecutiveErrors >= 5) return;
-                } else {
-                    consecutiveErrors = 0;
+                    continue;
+                }
+                consecutiveErrors = 0;
+
+                int batchBytes = 0;
+                for (int i = 0; i < batchThreads; i++) {
+                    if (results[i] != null) {
+                        out.write(results[i].data);
+                        batchBytes += results[i].data.length;
+                        out.flush();
+                    }
                 }
 
-                batchStart += (long) batchThreads * chunkSize;
                 long batchTime = System.currentTimeMillis() - batchT0;
 
                 winTimes[winIdx % 5] = batchTime;
-                winBytes[winIdx % 5] = written * (int) chunkSize;
+                winBytes[winIdx % 5] = batchBytes;
                 winIdx++;
 
                 if (autoTune && winIdx % 5 == 0) {
