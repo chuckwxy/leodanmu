@@ -30,11 +30,6 @@ jobs:
         with:
           go-version: '1.22'
 
-      - name: Setup Android NDK
-        uses: nttld/setup-ndk@v1
-        with:
-          ndk-version: r26d
-
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 

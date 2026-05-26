@@ -41,11 +41,8 @@ public class Init {
         get().app = ((Application) context);
         Proxy.init();
 
-        // 启动GoProxy
-        //GoProxySpider.initGoProxy(context);
-
-        // 启动Go代理健康检查
-        //GoProxySpider.startHealthCheck(context);
+        // 启动代理管理（自动检测 Go/JNI/Java 并初始化）
+        ProxyManager.initialize(context);
 
         // 删除弹幕缓存
         Leodanmu.clearCache(context);

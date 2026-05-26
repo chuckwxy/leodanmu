@@ -19,7 +19,7 @@ if [ -z "$NDK_ROOT" ] && [ -n "$ANDROID_NDK_HOME" ]; then
     NDK_ROOT="$ANDROID_NDK_HOME"
 fi
 NDK_ROOT="${NDK_ROOT:-/root/android-ndk-r26b}"
-GO_CMD="${GO_CMD:-/usr/local/go/bin/go}"
+GO_CMD="${GO_CMD:-go}"
 
 echo "========================================="
 echo "Go 代理交叉编译"

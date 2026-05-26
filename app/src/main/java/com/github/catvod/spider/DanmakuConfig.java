@@ -21,6 +21,7 @@ public class DanmakuConfig {
     private String quarkCookie = "";
     private String ucCookie = "";
     private String baiduCookie = "";
+    private int proxyType = 0; // 0=自动 1=Go代理 2=Java代理
 
     public DanmakuConfig() {
         apiUrls = new HashSet<>();
@@ -126,6 +127,14 @@ public class DanmakuConfig {
         this.danmakuTimeOffsetMs = danmakuTimeOffsetMs;
     }
 
+    public int getProxyType() {
+        return proxyType;
+    }
+
+    public void setProxyType(int proxyType) {
+        this.proxyType = proxyType;
+    }
+
     /**
      * 从JSON对象更新配置
      * @param json JSON对象，可包含 apiUrls、autoPushEnabled、lpWidth、lpHeight、lpAlpha、pushToastEnabled、theme
@@ -185,6 +194,9 @@ public class DanmakuConfig {
         }
         if (json.has("baiduCookie")) {
             setBaiduCookie(json.optString("baiduCookie"));
+        }
+        if (json.has("proxyType")) {
+            setProxyType(json.optInt("proxyType", 0));
         }
     }
 }
