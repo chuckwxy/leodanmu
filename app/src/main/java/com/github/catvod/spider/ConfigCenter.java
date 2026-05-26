@@ -30,8 +30,11 @@ public class ConfigCenter extends Spider {
 
             result.put("class", classes);
             result.put("list", new JSONArray());
-            return result.toString();
+            String json = result.toString();
+            Leodanmu.log("ConfigCenter homeContent: " + json);
+            return json;
         } catch (Exception e) {
+            Leodanmu.log("ConfigCenter homeContent异常: " + e.getMessage());
             return "";
         }
     }
