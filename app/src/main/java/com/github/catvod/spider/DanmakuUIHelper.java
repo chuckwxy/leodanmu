@@ -891,8 +891,8 @@ public class DanmakuUIHelper {
                 proxyLabel.setLayoutParams(proxyLabelParams);
 
                 int currentProxyType = config.getProxyType();
-                int iconSize = dpToPx(activity, 30);
-                int iconMargin = dpToPx(activity, 3);
+                int proxyIconSize = dpToPx(activity, 30);
+                int proxyIconMargin = dpToPx(activity, 3);
 
                 // 标签右方 spacer 把按钮推到右侧（类似时移行）
                 View proxySpacer = new View(activity);
@@ -901,9 +901,9 @@ public class DanmakuUIHelper {
                 proxyRow.addView(proxySpacer);
 
                 // 三个圆形图标按钮，参考 ± 按钮样式
-                Button autoProxyBtn = makeProxyIcon(activity, "Au", iconSize, iconMargin, colors);
-                Button goProxyBtn = makeProxyIcon(activity, "Go", iconSize, iconMargin, colors);
-                Button javaProxyBtn = makeProxyIcon(activity, "Ja", iconSize, iconMargin, colors);
+                Button autoProxyBtn = makeProxyIcon(activity, "Au", proxyIconSize, proxyIconMargin, colors);
+                Button goProxyBtn = makeProxyIcon(activity, "Go", proxyIconSize, proxyIconMargin, colors);
+                Button javaProxyBtn = makeProxyIcon(activity, "Ja", proxyIconSize, proxyIconMargin, colors);
 
                 setProxyIconSelected(autoProxyBtn, currentProxyType == 0, colors, activity);
                 setProxyIconSelected(goProxyBtn, currentProxyType == 1, colors, activity);
@@ -912,17 +912,17 @@ public class DanmakuUIHelper {
                 View.OnFocusChangeListener proxyIconFocus = (v, hasFocus) -> {
                     Button btn = (Button) v;
                     boolean selected = btn.getTag() != null && (boolean) btn.getTag();
-                    GradientDrawable bg = new GradientDrawable();
-                    bg.setShape(GradientDrawable.OVAL);
-                    bg.setColor(selected ? colors.focusBorder : colors.bgSecondary);
-                    bg.setStroke(hasFocus ? dpToPx(activity, 2) : dpToPx(activity, 1),
+                    GradientDrawable proxyIconBg = new GradientDrawable();
+                    proxyIconBg.setShape(GradientDrawable.OVAL);
+                    proxyIconBg.setColor(selected ? colors.focusBorder : colors.bgSecondary);
+                    proxyIconBg.setStroke(hasFocus ? dpToPx(activity, 2) : dpToPx(activity, 1),
                             hasFocus ? colors.focusBorder : colors.divider);
                     if (hasFocus) {
                         v.animate().scaleX(1.1f).scaleY(1.1f).setDuration(150).start();
                     } else {
                         v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start();
                     }
-                    btn.setBackground(bg);
+                    btn.setBackground(proxyIconBg);
                 };
                 autoProxyBtn.setOnFocusChangeListener(proxyIconFocus);
                 goProxyBtn.setOnFocusChangeListener(proxyIconFocus);
