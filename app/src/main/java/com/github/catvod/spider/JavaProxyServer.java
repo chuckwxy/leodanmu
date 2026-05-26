@@ -183,6 +183,12 @@ public class JavaProxyServer {
             long firstChunkTime = System.currentTimeMillis() - t1;
             double probeSpeedMBps = firstChunkTime > 0 ?
                     (firstResult.data.length / 1024.0 / 1024.0) / (firstChunkTime / 1000.0) : 0;
+            if (autoTune) {
+                ProxyManager.log("[调优] " + String.format("%.1f", fileSize/1024.0/1024.0) + "MB" +
+                        " 首块" + firstResult.data.length/1024 + "KB" +
+                        " 测速" + String.format("%.1f", probeSpeedMBps) + "MB/s" +
+                        (targetSpeedMBps > 0 ? " 目标" + String.format("%.1f", targetSpeedMBps) + "MB/s" : ""));
+            }
 
             // Get file size from Content-Range (backend response)
             String contentRangeHeader = firstResult.responseHeaders.get("Content-Range");
@@ -206,6 +212,8 @@ public class JavaProxyServer {
                 int tunedChunkKB = clamp((int) Math.round(chunkSizeKB * Math.sqrt(ratio)), 128, 2048);
 
                 if (tunedThread != threadCount || tunedChunkKB != chunkSizeKB) {
+                    ProxyManager.log("[调优] 线程" + threadCount + "→" + tunedThread +
+                            " 分块" + chunkSizeKB + "→" + tunedChunkKB + "KB");
                     threadCount = tunedThread;
                     chunkSizeKB = tunedChunkKB;
                 }
@@ -296,8 +304,10 @@ public class JavaProxyServer {
                 if (hasError.get()) {
                     consecutiveErrors++;
                     if (consecutiveErrors >= 3 && adaptiveThread > 2) {
+                        int oldT = adaptiveThread;
                         adaptiveThread = Math.max(2, adaptiveThread / 2);
                         int rc = Math.max(128, chunkSizeKB / 2);
+                        ProxyManager.log("[降级] " + consecutiveErrors + "次错误 线程" + oldT + "→" + adaptiveThread + " 分块" + chunkSizeKB + "→" + rc + "KB");
                         chunkSizeKB = rc;
                         chunkSize = (long) chunkSizeKB * 1024;
                         batchChunkSize = chunkSize * adaptiveThread;
@@ -337,8 +347,12 @@ public class JavaProxyServer {
                             chunkSizeKB = nc;
                             chunkSize = (long) chunkSizeKB * 1024;
                             batchChunkSize = chunkSize * adaptiveThread;
+                            ProxyManager.log("[调优] 提速 " + String.format("%.1f", curSpeed) + "MB/s<目标" +
+                                    String.format("%.1f", targetSpeedMBps) + "MB/s 线程" + adaptiveThread + " 分块" + chunkSizeKB + "KB");
                         } else if (ratio > 2.0 && adaptiveThread > 4) {
                             adaptiveThread = Math.max(4, adaptiveThread / 2);
+                            ProxyManager.log("[调优] 减速 " + String.format("%.1f", curSpeed) + "MB/s>>目标" +
+                                    String.format("%.1f", targetSpeedMBps) + "MB/s 线程" + adaptiveThread);
                         }
                     }
                 }
