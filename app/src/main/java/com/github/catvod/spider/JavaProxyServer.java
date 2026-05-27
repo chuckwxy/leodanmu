@@ -324,15 +324,9 @@ public class JavaProxyServer {
                                     String.format("%.1f", targetSpeedMBps) + "MB/s 线程" + adaptiveThread + " 分块" + chunkSizeKB + "KB");
                         } else if (ratio > 2.0 && adaptiveThread > 4) {
                             adaptiveThread = Math.max(4, adaptiveThread / 2);
+                            batchChunkSize = chunkSize * adaptiveThread;
                             ProxyManager.log("[调优] 减速 " + String.format("%.1f", curSpeed) + "MB/s>>目标" +
                                     String.format("%.1f", targetSpeedMBps) + "MB/s 线程" + adaptiveThread);
-                        }
-                        if (appContext != null) {
-                            if (source != null) {
-                                ProxyManager.saveSourceConfig(appContext, source, adaptiveThread, chunkSizeKB);
-                            } else {
-                                ProxyManager.saveAutoTuneConfig(appContext, adaptiveThread, chunkSizeKB);
-                            }
                         }
                     }
                 }
