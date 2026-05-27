@@ -149,7 +149,7 @@ public class JavaProxyServer {
         long startPos = range[0];
         long endPos = range[1];
 
-        okhttp3.OkHttpClient client = sharedClient;
+        okhttp3.OkHttpClient client = buildOkHttpClient();
 
         Map<String, String> forwardHeaders = new HashMap<>();
         String ua = headers.get("user-agent");
@@ -402,9 +402,7 @@ public class JavaProxyServer {
         }
     }
 
-    private static final okhttp3.OkHttpClient sharedClient = buildSharedClient();
-
-    private static okhttp3.OkHttpClient buildSharedClient() {
+    private okhttp3.OkHttpClient buildOkHttpClient() {
         try {
             javax.net.ssl.SSLContext sslContext = javax.net.ssl.SSLContext.getInstance("TLS");
             final javax.net.ssl.X509TrustManager trustAll = new javax.net.ssl.X509TrustManager() {
