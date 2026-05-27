@@ -384,7 +384,11 @@ public class JavaProxyServer {
             };
             sslContext.init(null, new javax.net.ssl.TrustManager[]{trustAll}, new java.security.SecureRandom());
 
+            okhttp3.Dispatcher dispatcher = new okhttp3.Dispatcher();
+            dispatcher.setMaxRequestsPerHost(32);
+
             return new okhttp3.OkHttpClient.Builder()
+                    .dispatcher(dispatcher)
                     .connectTimeout(10, TimeUnit.SECONDS)
                     .readTimeout(60, TimeUnit.SECONDS)
                     .writeTimeout(0, TimeUnit.SECONDS)
