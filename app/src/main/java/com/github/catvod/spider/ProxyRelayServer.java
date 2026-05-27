@@ -31,7 +31,7 @@ public class ProxyRelayServer {
         this.listenPort = listenPort;
         this.targetResolver = targetResolver;
         this.acceptExecutor = Executors.newSingleThreadExecutor();
-        this.relayExecutor = new ThreadPoolExecutor(0, 32, 60L, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>(64));
+        this.relayExecutor = new ThreadPoolExecutor(4, 32, 60L, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>(32));
     }
 
     public boolean startServer() {

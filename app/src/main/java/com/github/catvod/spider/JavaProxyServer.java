@@ -33,7 +33,7 @@ public class JavaProxyServer {
         this.port = port;
         this.appContext = context;
         this.acceptExecutor = Executors.newSingleThreadExecutor();
-        this.downloadExecutor = new ThreadPoolExecutor(0, 64, 60L, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>(128));
+        this.downloadExecutor = new ThreadPoolExecutor(32, 64, 60L, TimeUnit.SECONDS, new LinkedBlockingQueue<Runnable>(32));
     }
 
     public boolean startServer() {
