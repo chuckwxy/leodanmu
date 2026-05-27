@@ -17,7 +17,7 @@ public class DanmakuConfigManager {
     private static final String OLD_PREFS_AUTO_PUSH = "danmaku_prefs";
     private static final String OLD_KEY_AUTO_PUSH = "auto_push_enabled";
 
-    private static DanmakuConfig sDanmakuConfig;
+    private static volatile DanmakuConfig sDanmakuConfig;
     private static final Gson gson = new Gson();
 
     public static DanmakuConfig getConfig(Context context) {

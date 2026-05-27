@@ -160,6 +160,8 @@ public class JavaProxyServer {
         if (!TextUtils.isEmpty(referer)) forwardHeaders.put("Referer", referer);
 
         try {
+            ProxyManager.log("[代理] 启动 线程" + threadCount + " 分块" + chunkSizeKB + "KB autoTune=" + autoTune);
+
             // Phase 1: First chunk always 100 bytes (same as Go proxy) to avoid server minimum chunk trap
             long firstEnd = startPos + 100;
 
