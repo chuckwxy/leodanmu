@@ -240,11 +240,21 @@ public class JavaProxyServer {
                     long cs = pos + i * chunkSize;
                     long ce = Math.min(cs + chunkSize, finalEndPos + 1);
                     final int idx = i;
-                    downloadExecutor.submit(() -> {
+                    final long fCs = cs;
+                    final long fCe = ce;
+                    downloadExecutor.execute(() -> {
                         try {
-                            okhttp3.OkHttpClient c = buildOkHttpClient();
-                            results[idx] = downloadChunk(c, url, forwardHeaders, cs, ce, 3);
-                            if (results[idx] == null) hasError.set(true);
+                            ChunkResult r = null;
+                            for (int retry = 0; retry < 3; retry++) {
+                                r = downloadChunk(client, url, forwardHeaders, fCs, fCe, 3);
+                                if (r != null) break;
+                                try { Thread.sleep((retry + 1) * 1000L); } catch (InterruptedException e) {
+                                    Thread.currentThread().interrupt();
+                                    break;
+                                }
+                            }
+                            if (r == null) hasError.set(true);
+                            else results[idx] = r;
                         } catch (Exception e) {
                             hasError.set(true);
                         } finally {
@@ -273,9 +283,9 @@ public class JavaProxyServer {
                         out.write(results[i].data);
                         batchBytes += results[i].data.length;
                         pos += results[i].data.length;
+                        out.flush();
                     }
                 }
-                out.flush();
 
                 // Auto-tune every batch
                 if (autoTune) {
