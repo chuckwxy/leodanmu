@@ -8,9 +8,11 @@ import java.net.*;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -158,17 +160,7 @@ public class JavaProxyServer {
         if (!TextUtils.isEmpty(referer)) forwardHeaders.put("Referer", referer);
 
         try {
-            // Phase 1: HEAD probe for file size
-            long fileSize = -1;
-            double targetSpeedMBps = -1;
-            if (autoTune) {
-                fileSize = probeFileSize(client, url);
-                if (fileSize > 0) {
-                    targetSpeedMBps = calcTargetSpeed(fileSize);
-                }
-            }
-
-            // Phase 2: Download first chunk (larger for a better speed sample)
+            // Phase 1: Download first chunk (probe for speed + get file size from Content-Range)
             int probeChunk = (autoTune && chunkSizeKB < 512) ? 512 * 1024 : chunkSizeKB * 1024;
             long probeEnd;
             if (endPos < 0) {
@@ -188,16 +180,11 @@ public class JavaProxyServer {
             long firstChunkTime = System.currentTimeMillis() - t1;
             double probeSpeedMBps = firstChunkTime > 0 ?
                     (firstResult.data.length / 1024.0 / 1024.0) / (firstChunkTime / 1000.0) : 0;
-            if (autoTune) {
-                ProxyManager.log("[调优] " + String.format("%.1f", fileSize/1024.0/1024.0) + "MB" +
-                        " 首块" + firstResult.data.length/1024 + "KB" +
-                        " 测速" + String.format("%.1f", probeSpeedMBps) + "MB/s" +
-                        (targetSpeedMBps > 0 ? " 目标" + String.format("%.1f", targetSpeedMBps) + "MB/s" : ""));
-            }
 
-            // Get file size from Content-Range of actual response (more reliable than HEAD)
+            // Get file size from Content-Range of actual response
             String contentRangeHeader = firstResult.responseHeaders.get("Content-Range");
             if (contentRangeHeader == null) contentRangeHeader = firstResult.responseHeaders.get("content-range");
+            long fileSize = -1;
             if (!TextUtils.isEmpty(contentRangeHeader)) {
                 Matcher m = CONTENT_RANGE_PATTERN.matcher(contentRangeHeader);
                 if (m.find()) fileSize = Long.parseLong(m.group(3));
@@ -210,19 +197,25 @@ public class JavaProxyServer {
             if (endPos <= 0) endPos = fileSize - 1;
             final long finalEndPos = endPos;
 
-            // Phase 3: Auto-tune based on probe speed vs target
-            if (autoTune && targetSpeedMBps > 0 && probeSpeedMBps > 0) {
+            // Phase 2: Auto-tune based on probe speed vs target (using real file size)
+            double targetSpeedMBps = calcTargetSpeed(fileSize);
+            if (autoTune && probeSpeedMBps > 0) {
                 double ratio = targetSpeedMBps / Math.max(probeSpeedMBps, 0.1);
                 int tunedThread = clamp((int) Math.round(threadCount * ratio), 2, 16);
                 int tunedChunkKB = clamp((int) Math.round(chunkSizeKB * Math.sqrt(ratio)), 128, 2048);
 
+                ProxyManager.log("[调优] " + String.format("%.1f", fileSize/1024.0/1024.0) + "MB" +
+                        " 首块" + firstResult.data.length/1024 + "KB" +
+                        " 测速" + String.format("%.1f", probeSpeedMBps) + "MB/s" +
+                        " 目标" + String.format("%.1f", targetSpeedMBps) + "MB/s" +
+                        (tunedThread != threadCount || tunedChunkKB != chunkSizeKB ?
+                                " 线程" + threadCount + "→" + tunedThread +
+                                " 分块" + chunkSizeKB + "→" + tunedChunkKB + "KB" : ""));
+
                 if (tunedThread != threadCount || tunedChunkKB != chunkSizeKB) {
-                    ProxyManager.log("[调优] 线程" + threadCount + "→" + tunedThread +
-                            " 分块" + chunkSizeKB + "→" + tunedChunkKB + "KB");
                     threadCount = tunedThread;
                     chunkSizeKB = tunedChunkKB;
                 }
-                // Persist the tuned config so future requests start closer to optimal
                 if (appContext != null) {
                     if (source != null) {
                         ProxyManager.saveSourceConfig(appContext, source, threadCount, chunkSizeKB);
@@ -373,17 +366,6 @@ public class JavaProxyServer {
     }
 
     // ---- Auto-tuning helpers ----
-
-    private long probeFileSize(okhttp3.OkHttpClient client, String url) {
-        try {
-            okhttp3.Request req = new okhttp3.Request.Builder().url(url).head().build();
-            okhttp3.Response resp = client.newCall(req).execute();
-            String cl = resp.header("Content-Length");
-            resp.close();
-            if (cl != null) return Long.parseLong(cl);
-        } catch (Exception ignored) {}
-        return -1;
-    }
 
     private static double calcTargetSpeed(long fileSize) {
         long mb = fileSize / (1024L * 1024L);
