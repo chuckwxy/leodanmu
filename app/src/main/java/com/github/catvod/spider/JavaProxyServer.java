@@ -447,7 +447,8 @@ public class JavaProxyServer {
                 okhttp3.Response resp = client.newCall(reqBuilder.build()).execute();
                 int status = resp.code();
                 if (status == 200 || status == 206) {
-                    byte[] data = readAllBytes(resp.body().byteStream());
+                    int expected = (int) Math.min(end - start, 1024 * 1024);
+                    byte[] data = readLimited(resp.body().byteStream(), expected);
                     String contentType = resp.header("Content-Type", "application/octet-stream");
                     Map<String, String> respHeaders = new HashMap<>();
                     for (String name : resp.headers().names()) {
@@ -472,12 +473,14 @@ public class JavaProxyServer {
         return null;
     }
 
-    private static byte[] readAllBytes(InputStream in) throws IOException {
-        ByteArrayOutputStream bos = new ByteArrayOutputStream(1024 * 1024);
-        byte[] buf = new byte[1024 * 1024];
+    private static byte[] readLimited(InputStream in, int maxLen) throws IOException {
+        ByteArrayOutputStream bos = new ByteArrayOutputStream(Math.min(maxLen, 65536));
+        byte[] buf = new byte[8192];
+        int total = 0;
         int n;
-        while ((n = in.read(buf)) != -1) {
+        while (total < maxLen && (n = in.read(buf, 0, Math.min(buf.length, maxLen - total))) != -1) {
             bos.write(buf, 0, n);
+            total += n;
         }
         return bos.toByteArray();
     }
