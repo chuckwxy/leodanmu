@@ -83,6 +83,9 @@ public class ConfigCenter extends Spider {
         Activity activity = Utils.getTopActivity();
         DanmakuConfig config = activity != null ? DanmakuConfigManager.getConfig(activity) : new DanmakuConfig();
 
+        list.put(createActionVod("auto_tune", "自动线程调优", "",
+                config.isEnableAutoTune() ? "已开启" : "已关闭"));
+
         String[][] sources = {{"ali", "阿里云盘"}, {"quark", "夸克云盘"}, {"uc", "UC云盘"}};
         for (String[] s : sources) {
             DanmakuConfig.SourceProxyConfig spc = config.getProxySourceConfig().get(s[0]);
@@ -132,6 +135,13 @@ public class ConfigCenter extends Spider {
                             break;
                         case "log":
                             DanmakuUIHelper.showLogDialog(ctx);
+                            break;
+                        case "auto_tune":
+                            config.setEnableAutoTune(!config.isEnableAutoTune());
+                            DanmakuConfigManager.saveConfig(ctx, config);
+                            Leodanmu.log("ConfigCenter: 自动线程调优状态切换: " + config.isEnableAutoTune());
+                            Utils.safeShowToast(ctx,
+                                    config.isEnableAutoTune() ? "自动线程调优已开启" : "自动线程调优已关闭");
                             break;
                         case "ali_thread":
                             DanmakuUIHelper.showSourceProxyDialog(ctx, config, "ali", "阿里云盘");
@@ -196,8 +206,8 @@ public class ConfigCenter extends Spider {
     private String searchContentShell(String key) {
         if (key == null || key.isEmpty()) return "";
         try {
-            String[] ids = {"config", "auto_push", "lp_config", "log", "ali_thread", "quark_thread", "uc_thread"};
-            String[] names = {"弹幕配置", "自动推送弹幕", "布局配置", "查看日志", "阿里云盘", "夸克云盘", "UC云盘"};
+            String[] ids = {"config", "auto_push", "lp_config", "log", "auto_tune", "ali_thread", "quark_thread", "uc_thread"};
+            String[] names = {"弹幕配置", "自动推送弹幕", "布局配置", "查看日志", "自动线程调优", "阿里云盘", "夸克云盘", "UC云盘"};
             for (int i = 0; i < ids.length; i++) {
                 if (!key.equals(names[i])) continue;
                 JSONObject vod = new JSONObject();
@@ -228,6 +238,7 @@ public class ConfigCenter extends Spider {
             case "auto_push": return "自动推送弹幕";
             case "lp_config": return "布局配置";
             case "log": return "查看日志";
+            case "auto_tune": return "自动线程调优";
             case "ali_thread": return "阿里云盘";
             case "quark_thread": return "夸克云盘";
             case "uc_thread": return "UC云盘";
@@ -243,6 +254,7 @@ public class ConfigCenter extends Spider {
             case "auto_push": return config.isAutoPushEnabled() ? "已开启" : "已关闭";
             case "lp_config": return "调整弹窗大小和透明度";
             case "log": return "查看运行日志与Hook诊断";
+            case "auto_tune": return config.isEnableAutoTune() ? "已开启" : "已关闭";
             case "ali_thread": case "quark_thread": case "uc_thread": {
                 DanmakuConfig.SourceProxyConfig spc = config.getProxySourceConfig().get(id.replace("_thread", ""));
                 int t = spc != null ? spc.thread : 8;

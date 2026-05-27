@@ -281,14 +281,13 @@ public class JavaProxyServer {
                             (batchBytes / 1024.0 / 1024.0) / (batchElapsed / 1000.0) : 0;
 
                     if (curSpeed > 0 && targetSpeedMBps > 0) {
-                        double ratio = curSpeed / targetSpeedMBps;
                         int oldThread = tuneThread;
                         int oldChunk = chunkSizeKB;
                         boolean changed = false;
 
-                        if (ratio < 0.5) {
+                        if (curSpeed < targetSpeedMBps * 0.8) {
                             if (tuneThread < 32) {
-                                tuneThread = Math.min(32, (int) (tuneThread * 1.5));
+                                tuneThread = Math.min(32, tuneThread * 2);
                                 changed = true;
                             } else {
                                 int newChunk = Math.min(1024, (int) (chunkSizeKB * 1.5));
@@ -298,12 +297,9 @@ public class JavaProxyServer {
                                     changed = true;
                                 }
                             }
-                        } else if (ratio > 2.0) {
+                        } else if (curSpeed > targetSpeedMBps * 1.5) {
                             if (tuneThread > 4) {
                                 tuneThread = Math.max(4, tuneThread / 2);
-                                changed = true;
-                            } else if (chunkSizeKB > 128) {
-                                chunkSizeKB = Math.max(128, chunkSizeKB / 2);
                                 changed = true;
                             }
                         }
