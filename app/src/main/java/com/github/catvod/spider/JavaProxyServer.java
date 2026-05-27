@@ -161,12 +161,11 @@ public class JavaProxyServer {
 
         try {
             // Phase 1: Download first chunk (probe for speed + get file size from Content-Range)
-            int probeChunk = (autoTune && chunkSizeKB < 512) ? 512 * 1024 : chunkSizeKB * 1024;
             long probeEnd;
             if (endPos < 0) {
-                probeEnd = startPos + probeChunk;
+                probeEnd = startPos + (long) chunkSizeKB * 1024;
             } else {
-                probeEnd = Math.min(startPos + probeChunk, endPos + 1);
+                probeEnd = Math.min(startPos + (long) chunkSizeKB * 1024, endPos + 1);
             }
 
             long t1 = System.currentTimeMillis();
