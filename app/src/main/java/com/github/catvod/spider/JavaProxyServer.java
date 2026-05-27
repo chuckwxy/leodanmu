@@ -7,13 +7,9 @@ import java.io.*;
 import java.net.*;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -191,17 +187,19 @@ public class JavaProxyServer {
             if (endPos <= 0) endPos = fileSize - 1;
             final long finalEndPos = endPos;
 
-            // Phase 2: Auto-tune uses batch throughput (not probe — too small)
+            // Phase 2: Suggest chunk size based on file size (larger files → fewer HTTP overhead)
             double targetSpeedMBps = calcTargetSpeed(fileSize);
+            int suggestedChunkKB = clamp((int) Math.round(targetSpeedMBps * 100), 128, 1024);
+            if (!autoTune) suggestedChunkKB = chunkSizeKB;
+            chunkSizeKB = suggestedChunkKB;
+
             if (autoTune) {
                 ProxyManager.log("[信息] " + String.format("%.1f", fileSize/1024.0/1024.0) + "MB" +
-                        " 首块" + firstResult.data.length + "B" +
                         " 目标" + String.format("%.1f", targetSpeedMBps) + "MB/s" +
-                        " 线程" + threadCount + " 分块" + chunkSizeKB + "KB");
+                        " 分块" + chunkSizeKB + "KB");
             }
 
             long chunkSize = (long) chunkSizeKB * 1024;
-            long batchChunkSize = chunkSize * threadCount;
 
             // Build & write response header
             StringBuilder headerBuilder = new StringBuilder();
@@ -225,111 +223,65 @@ public class JavaProxyServer {
             out.write(firstResult.data);
             out.flush();
 
-            // Phase 4: Batch download loop (small batches, write after all complete)
-            long nextPos = startPos + firstResult.data.length;
-            int adaptiveThread = threadCount;
-
-            long[] winTimes = new long[5];
-            int[] winBytes = new int[5];
-            int winIdx = 0;
+            // Phase 3: Sequential download — one chunk at a time, write immediately
+            long pos = startPos + firstResult.data.length;
             int consecutiveErrors = 0;
+            long seqT0 = System.currentTimeMillis();
+            long seqBytes = firstResult.data.length;
+            int chunkCount = 0;
 
-            for (long batchStart = nextPos; batchStart <= finalEndPos; batchStart += batchChunkSize) {
-                long remaining = finalEndPos - batchStart + 1;
-                if (remaining <= 0) break;
-
-                int batchThreads = (int) Math.min(adaptiveThread, (remaining + chunkSize - 1) / chunkSize);
-                if (batchThreads <= 0) batchThreads = 1;
-
-                long batchT0 = System.currentTimeMillis();
-
-                ChunkResult[] results = new ChunkResult[batchThreads];
-                AtomicBoolean hasError = new AtomicBoolean(false);
-                CountDownLatch latch = new CountDownLatch(batchThreads);
-
-                for (int i = 0; i < batchThreads; i++) {
-                    long cs = batchStart + (long) i * chunkSize;
-                    long ce = Math.min(cs + chunkSize, finalEndPos + 1);
-                    if (cs > finalEndPos) break;
-                    final int idx = i;
-                    final long fCs = cs;
-                    final long fCe = ce;
-                    downloadExecutor.execute(() -> {
-                        try {
-                            ChunkResult r = null;
-                            for (int retry = 0; retry < 3; retry++) {
-                                r = downloadChunk(client, url, forwardHeaders, fCs, fCe, 3);
-                                if (r != null) break;
-                                Thread.sleep((retry + 1) * 1000L);
-                            }
-                            if (r == null) hasError.set(true);
-                            else results[idx] = r;
-                        } catch (InterruptedException e) {
-                            Thread.currentThread().interrupt();
-                            hasError.set(true);
-                        } finally {
-                            latch.countDown();
-                        }
-                    });
-                }
-
-                latch.await(120, TimeUnit.SECONDS);
-
-                if (hasError.get()) {
+            while (pos <= finalEndPos) {
+                long end = Math.min(pos + chunkSize, finalEndPos + 1);
+                ChunkResult r = downloadChunk(client, url, forwardHeaders, pos, end, 3);
+                if (r == null) {
                     consecutiveErrors++;
-                    if (consecutiveErrors >= 3 && adaptiveThread > 2) {
-                        int oldT = adaptiveThread;
-                        adaptiveThread = Math.max(2, adaptiveThread / 2);
-                        int rc = Math.max(128, chunkSizeKB / 2);
-                        ProxyManager.log("[降级] " + consecutiveErrors + "次错误 线程" + oldT + "→" + adaptiveThread + " 分块" + chunkSizeKB + "→" + rc + "KB");
-                        chunkSizeKB = rc;
-                        chunkSize = (long) chunkSizeKB * 1024;
-                        batchChunkSize = chunkSize * adaptiveThread;
+                    if (consecutiveErrors >= 5) {
+                        ProxyManager.log("[中止] 连续5次下载失败");
+                        return;
                     }
-                    if (consecutiveErrors >= 5) return;
                     continue;
                 }
                 consecutiveErrors = 0;
+                out.write(r.data);
+                out.flush();
+                seqBytes += r.data.length;
+                pos += r.data.length;
+                chunkCount++;
 
-                int batchBytes = 0;
-                for (int i = 0; i < batchThreads; i++) {
-                    if (results[i] != null) {
-                        out.write(results[i].data);
-                        batchBytes += results[i].data.length;
-                        out.flush();
-                    }
-                }
-
-                long batchTime = System.currentTimeMillis() - batchT0;
-
-                winTimes[winIdx % 5] = batchTime;
-                winBytes[winIdx % 5] = batchBytes;
-                winIdx++;
-
-                if (autoTune && winIdx % 5 == 0) {
-                    long sumT = 0;
-                    int sumB = 0;
-                    for (int i = 0; i < 5; i++) { sumT += winTimes[i]; sumB += winBytes[i]; }
-                    double curSpeed = sumT > 0 ? (sumB / 1024.0 / 1024.0) / (sumT / 1000.0) : 0;
-
-                    if (targetSpeedMBps > 0 && curSpeed > 0) {
+                // Measure speed every 10 chunks for auto-tune
+                if (autoTune && chunkCount % 10 == 0) {
+                    long elapsed = System.currentTimeMillis() - seqT0;
+                    double curSpeed = elapsed > 0 ? (seqBytes / 1024.0 / 1024.0) / (elapsed / 1000.0) : 0;
+                    if (curSpeed > 0 && targetSpeedMBps > 0) {
                         double ratio = curSpeed / targetSpeedMBps;
-                        if (ratio < 0.5 && adaptiveThread < 16) {
-                            adaptiveThread = Math.min(16, (int)(adaptiveThread * 1.5));
-                            int nc = Math.min(2048, (int)(chunkSizeKB * 1.2));
-                            chunkSizeKB = nc;
+                        if (ratio < 0.5 && chunkSizeKB < 2048) {
+                            chunkSizeKB = Math.min(2048, (int)(chunkSizeKB * 1.5));
                             chunkSize = (long) chunkSizeKB * 1024;
-                            batchChunkSize = chunkSize * adaptiveThread;
-                            ProxyManager.log("[调优] 提速 " + String.format("%.1f", curSpeed) + "MB/s<目标" +
-                                    String.format("%.1f", targetSpeedMBps) + "MB/s 线程" + adaptiveThread + " 分块" + chunkSizeKB + "KB");
-                        } else if (ratio > 2.0 && adaptiveThread > 4) {
-                            adaptiveThread = Math.max(4, adaptiveThread / 2);
-                            batchChunkSize = chunkSize * adaptiveThread;
-                            ProxyManager.log("[调优] 减速 " + String.format("%.1f", curSpeed) + "MB/s>>目标" +
-                                    String.format("%.1f", targetSpeedMBps) + "MB/s 线程" + adaptiveThread);
+                            ProxyManager.log("[调优] 提速 速度" + String.format("%.1f", curSpeed) +
+                                    "MB/s<目标" + String.format("%.1f", targetSpeedMBps) +
+                                    "MB/s 分块→" + chunkSizeKB + "KB");
+                            seqT0 = System.currentTimeMillis();
+                            seqBytes = 0;
+                            chunkCount = 0;
+                        } else if (ratio > 3.0 && chunkSizeKB > 128) {
+                            chunkSizeKB = Math.max(128, chunkSizeKB / 2);
+                            chunkSize = (long) chunkSizeKB * 1024;
+                            ProxyManager.log("[调优] 减速 速度" + String.format("%.1f", curSpeed) +
+                                    "MB/s>>目标" + String.format("%.1f", targetSpeedMBps) +
+                                    "MB/s 分块→" + chunkSizeKB + "KB");
+                            seqT0 = System.currentTimeMillis();
+                            seqBytes = 0;
+                            chunkCount = 0;
                         }
                     }
                 }
+            }
+
+            if (autoTune) {
+                long elapsed = System.currentTimeMillis() - seqT0;
+                double avgSpd = elapsed > 0 ? (seqBytes / 1024.0 / 1024.0) / (elapsed / 1000.0) : 0;
+                ProxyManager.log("[完成] " + String.format("%.1f", seqBytes/1024.0/1024.0) + "MB " +
+                        String.format("%.1f", avgSpd) + "MB/s");
             }
 
         } catch (Exception e) {
