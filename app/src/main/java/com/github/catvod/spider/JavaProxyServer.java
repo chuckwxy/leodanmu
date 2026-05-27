@@ -238,8 +238,7 @@ public class JavaProxyServer {
                     final int idx = i;
                     downloadExecutor.submit(() -> {
                         try {
-                            okhttp3.OkHttpClient c = buildOkHttpClient();
-                            results[idx] = downloadChunk(c, url, forwardHeaders, cs, ce, 3);
+                            results[idx] = downloadChunk(client, url, forwardHeaders, cs, ce, 3);
                             if (results[idx] == null) hasError.set(true);
                         } catch (Exception e) {
                             hasError.set(true);
