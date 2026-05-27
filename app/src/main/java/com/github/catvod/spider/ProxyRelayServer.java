@@ -9,7 +9,8 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 public class ProxyRelayServer {
@@ -29,7 +30,7 @@ public class ProxyRelayServer {
         this.listenPort = listenPort;
         this.targetResolver = targetResolver;
         this.acceptExecutor = Executors.newSingleThreadExecutor();
-        this.relayExecutor = Executors.newCachedThreadPool();
+        this.relayExecutor = new ThreadPoolExecutor(0, 32, 60L, TimeUnit.SECONDS, new SynchronousQueue<Runnable>());
     }
 
     public boolean startServer() {

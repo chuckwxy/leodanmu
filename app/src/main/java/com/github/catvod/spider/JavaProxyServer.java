@@ -10,6 +10,8 @@ import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
@@ -31,7 +33,7 @@ public class JavaProxyServer {
         this.port = port;
         this.appContext = context;
         this.acceptExecutor = Executors.newSingleThreadExecutor();
-        this.downloadExecutor = Executors.newCachedThreadPool();
+        this.downloadExecutor = new ThreadPoolExecutor(0, 32, 60L, TimeUnit.SECONDS, new SynchronousQueue<Runnable>());
     }
 
     public boolean startServer() {
@@ -424,6 +426,9 @@ public class JavaProxyServer {
                 lastErr = new Exception("状态码: " + status);
             } catch (Exception e) {
                 lastErr = e;
+            } catch (Error e) {
+                lastErr = new Exception("Fatal: " + e.getClass().getSimpleName() + " " + e.getMessage());
+                break;
             }
             if (retry < maxRetries - 1) {
                 try { Thread.sleep((retry + 1) * 500L); } catch (InterruptedException e) {
