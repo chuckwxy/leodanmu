@@ -160,25 +160,20 @@ public class JavaProxyServer {
         if (!TextUtils.isEmpty(referer)) forwardHeaders.put("Referer", referer);
 
         try {
-            // Phase 1: Download first chunk (probe for speed + get file size from Content-Range)
-            long probeEnd;
-            if (endPos < 0) {
-                probeEnd = startPos + (long) chunkSizeKB * 1024;
+            // Phase 1: Download first chunk — small to reliably get Content-Range
+            long firstEnd;
+            if (endPos <= 0) {
+                firstEnd = startPos + 100;
             } else {
-                probeEnd = Math.min(startPos + (long) chunkSizeKB * 1024, endPos + 1);
+                firstEnd = startPos + Math.min(endPos - startPos + 1, chunkSizeKB * 1024L);
             }
 
-            long t1 = System.currentTimeMillis();
-            ChunkResult firstResult = downloadChunk(client, url, forwardHeaders, startPos, probeEnd, 3);
+            ChunkResult firstResult = downloadChunk(client, url, forwardHeaders, startPos, firstEnd, 3);
 
             if (firstResult == null) {
                 writeSimpleResponse(out, 500, "text/plain", "首块下载失败");
                 return;
             }
-
-            long firstChunkTime = System.currentTimeMillis() - t1;
-            double probeSpeedMBps = firstChunkTime > 0 ?
-                    (firstResult.data.length / 1024.0 / 1024.0) / (firstChunkTime / 1000.0) : 0;
 
             // Get file size from Content-Range of actual response
             String contentRangeHeader = firstResult.responseHeaders.get("Content-Range");
@@ -196,32 +191,13 @@ public class JavaProxyServer {
             if (endPos <= 0) endPos = fileSize - 1;
             final long finalEndPos = endPos;
 
-            // Phase 2: Auto-tune based on probe speed vs target (using real file size)
+            // Phase 2: Auto-tune uses batch throughput (not probe — too small)
             double targetSpeedMBps = calcTargetSpeed(fileSize);
-            if (autoTune && probeSpeedMBps > 0) {
-                double ratio = targetSpeedMBps / Math.max(probeSpeedMBps, 0.1);
-                int tunedThread = clamp((int) Math.round(threadCount * ratio), 2, 16);
-                int tunedChunkKB = clamp((int) Math.round(chunkSizeKB * Math.sqrt(ratio)), 128, 2048);
-
-                ProxyManager.log("[调优] " + String.format("%.1f", fileSize/1024.0/1024.0) + "MB" +
-                        " 首块" + firstResult.data.length/1024 + "KB" +
-                        " 测速" + String.format("%.1f", probeSpeedMBps) + "MB/s" +
+            if (autoTune) {
+                ProxyManager.log("[信息] " + String.format("%.1f", fileSize/1024.0/1024.0) + "MB" +
+                        " 首块" + firstResult.data.length + "B" +
                         " 目标" + String.format("%.1f", targetSpeedMBps) + "MB/s" +
-                        (tunedThread != threadCount || tunedChunkKB != chunkSizeKB ?
-                                " 线程" + threadCount + "→" + tunedThread +
-                                " 分块" + chunkSizeKB + "→" + tunedChunkKB + "KB" : ""));
-
-                if (tunedThread != threadCount || tunedChunkKB != chunkSizeKB) {
-                    threadCount = tunedThread;
-                    chunkSizeKB = tunedChunkKB;
-                }
-                if (appContext != null) {
-                    if (source != null) {
-                        ProxyManager.saveSourceConfig(appContext, source, threadCount, chunkSizeKB);
-                    } else {
-                        ProxyManager.saveAutoTuneConfig(appContext, threadCount, chunkSizeKB);
-                    }
-                }
+                        " 线程" + threadCount + " 分块" + chunkSizeKB + "KB");
             }
 
             long chunkSize = (long) chunkSizeKB * 1024;
@@ -350,6 +326,13 @@ public class JavaProxyServer {
                             adaptiveThread = Math.max(4, adaptiveThread / 2);
                             ProxyManager.log("[调优] 减速 " + String.format("%.1f", curSpeed) + "MB/s>>目标" +
                                     String.format("%.1f", targetSpeedMBps) + "MB/s 线程" + adaptiveThread);
+                        }
+                        if (appContext != null) {
+                            if (source != null) {
+                                ProxyManager.saveSourceConfig(appContext, source, adaptiveThread, chunkSizeKB);
+                            } else {
+                                ProxyManager.saveAutoTuneConfig(appContext, adaptiveThread, chunkSizeKB);
+                            }
                         }
                     }
                 }
