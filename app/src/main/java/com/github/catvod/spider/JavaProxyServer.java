@@ -242,7 +242,8 @@ public class JavaProxyServer {
                     final int idx = i;
                     downloadExecutor.submit(() -> {
                         try {
-                            results[idx] = downloadChunk(client, url, forwardHeaders, cs, ce, 3);
+                            okhttp3.OkHttpClient c = buildOkHttpClient();
+                            results[idx] = downloadChunk(c, url, forwardHeaders, cs, ce, 3);
                             if (results[idx] == null) hasError.set(true);
                         } catch (Exception e) {
                             hasError.set(true);
@@ -384,11 +385,7 @@ public class JavaProxyServer {
             };
             sslContext.init(null, new javax.net.ssl.TrustManager[]{trustAll}, new java.security.SecureRandom());
 
-            okhttp3.Dispatcher dispatcher = new okhttp3.Dispatcher();
-            dispatcher.setMaxRequestsPerHost(32);
-
             return new okhttp3.OkHttpClient.Builder()
-                    .dispatcher(dispatcher)
                     .connectTimeout(10, TimeUnit.SECONDS)
                     .readTimeout(60, TimeUnit.SECONDS)
                     .writeTimeout(0, TimeUnit.SECONDS)
