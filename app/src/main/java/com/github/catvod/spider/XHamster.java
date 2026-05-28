@@ -262,8 +262,8 @@ public class XHamster extends Spider {
                 }
                 if (k.equals("mediaDefinitions") && v instanceof JSONArray) {
                     JSONArray md = (JSONArray) v;
-                    for (int i = 0; i < md.length(); i++) {
-                        JSONObject mdo = md.optJSONObject(i);
+                    for (int j = 0; j < md.length(); j++) {
+                        JSONObject mdo = md.optJSONObject(j);
                         if (mdo == null) continue;
                         String vu = mdo.optString("videoUrl", "");
                         if (vu.isEmpty() || vu.contains("preview") || vu.contains("teaser")) continue;
