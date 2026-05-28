@@ -255,25 +255,8 @@ public class GoProxyManager {
                 dos.writeBytes("sleep 1\n");
                 dos.flush();
                 java.io.File logFile = new java.io.File(context.getCacheDir(), "goproxy_output.log");
-                // 旧方案：直接执行 ELF（高版本 Android 可能被阻止）
-                //dos.writeBytes("nohup " + file.getAbsolutePath() + " --port " + DEFAULT_BACKEND_PORT + " > " + logFile.getAbsolutePath() + " 2>&1 &\n");
-                // 新方案：通过系统 linker 加载，兼容高版本 Android
-                String linker;
-                if (new java.io.File("/apex/com.android.runtime/bin/linker64").exists()) {
-                    linker = "/apex/com.android.runtime/bin/linker64";
-                } else if (new java.io.File("/system/bin/linker64").exists()) {
-                    linker = "/system/bin/linker64";
-                } else if (new java.io.File("/apex/com.android.runtime/bin/linker").exists()) {
-                    linker = "/apex/com.android.runtime/bin/linker";
-                } else {
-                    linker = "/system/bin/linker";
-                }
-                String command = "nohup "
-                        + linker + " "
-                        + "\"" + file.getAbsolutePath() + "\""
-                        + " --port " + DEFAULT_BACKEND_PORT
-                        + " > " + logFile.getAbsolutePath() + " 2>&1 &\n";
-                dos.writeBytes(command);
+                // 直接执行 ELF（如遇高版本Android限制，需切到.so JNI方案）
+                dos.writeBytes("nohup " + file.getAbsolutePath() + " --port " + DEFAULT_BACKEND_PORT + " > " + logFile.getAbsolutePath() + " 2>&1 &\n");
                 dos.flush();
                 dos.writeBytes("exit\n");
                 dos.flush();
