@@ -160,8 +160,6 @@ public class JavaProxyServer {
         if (!TextUtils.isEmpty(referer)) forwardHeaders.put("Referer", referer);
 
         try {
-            ProxyManager.log("[代理] 启动 线程" + threadCount + " 分块" + chunkSizeKB + "KB autoTune=" + autoTune);
-
             // Phase 1: First chunk always 100 bytes (same as Go proxy) to avoid server minimum chunk trap
             long firstEnd = startPos + 100;
 
@@ -215,16 +213,12 @@ public class JavaProxyServer {
             // Phase 3: Batch download — parallel chunks, write in order
             long pos = startPos + firstResult.data.length;
             int tuneThread = threadCount;
+            final int startThread = threadCount;
+            final int startChunk = chunkSizeKB;
             long chunkSize = (long) chunkSizeKB * 1024;
             int batchChunks = tuneThread;
             long batchChunkSize = chunkSize * batchChunks;
             int consecutiveErrors = 0;
-
-            if (autoTune) {
-                ProxyManager.log("[信息] " + String.format("%.1f", fileSize/1024.0/1024.0) + "MB" +
-                        " 目标" + String.format("%.1f", targetSpeedMBps) + "MB/s" +
-                        " 线程" + tuneThread + " 分块" + chunkSizeKB + "KB");
-            }
 
             while (pos <= finalEndPos) {
                 long batchT0 = System.currentTimeMillis();
@@ -321,17 +315,14 @@ public class JavaProxyServer {
                             chunkSize = (long) chunkSizeKB * 1024;
                             batchChunks = tuneThread;
                             batchChunkSize = chunkSize * batchChunks;
-                            ProxyManager.log("[调优] " + String.format("%.1f", curSpeed) +
-                                    "/" + String.format("%.1f", targetSpeedMBps) + "MB/s" +
-                                    " 线程" + oldThread + "→" + tuneThread +
-                                    " 分块" + oldChunk + "→" + chunkSizeKB + "KB");
                         }
                     }
                 }
             }
 
-            if (autoTune) {
-                ProxyManager.log("[完成] 代理下载结束 线程" + tuneThread + " 分块" + chunkSizeKB + "KB");
+            if (autoTune && (tuneThread != startThread || chunkSizeKB != startChunk)) {
+                ProxyManager.log("[完成] 线程" + startThread + "→" + tuneThread +
+                        " 分块" + startChunk + "→" + chunkSizeKB + "KB");
             }
 
         } catch (Exception e) {
