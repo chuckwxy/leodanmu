@@ -143,6 +143,7 @@ public class JavaProxyServer {
         int chunkSizeKB = parseIntParam(params.get("chunkSize"),
                 source != null ? ProxyManager.getSourceChunkSize(appContext, source) : ProxyManager.getDefaultChunkSize(appContext), 256);
         boolean autoTune = ProxyManager.isAutoTuneEnabled(appContext);
+        ProxyManager.log("[调优] " + (autoTune ? "已开启" : "未开启"));
 
         String rangeHeader = headers.get("range");
         long[] range = parseRange(rangeHeader);
@@ -318,11 +319,6 @@ public class JavaProxyServer {
                         }
                     }
                 }
-            }
-
-            if (autoTune && (tuneThread != startThread || chunkSizeKB != startChunk)) {
-                ProxyManager.log("[完成] 线程" + startThread + "→" + tuneThread +
-                        " 分块" + startChunk + "→" + chunkSizeKB + "KB");
             }
 
         } catch (Exception e) {
