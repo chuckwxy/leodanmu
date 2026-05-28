@@ -255,8 +255,19 @@ public class GoProxyManager {
                 dos.writeBytes("sleep 1\n");
                 dos.flush();
                 java.io.File logFile = new java.io.File(context.getCacheDir(), "goproxy_output.log");
-                // 直接执行 ELF（如遇高版本Android限制，需切到.so JNI方案）
-                dos.writeBytes("nohup " + file.getAbsolutePath() + " --port " + DEFAULT_BACKEND_PORT + " > " + logFile.getAbsolutePath() + " 2>&1 &\n");
+                // linker启动，通过goProxyExecutableName匹配架构
+                boolean is64Bit = goProxyExecutableName.endsWith("64");
+                String linkerPath;
+                if (is64Bit) {
+                    linkerPath = new java.io.File("/apex/com.android.runtime/bin/linker64").exists()
+                            ? "/apex/com.android.runtime/bin/linker64" : "/system/bin/linker64";
+                } else {
+                    linkerPath = new java.io.File("/apex/com.android.runtime/bin/linker").exists()
+                            ? "/apex/com.android.runtime/bin/linker" : "/system/bin/linker";
+                }
+                dos.writeBytes("nohup " + linkerPath + " \"" + file.getAbsolutePath() + "\""
+                        + " --port " + DEFAULT_BACKEND_PORT
+                        + " > " + logFile.getAbsolutePath() + " 2>&1 &\n");
                 dos.flush();
                 dos.writeBytes("exit\n");
                 dos.flush();
