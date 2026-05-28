@@ -17,6 +17,7 @@ public class ConfigCenter extends Spider {
     private static final String SECTION_DANMAKU = "danmaku";
     private static final String SECTION_THREAD = "thread";
     private static final String SECTION_DOUBAN = "douban";
+    private static final String SECTION_NETWORK = "network";
 
     @Override
     public String homeContent(boolean filter) {
@@ -27,6 +28,7 @@ public class ConfigCenter extends Spider {
             classes.put(createClass(SECTION_DANMAKU, "弹幕配置"));
             classes.put(createClass(SECTION_THREAD, "线程管理"));
             classes.put(createClass(SECTION_DOUBAN, "豆瓣配置"));
+            classes.put(createClass(SECTION_NETWORK, "网络配置"));
 
             result.put("class", classes);
             result.put("list", new JSONArray());
@@ -54,6 +56,9 @@ public class ConfigCenter extends Spider {
                     break;
                 case SECTION_DOUBAN:
                     buildDoubanSection(list);
+                    break;
+                case SECTION_NETWORK:
+                    buildNetworkSection(list);
                     break;
             }
 
@@ -102,6 +107,14 @@ public class ConfigCenter extends Spider {
                 "已缓存 " + cacheSize + " 个分类，点击清除"));
         list.put(createActionVod("douban_prewarm", "豆瓣预热", "",
                 "强制后台刷新所有分类缓存"));
+    }
+
+    private void buildNetworkSection(JSONArray list) throws Exception {
+        Activity activity = Utils.getTopActivity();
+        DanmakuConfig config = activity != null ? DanmakuConfigManager.getConfig(activity) : new DanmakuConfig();
+        String proxy = config.getHttpProxyUrl();
+        list.put(createActionVod("http_proxy", "HTTP代理", "",
+                proxy.isEmpty() ? "未设置" : proxy));
     }
 
     @Override
@@ -160,6 +173,9 @@ public class ConfigCenter extends Spider {
                             DoubanFetcher.prewarm();
                             Utils.safeShowToast(ctx, "豆瓣预热已触发");
                             break;
+                        case "http_proxy":
+                            showHttpProxyDialog(ctx, config);
+                            break;
                         default:
                             Utils.safeShowToast(ctx, "功能开发中");
                             break;
@@ -206,8 +222,8 @@ public class ConfigCenter extends Spider {
     private String searchContentShell(String key) {
         if (key == null || key.isEmpty()) return "";
         try {
-            String[] ids = {"config", "auto_push", "lp_config", "log", "auto_tune", "ali_thread", "quark_thread", "uc_thread"};
-            String[] names = {"弹幕配置", "自动推送弹幕", "布局配置", "查看日志", "自动线程调优", "阿里云盘", "夸克云盘", "UC云盘"};
+            String[] ids = {"config", "auto_push", "lp_config", "log", "auto_tune", "ali_thread", "quark_thread", "uc_thread", "http_proxy"};
+            String[] names = {"弹幕配置", "自动推送弹幕", "布局配置", "查看日志", "自动线程调优", "阿里云盘", "夸克云盘", "UC云盘", "HTTP代理"};
             for (int i = 0; i < ids.length; i++) {
                 if (!key.equals(names[i])) continue;
                 JSONObject vod = new JSONObject();
@@ -244,6 +260,7 @@ public class ConfigCenter extends Spider {
             case "uc_thread": return "UC云盘";
             case "douban_cache": return "豆瓣缓存";
             case "douban_prewarm": return "豆瓣预热";
+            case "http_proxy": return "HTTP代理";
             default: return "配置中心";
         }
     }
@@ -263,6 +280,7 @@ public class ConfigCenter extends Spider {
             }
             case "douban_cache": return "已缓存 " + DoubanFetcher.getCacheSize() + " 个分类，点击清除";
             case "douban_prewarm": return "强制后台刷新所有分类缓存";
+            case "http_proxy": return config.getHttpProxyUrl().isEmpty() ? "未设置" : config.getHttpProxyUrl();
             default: return "";
         }
     }
@@ -282,5 +300,26 @@ public class ConfigCenter extends Spider {
         vod.put("vod_remarks", remark);
         vod.put("action", id);
         return vod;
+    }
+
+    private void showHttpProxyDialog(Activity ctx, DanmakuConfig config) {
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(ctx);
+        builder.setTitle("HTTP代理");
+
+        android.widget.EditText input = new android.widget.EditText(ctx);
+        input.setText(config.getHttpProxyUrl());
+        input.setHint("例如: http://192.168.31.77:7890");
+        input.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
+        input.setPadding(48, 24, 48, 24);
+        builder.setView(input);
+
+        builder.setPositiveButton("保存", (dialog, which) -> {
+            String val = input.getText().toString().trim();
+            config.setHttpProxyUrl(val);
+            DanmakuConfigManager.saveConfig(ctx, config);
+            Utils.safeShowToast(ctx, val.isEmpty() ? "已清除代理" : "代理已设置");
+        });
+        builder.setNegativeButton("取消", null);
+        builder.show();
     }
 }

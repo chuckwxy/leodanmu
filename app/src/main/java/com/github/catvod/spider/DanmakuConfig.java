@@ -28,6 +28,7 @@ public class DanmakuConfig {
     private int proxyThread = 8;
     private int proxyChunkSize = 256;
     private Map<String, SourceProxyConfig> proxySourceConfig = new HashMap<>();
+    private String httpProxyUrl = "";
 
     public static class SourceProxyConfig {
         public int thread = 8;
@@ -189,6 +190,14 @@ public class DanmakuConfig {
         this.proxySourceConfig = proxySourceConfig != null ? proxySourceConfig : new HashMap<>();
     }
 
+    public String getHttpProxyUrl() {
+        return httpProxyUrl;
+    }
+
+    public void setHttpProxyUrl(String httpProxyUrl) {
+        this.httpProxyUrl = httpProxyUrl != null ? httpProxyUrl.trim() : "";
+    }
+
     /**
      * 从JSON对象更新配置
      * @param json JSON对象，可包含 apiUrls、autoPushEnabled、lpWidth、lpHeight、lpAlpha、pushToastEnabled、theme
@@ -278,6 +287,9 @@ public class DanmakuConfig {
                 }
                 if (!map.isEmpty()) setProxySourceConfig(map);
             }
+        }
+        if (json.has("httpProxyUrl")) {
+            setHttpProxyUrl(json.optString("httpProxyUrl"));
         }
     }
 }
