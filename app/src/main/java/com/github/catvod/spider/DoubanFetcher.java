@@ -286,7 +286,8 @@ public class DoubanFetcher {
 
         // ── 豆瓣热播 ────────────────────────────────────────────────────
         root.put("douban_hot", buildFilters(
-                filter("分类", "分类", "movie/hot_gaia", new String[][]{
+                filter("分类", "分类", "ALL", new String[][]{
+                        {"全部", "ALL"},
                         {"电视剧", "subject_collection/tv_hot/items"},
                         {"电影", "movie/hot_gaia"},
                         {"国产剧", "subject_collection/tv_domestic/items"},
@@ -798,47 +799,62 @@ public class DoubanFetcher {
 
         // ── 豆瓣热播 ────────────────────────────────────────────────────
         } else if ("douban_hot".equals(id)) {
-            String u = getFilter(filters, "分类", "movie/hot_gaia");
+            String u = getFilter(filters, "分类", "ALL");
             String safeU = u.replaceAll("^/+", "");
-            String url;
-            if (safeU.startsWith("subject_collection/")) {
-                url = HOST + "/" + safeU + "?start=" + start + "&count=" + COUNT;
-            } else {
-                url = HOST + "/" + safeU + "?area=\u5168\u90e8&sort=recommend&playable=0&loc_id=0&start=" + start + "&count=" + COUNT;
-            }
-            JSONObject data = requestDouban(url);
-            if (data != null) {
-                JSONArray arr = data.optJSONArray("subject_collection_items");
-                if (arr != null) {
-                    mergeItems(items, arr);
-                } else {
-                    mergeItems(items, data.optJSONArray("items"));
-                }
-                total = data.optInt("total", items.length() + COUNT);
-            }
-            // 不足40条时自动翻页补齐（最多3轮）
-            int offset = start + COUNT;
-            for (int round = 0; round < 3 && items.length() < COUNT; round++) {
-                int before = items.length();
-                String fillUrl;
-                if (safeU.startsWith("subject_collection/")) {
-                    fillUrl = HOST + "/" + safeU + "?start=" + offset + "&count=" + COUNT;
-                } else {
-                    fillUrl = HOST + "/" + safeU + "?area=\u5168\u90e8&sort=recommend&playable=0&loc_id=0&start=" + offset + "&count=" + COUNT;
-                }
-                JSONObject fillData = requestDouban(fillUrl);
-                if (fillData != null) {
-                    JSONArray fillArr = fillData.optJSONArray("subject_collection_items");
-                    if (fillArr != null) {
-                        mergeItems(items, fillArr);
-                    } else {
-                        mergeItems(items, fillData.optJSONArray("items"));
+            if ("ALL".equals(safeU)) {
+                String[] eps = {"movie/hot_gaia", "subject_collection/tv_hot/items"};
+                for (String ep : eps) {
+                    String epUrl = ep.startsWith("subject_collection/")
+                        ? HOST + "/" + ep + "?start=" + start + "&count=" + COUNT
+                        : HOST + "/" + ep + "?area=\u5168\u90e8&sort=recommend&playable=0&loc_id=0&start=" + start + "&count=" + COUNT;
+                    JSONObject epData = requestDouban(epUrl);
+                    if (epData != null) {
+                        JSONArray epArr = epData.optJSONArray("subject_collection_items");
+                        mergeItems(items, epArr != null ? epArr : epData.optJSONArray("items"));
                     }
                 }
-                if (items.length() == before) break;
-                offset += COUNT;
+                total = Math.max(total, items.length());
+            } else {
+                String url;
+                if (safeU.startsWith("subject_collection/")) {
+                    url = HOST + "/" + safeU + "?start=" + start + "&count=" + COUNT;
+                } else {
+                    url = HOST + "/" + safeU + "?area=\u5168\u90e8&sort=recommend&playable=0&loc_id=0&start=" + start + "&count=" + COUNT;
+                }
+                JSONObject data = requestDouban(url);
+                if (data != null) {
+                    JSONArray arr = data.optJSONArray("subject_collection_items");
+                    if (arr != null) {
+                        mergeItems(items, arr);
+                    } else {
+                        mergeItems(items, data.optJSONArray("items"));
+                    }
+                    total = data.optInt("total", items.length() + COUNT);
+                }
+                // 不足40条时自动翻页补齐（最多3轮）
+                int offset = start + COUNT;
+                for (int round = 0; round < 3 && items.length() < COUNT; round++) {
+                    int before = items.length();
+                    String fillUrl;
+                    if (safeU.startsWith("subject_collection/")) {
+                        fillUrl = HOST + "/" + safeU + "?start=" + offset + "&count=" + COUNT;
+                    } else {
+                        fillUrl = HOST + "/" + safeU + "?area=\u5168\u90e8&sort=recommend&playable=0&loc_id=0&start=" + offset + "&count=" + COUNT;
+                    }
+                    JSONObject fillData = requestDouban(fillUrl);
+                    if (fillData != null) {
+                        JSONArray fillArr = fillData.optJSONArray("subject_collection_items");
+                        if (fillArr != null) {
+                            mergeItems(items, fillArr);
+                        } else {
+                            mergeItems(items, fillData.optJSONArray("items"));
+                        }
+                    }
+                    if (items.length() == before) break;
+                    offset += COUNT;
+                }
+                total = Math.max(total, items.length());
             }
-            total = Math.max(total, items.length());
 
         // ── 热门电影 ──────────────────────────────────────────────────────
         } else if ("movie".equals(id)) {

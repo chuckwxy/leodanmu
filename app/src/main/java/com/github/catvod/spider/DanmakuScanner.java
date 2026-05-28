@@ -1257,7 +1257,7 @@ public class DanmakuScanner {
         // 如果上下文中有明显的非集数关键词，减分
         boolean hasNonEpisodeKeyword = context.matches(".*(?i)(gb|mb|kb|size|大小|分辨率|fps|bitrate|码率).*");
 
-        return hasEpisodeKeyword || (!hasNonEpisodeKeyword && numValue >= 1 && numValue <= 99);
+        return hasEpisodeKeyword || (!hasNonEpisodeKeyword && numValue >= 1 && numValue <= 199);
     }
 
     /**

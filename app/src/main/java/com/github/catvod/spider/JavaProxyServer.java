@@ -21,6 +21,7 @@ public class JavaProxyServer {
 
     private static final Pattern CONTENT_RANGE_PATTERN = Pattern.compile("bytes\\s+(\\d+)-(\\d+)/(\\d+)");
     private static final Pattern RANGE_PATTERN = Pattern.compile("bytes=(\\d+)-(\\d*)");
+    private static final AtomicBoolean autoTuneLogged = new AtomicBoolean(false);
 
     private ServerSocket serverSocket;
     private volatile boolean running = false;
@@ -143,7 +144,9 @@ public class JavaProxyServer {
         int chunkSizeKB = parseIntParam(params.get("chunkSize"),
                 source != null ? ProxyManager.getSourceChunkSize(appContext, source) : ProxyManager.getDefaultChunkSize(appContext), 256);
         boolean autoTune = ProxyManager.isAutoTuneEnabled(appContext);
-        ProxyManager.log("[调优] " + (autoTune ? "已开启" : "未开启"));
+        if (autoTuneLogged.compareAndSet(false, true)) {
+            ProxyManager.log("[调优] " + (autoTune ? "已开启" : "未开启"));
+        }
 
         String rangeHeader = headers.get("range");
         long[] range = parseRange(rangeHeader);
