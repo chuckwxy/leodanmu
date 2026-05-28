@@ -248,7 +248,10 @@ public class XHamster extends Spider {
         }
         if (obj instanceof JSONObject) {
             JSONObject jo = (JSONObject) obj;
-            for (String k : jo.keySet()) {
+            JSONArray keys = jo.names();
+            if (keys == null) return;
+            for (int i = 0; i < keys.length(); i++) {
+                String k = keys.optString(i);
                 Object v = jo.opt(k);
                 if (v instanceof String) {
                     String s = (String) v;
