@@ -255,7 +255,26 @@ public class GoProxyManager {
                 dos.writeBytes("sleep 1\n");
                 dos.flush();
                 java.io.File logFile = new java.io.File(context.getCacheDir(), "goproxy_output.log");
-                dos.writeBytes("nohup " + file.getAbsolutePath() + " --port " + DEFAULT_BACKEND_PORT + " > " + logFile.getAbsolutePath() + " 2>&1 &\n");
+                // 旧方案：直接执行 ELF（高版本 Android 可能被阻止）
+                //dos.writeBytes("nohup " + file.getAbsolutePath() + " --port " + DEFAULT_BACKEND_PORT + " > " + logFile.getAbsolutePath() + " 2>&1 &\n");
+                // 新方案：通过系统 linker 加载，兼容高版本 Android
+                List<String> abis = Arrays.asList(Build.SUPPORTED_ABIS);
+                boolean is64 = abis.contains("arm64-v8a") || abis.contains("x86_64");
+                boolean niceFlag = is64;
+                String linker64 = new java.io.File("/apex/com.android.runtime/bin/linker64").exists()
+                        ? "/apex/com.android.runtime/bin/linker64"
+                        : "/system/bin/linker64";
+                String linker32 = new java.io.File("/apex/com.android.runtime/bin/linker").exists()
+                        ? "/apex/com.android.runtime/bin/linker"
+                        : "/system/bin/linker";
+                String niceCommand = niceFlag ? "nice -n -10 " : "";
+                String linker = is64 ? linker64 : linker32;
+                String command = "nohup "
+                        + niceCommand + linker + " "
+                        + "\"" + file.getAbsolutePath() + "\""
+                        + " --port " + DEFAULT_BACKEND_PORT
+                        + " > " + logFile.getAbsolutePath() + " 2>&1 &\n";
+                dos.writeBytes(command);
                 dos.flush();
                 dos.writeBytes("exit\n");
                 dos.flush();
