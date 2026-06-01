@@ -29,6 +29,24 @@ import javax.xml.transform.stream.StreamResult;
 
 public class WebServer extends NanoHTTPD {
 
+    public static int sPort = 9888;
+
+    /** 自动检测可用端口并启动 WebServer */
+    public static WebServer startWithAutoPort() {
+        for (int port = 9888; port <= 9892; port++) {
+            try {
+                WebServer ws = new WebServer(port);
+                sPort = port;
+                Leodanmu.log("✅ WebServer 已启动，端口: " + port);
+                return ws;
+            } catch (IOException ignored) {
+                Leodanmu.log("⚠️ 端口 " + port + " 被占用，尝试下一个");
+            }
+        }
+        Leodanmu.log("❌ WebServer 启动失败: 9888-9892 均被占用");
+        return null;
+    }
+
     // 【修复】使用固定的Token，确保手机端和TV端一致
     private static final String FIXED_REMOTE_TOKEN = "default_remote_input";
 

@@ -1133,7 +1133,7 @@ public class LeoDanmakuService {
     }
 
     private static int getWebServerPort() {
-        return 9888;
+        return WebServer.sPort;
     }
 
     // ========== 新增：反射推送弹幕（参考 CatVodSpider）==========

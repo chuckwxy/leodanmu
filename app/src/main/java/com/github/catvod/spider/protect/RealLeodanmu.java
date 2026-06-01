@@ -16,7 +16,6 @@ import com.github.catvod.spider.Leodanmu;
 import com.github.catvod.spider.Utils;
 import com.github.catvod.spider.WebServer;
 
-import java.io.IOException;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -204,11 +203,7 @@ public class RealLeodanmu implements PayloadBridge {
 
     @Override
     public void ensureWebServer(Context context) {
-        try {
-            new WebServer(9888);
-        } catch (IOException e) {
-            Leodanmu.log("WebServer 启动失败: " + e.getMessage());
-        }
+        WebServer.startWithAutoPort();
     }
 
     @Override
