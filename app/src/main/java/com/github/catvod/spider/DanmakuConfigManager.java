@@ -101,14 +101,17 @@ public class DanmakuConfigManager {
         SharedPreferences autoPushPrefs = context.getSharedPreferences(OLD_PREFS_AUTO_PUSH, Context.MODE_PRIVATE);
         config.autoPushEnabled = autoPushPrefs.getBoolean(OLD_KEY_AUTO_PUSH, true);
 
-        saveConfig(context, config);
+        sDanmakuConfig = config;
+        String json = gson.toJson(config);
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit().putString(KEY_CONFIG_JSON, json).commit();
         oldPrefs.edit()
                 .remove(OLD_KEY_API_URLS)
                 .remove(OLD_KEY_LP_WIDTH)
                 .remove(OLD_KEY_LP_HEIGHT)
                 .remove(OLD_KEY_LP_ALPHA)
-                .apply();
-        autoPushPrefs.edit().remove(OLD_KEY_AUTO_PUSH).apply();
+                .commit();
+        autoPushPrefs.edit().remove(OLD_KEY_AUTO_PUSH).commit();
 
         Leodanmu.log("旧配置已成功迁移到新格式。");
         return config;
