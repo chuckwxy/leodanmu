@@ -8,6 +8,7 @@ import android.os.Looper;
 import android.text.TextUtils;
 
 import com.github.catvod.spider.entity.DanmakuItem;
+import com.github.catvod.net.OkHttp;
 import com.github.catvod.spider.protect.PayloadBridge;
 import com.github.catvod.spider.protect.ProtectedLoader;
 
@@ -25,6 +26,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -602,12 +604,16 @@ public class Leodanmu extends Spider {
 
     @Override
     public String detailContent(List<String> ids) {
+        String result = proxyYlhjDetail(ids);
+        if (result != null) return result;
         return getPayloadBridge(Utils.getTopActivity()).detailContent(ids);
     }
 
     public static String detailContentShellFallback(List<String> ids) {
         ensureConfig(Utils.getTopActivity());
         if (ids == null || ids.isEmpty()) return "";
+        String result = proxyYlhjDetail(ids);
+        if (result != null) return result;
         final String id = ids.get(0);
 
         new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
@@ -680,11 +686,15 @@ public class Leodanmu extends Spider {
 
     @Override
     public String playerContent(String flag, String id, List<String> vipFlags) {
+        String result = proxyYlhjPlay(id, flag);
+        if (result != null) return result;
         return getPayloadBridge(Utils.getTopActivity()).playerContent(flag, id, vipFlags);
     }
 
     public static String playerContentShellFallback(String flag, String id, List<String> vipFlags) {
         ensureConfig(Utils.getTopActivity());
+        String result = proxyYlhjPlay(id, flag);
+        if (result != null) return result;
         return "";
     }
 
@@ -800,6 +810,52 @@ public class Leodanmu extends Spider {
 
     public String superLiveContent(String url) throws Exception {
         return super.liveContent(url);
+    }
+
+    // ─── 追更助手代理：识别 track:// 协议，转发到 77 的 API ──────────────
+    private static final String YLHJ_HOST = "http://192.168.31.77:8160";
+    private static final String YLHJ_TOKEN = "sfahefjkahskjfha";
+
+    private static boolean isYlhjId(String id) {
+        return id != null && (id.startsWith("track://") || id.startsWith("tracksmart://") || id.startsWith("link://"));
+    }
+
+    private static String proxyYlhjDetail(List<String> ids) {
+        if (ids == null || ids.isEmpty()) return null;
+        String id = ids.get(0);
+        if (!isYlhjId(id)) return null;
+        try {
+            String url = YLHJ_HOST + "/video/ylhj_tracking?id=" + java.net.URLEncoder.encode(id, "UTF-8");
+            Map<String, String> headers = new HashMap<>();
+            headers.put("token", YLHJ_TOKEN);
+            String body = OkHttp.string(url, headers);
+            if (TextUtils.isEmpty(body)) return null;
+            JSONObject data = new JSONObject(body);
+            JSONArray list = data.optJSONArray("list");
+            if (list == null || list.length() == 0) return null;
+            JSONObject result = new JSONObject();
+            result.put("list", list);
+            return result.toString();
+        } catch (Exception e) {
+            log("proxyYlhjDetail error: " + e.getMessage());
+            return null;
+        }
+    }
+
+    private static String proxyYlhjPlay(String id, String flag) {
+        if (!isYlhjId(id)) return null;
+        try {
+            String url = YLHJ_HOST + "/video/ylhj_tracking?play=" + java.net.URLEncoder.encode(id, "UTF-8")
+                    + "&flag=" + (flag != null ? java.net.URLEncoder.encode(flag, "UTF-8") : "");
+            Map<String, String> headers = new HashMap<>();
+            headers.put("token", YLHJ_TOKEN);
+            String body = OkHttp.string(url, headers);
+            if (TextUtils.isEmpty(body)) return null;
+            return body;
+        } catch (Exception e) {
+            log("proxyYlhjPlay error: " + e.getMessage());
+            return null;
+        }
     }
 
 }
