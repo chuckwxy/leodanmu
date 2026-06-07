@@ -810,13 +810,7 @@ public class DoubanFetcher {
                 if (!TextUtils.isEmpty(body)) {
                     JSONObject data = new JSONObject(body);
                     JSONArray list = data.optJSONArray("list");
-                    if (list != null) {
-                        for (int i = 0; i < list.length(); i++) {
-                            JSONObject item = list.optJSONObject(i);
-                            if (item != null) item.remove("vod_tag");
-                        }
-                        mergeItems(items, list);
-                    }
+                    if (list != null) mergeItems(items, list);
                     total = data.optInt("total", items.length() + COUNT);
                 } else {
                     total = items.length() + COUNT;

@@ -589,6 +589,8 @@ public class Leodanmu extends Spider {
     }
 
     public static String categoryContentShellFallback(String tid, String pg, boolean filter, HashMap<String, String> extend) {
+        String ylhj = proxyYlhjCategory(tid, pg);
+        if (ylhj != null) return ylhj;
         if (!DoubanFetcher.isDouban(tid)) return "";
         try {
             int page = 1;
@@ -813,8 +815,27 @@ public class Leodanmu extends Spider {
     }
 
     // ─── 追更助手代理：识别 track:// 协议，转发到 77 的 API ──────────────
-    private static final String YLHJ_HOST = "http://192.168.31.77:8160";
+    private static final String YLHJ_HOST = "http://leotv.leo123.cn:8160";
     private static final String YLHJ_TOKEN = "sfahefjkahskjfha";
+
+    private static boolean isYlhjCategoryId(String id) {
+        return id != null && (id.startsWith("track://") || id.startsWith("trackdrive://") || id.startsWith("tracksmart://"));
+    }
+
+    private static String proxyYlhjCategory(String tid, String pg) {
+        if (!isYlhjCategoryId(tid)) return null;
+        try {
+            String url = YLHJ_HOST + "/video/ylhj_tracking?id=" + java.net.URLEncoder.encode(tid, "UTF-8") + "&pg=" + pg;
+            Map<String, String> headers = new HashMap<>();
+            headers.put("token", YLHJ_TOKEN);
+            String body = OkHttp.string(url, headers);
+            if (TextUtils.isEmpty(body)) return "";
+            return body;
+        } catch (Exception e) {
+            log("proxyYlhjCategory error: " + e.getMessage());
+            return "";
+        }
+    }
 
     private static boolean isYlhjId(String id) {
         return id != null && (id.startsWith("track://") || id.startsWith("trackdrive://") || id.startsWith("tracksmart://") || id.startsWith("trackplay://") || id.startsWith("link://"));
