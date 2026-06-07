@@ -674,11 +674,11 @@ public class Leodanmu extends Spider {
                     id.equals("hook_diag") ? getHookStatusSummary() : "请稍候...");
             vod.put("vod_play_url", "");
             vod.put("vod_play_from", "");
-            JSONObject result = new JSONObject();
+            JSONObject res = new JSONObject();
             JSONArray list = new JSONArray();
             list.put(vod);
-            result.put("list", list);
-            return result.toString();
+            res.put("list", list);
+            return res.toString();
         } catch (Exception e) {
             return "";
         }
