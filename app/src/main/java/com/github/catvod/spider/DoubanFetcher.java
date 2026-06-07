@@ -167,7 +167,7 @@ public class DoubanFetcher {
     }
 
     private static final Set<String> CATEGORIES = new HashSet<>(Arrays.asList(
-            "latest", "douban_hot", "movie", "tv", "show", "anime", "douban_anime",
+            "latest", "week_airing", "douban_hot", "movie", "tv", "show", "anime", "douban_anime",
             "hot_movie", "hot_tv", "hot_show",
             "movie_filter", "tv_filter", "top_250", "douban_playlist"
     ));
@@ -253,6 +253,7 @@ public class DoubanFetcher {
     public static JSONArray getCategories() throws Exception {
         JSONArray arr = new JSONArray();
         arr.put(classObj("latest", "\u6700\u8fd1\u66f4\u65b0"));
+        arr.put(classObj("week_airing", "\u6b63\u5728\u8ffd\u66f4"));
         arr.put(classObj("douban_hot", "\u8c46\u74e3\u70ed\u64ad"));
         arr.put(classObj("movie", "\u70ed\u95e8\u7535\u5f71"));
         arr.put(classObj("tv", "\u70ed\u95e8\u5267\u96c6"));
@@ -580,6 +581,8 @@ public class DoubanFetcher {
                 })
         ));
 
+        root.put("week_airing", new JSONArray());
+
         return root;
     }
 
@@ -796,6 +799,25 @@ public class DoubanFetcher {
             String platform = getFilter(filters, "数据源", "");
             fetchLatest(platform, contentType, pg, sort, items);
             total = items.length() + COUNT;
+
+        // ── 正在追更 ──────────────────────────────────────────────────────
+        } else if ("week_airing".equals(id)) {
+            try {
+                String url = "http://192.168.31.77:8160/video/ylhj_tracking?t=week_airing&pg=" + pg;
+                Map<String, String> headers = new HashMap<>();
+                headers.put("token", "sfahefjkahskjfha");
+                String body = OkHttp.string(url, headers);
+                if (!TextUtils.isEmpty(body)) {
+                    JSONObject data = new JSONObject(body);
+                    JSONArray list = data.optJSONArray("list");
+                    if (list != null) mergeItems(items, list);
+                    total = data.optInt("total", items.length() + COUNT);
+                } else {
+                    total = items.length() + COUNT;
+                }
+            } catch (Exception e) {
+                total = items.length() + COUNT;
+            }
 
         // ── 豆瓣热播 ────────────────────────────────────────────────────
         } else if ("douban_hot".equals(id)) {
