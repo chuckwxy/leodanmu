@@ -817,7 +817,7 @@ public class Leodanmu extends Spider {
     private static final String YLHJ_TOKEN = "sfahefjkahskjfha";
 
     private static boolean isYlhjId(String id) {
-        return id != null && (id.startsWith("track://") || id.startsWith("tracksmart://") || id.startsWith("link://"));
+        return id != null && (id.startsWith("track://") || id.startsWith("trackdrive://") || id.startsWith("tracksmart://") || id.startsWith("trackplay://") || id.startsWith("link://"));
     }
 
     private static String proxyYlhjDetail(List<String> ids) {
