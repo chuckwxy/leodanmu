@@ -815,7 +815,7 @@ public class Leodanmu extends Spider {
     }
 
     // ─── 追更助手代理：识别 track:// 协议，转发到 77 的 API ──────────────
-    private static final String YLHJ_HOST = "http://leotv.leo123.cn:8160";
+    private static final String YLHJ_HOST = "http://192.168.31.77:8160";
     private static final String YLHJ_TOKEN = "sfahefjkahskjfha";
 
     private static boolean isYlhjCategoryId(String id) {
