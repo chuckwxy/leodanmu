@@ -585,6 +585,8 @@ public class Leodanmu extends Spider {
 
     @Override
     public String categoryContent(String tid, String pg, boolean filter, HashMap<String, String> extend) {
+        String ylhj = proxyYlhjCategory(tid, pg);
+        if (ylhj != null) return ylhj;
         return getPayloadBridge(Utils.getTopActivity()).categoryContent(tid, pg, filter, extend);
     }
 

@@ -285,6 +285,20 @@ public class DoubanFetcher {
                 })
         ));
 
+        // ── 正在追更 ──────────────────────────────────────────────────────
+        root.put("week_airing", buildFilters(
+                filter("类型", "类型", "", new String[][]{
+                        {"全部", ""},
+                        {"剧集", "tv"},
+                        {"动漫", "anime"},
+                        {"电影", "movie"}
+                }),
+                filter("排序", "排序", "U", new String[][]{
+                        {"最近更新", "U"},
+                        {"名称", "T"}
+                })
+        ));
+
         // ── 豆瓣热播 ────────────────────────────────────────────────────
         root.put("douban_hot", buildFilters(
                 filter("分类", "分类", "ALL", new String[][]{
@@ -800,17 +814,29 @@ public class DoubanFetcher {
             fetchLatest(platform, contentType, pg, sort, items);
             total = items.length() + COUNT;
 
-        // ── 正在追更 ──────────────────────────────────────────────────────
+        // ── 正在追更（追更助手 week_airing ─ 完整走追更助手逻辑）─────────
         } else if ("week_airing".equals(id)) {
             try {
-                String url = "http://192.168.31.77:8160/video/ylhj_tracking?t=week_airing&pg=" + pg;
+                String contentType = getFilter(filters, "类型", "");
+                String sortType = getFilter(filters, "排序", "U");
+                String tParam = "week_airing";
+                if ("tv".equals(contentType)) tParam = "tv";
+                else if ("anime".equals(contentType)) tParam = "anime";
+                else if ("movie".equals(contentType)) tParam = "movie";
+                String url = "http://192.168.31.77:8160/video/ylhj_tracking?t=" + tParam + "&pg=" + pg;
                 Map<String, String> headers = new HashMap<>();
                 headers.put("token", "sfahefjkahskjfha");
                 String body = OkHttp.string(url, headers);
                 if (!TextUtils.isEmpty(body)) {
                     JSONObject data = new JSONObject(body);
                     JSONArray list = data.optJSONArray("list");
-                    if (list != null) mergeItems(items, list);
+                    if (list != null) {
+                        for (int i = 0; i < list.length(); i++) {
+                            JSONObject item = list.optJSONObject(i);
+                            if (item != null) item.remove("vod_tag");
+                        }
+                        mergeItems(items, list);
+                    }
                     total = data.optInt("total", items.length() + COUNT);
                 } else {
                     total = items.length() + COUNT;
