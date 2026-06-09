@@ -611,21 +611,22 @@ public class Leodanmu extends Spider {
         String result = proxyYlhjDetail(ids);
         if (result != null) return result;
         String bridgeResult = getPayloadBridge(Utils.getTopActivity()).detailContent(ids);
-        // 对豆瓣ID（m:名称:id）追加云盘搜索结果作为播放源
+        // 对非 YLHJ 协议的普通条目，从返回结果提取标题后追加云盘搜索源
         if (ids != null && ids.size() == 1 && !TextUtils.isEmpty(bridgeResult)) {
             String id = ids.get(0);
-            if (id.startsWith("m:")) {
-                int lastColon = id.lastIndexOf(":");
-                if (lastColon > 2) {
-                    try {
-                        String title = java.net.URLDecoder.decode(id.substring(2, lastColon), "UTF-8");
+            if (!isYlhjId(id)) {
+                try {
+                    JSONObject bridgeData = new JSONObject(bridgeResult);
+                    JSONArray list = bridgeData.optJSONArray("list");
+                    if (list != null && list.length() > 0) {
+                        String title = list.optJSONObject(0).optString("vod_name", "");
                         if (!TextUtils.isEmpty(title)) {
                             String enriched = enrichWithCloudSources(bridgeResult, title);
                             if (enriched != null) return enriched;
                         }
-                    } catch (Exception e) {
-                        log("detailContent cross-site error: " + e.getMessage());
                     }
+                } catch (Exception e) {
+                    log("detailContent cross-site error: " + e.getMessage());
                 }
             }
         }
