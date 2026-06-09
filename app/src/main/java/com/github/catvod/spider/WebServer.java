@@ -50,6 +50,9 @@ public class WebServer extends NanoHTTPD {
     // 【修复】使用固定的Token，确保手机端和TV端一致
     private static final String FIXED_REMOTE_TOKEN = "default_remote_input";
 
+    // 配置远程输入前缀
+    private static final String CONFIG_REMOTE_PREFIX = "config:";
+
     // 存储远程输入的关键词
     private static final Map<String, RemoteInputData> remoteInputMap = Collections.synchronizedMap(new HashMap<String, RemoteInputData>());
     private static final long INPUT_EXPIRE_TIME = 5 * 60 * 1000; // 5分钟过期
@@ -309,6 +312,39 @@ public class WebServer extends NanoHTTPD {
             response.addHeader("Access-Control-Allow-Origin", "*");
             return response;
         }
+        else if (uri.equals("/api/config_fields")) {
+            return handleConfigFields();
+        }
+        else if (uri.equals("/config_input")) {
+            return newFixedLengthResponse(getConfigInputHtml());
+        }
+        else if (uri.equals("/send_config_value")) {
+            Map<String, String> params = session.getParms();
+            String field = params.get("field");
+            String value = params.get("value");
+            if (!TextUtils.isEmpty(field) && value != null) {
+                remoteInputMap.put(CONFIG_REMOTE_PREFIX + field, new RemoteInputData(value));
+                Leodanmu.log("📱 收到配置远程输入: " + field + " = " + value);
+                String confirmHtml = "<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>" +
+                        "<style>body { font-family: sans-serif; padding: 20px; text-align: center; } .success { color: green; }</style></head>" +
+                        "<body><h2>已发送</h2><div class='success'>" + field + " = " + value + "</div>" +
+                        "<p><a href='/config_input'>继续配置</a></p></body></html>";
+                return newFixedLengthResponse(confirmHtml);
+            }
+            return newFixedLengthResponse(Response.Status.BAD_REQUEST, MIME_PLAINTEXT, "Missing field or value");
+        }
+        else if (uri.equals("/get_config_value")) {
+            Map<String, String> params = session.getParms();
+            String field = params.get("field");
+            if (!TextUtils.isEmpty(field)) {
+                String key = CONFIG_REMOTE_PREFIX + field;
+                RemoteInputData data = remoteInputMap.remove(key);
+                if (data != null) {
+                    return newFixedLengthResponse(data.keyword);
+                }
+            }
+            return newFixedLengthResponse("");
+        }
         return newFixedLengthResponse(Response.Status.NOT_FOUND, MIME_PLAINTEXT, "Not Found");
     }
 
@@ -514,6 +550,102 @@ public class WebServer extends NanoHTTPD {
                 "});" +
                 "</script>" +
                 "</body></html>";
+    }
+
+    private Response handleConfigFields() {
+        try {
+            Activity activity = Utils.getTopActivity();
+            String currentIp = NetworkUtils.getLocalIpAddress();
+            StringBuilder json = new StringBuilder("[");
+            String[][] fields = {
+                {"http_proxy", "HTTP代理"},
+                {"ylhj_host", "不夜地址"},
+                {"ylhj_token", "不夜Token"}
+            };
+            for (int i = 0; i < fields.length; i++) {
+                if (i > 0) json.append(",");
+                String val = "";
+                if (activity != null) {
+                    DanmakuConfig config = DanmakuConfigManager.getConfig(activity);
+                    switch (fields[i][0]) {
+                        case "http_proxy": val = config.getHttpProxyUrl(); break;
+                        case "ylhj_host": val = config.getYlhjHost(); break;
+                        case "ylhj_token": val = config.getYlhjToken(); break;
+                    }
+                }
+                json.append("{\"id\":\"").append(fields[i][0])
+                    .append("\",\"label\":\"").append(fields[i][1])
+                    .append("\",\"value\":\"").append(escapeJson(val))
+                    .append("\"}");
+            }
+            json.append("]");
+            return newFixedLengthResponse(Response.Status.OK, "application/json; charset=utf-8", json.toString());
+        } catch (Exception e) {
+            return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, MIME_PLAINTEXT, e.getMessage());
+        }
+    }
+
+    private String escapeJson(String s) {
+        if (s == null) return "";
+        return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t");
+    }
+
+    private String getConfigInputHtml() {
+        return "<!DOCTYPE html><html><head><title>配置远程输入</title><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>" +
+                "<style>" +
+                "body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; }" +
+                ".container { max-width: 500px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }" +
+                "h1 { text-align: center; color: #333; margin-bottom: 24px; font-size: 20px; }" +
+                "label { display: block; margin-bottom: 6px; font-weight: bold; color: #555; font-size: 14px; }" +
+                "select, input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 5px; font-size: 16px; box-sizing: border-box; margin-bottom: 16px; }" +
+                ".current-value { background: #f8f9fa; padding: 10px; border-radius: 5px; margin-bottom: 16px; font-size: 13px; color: #666; word-break: break-all; }" +
+                "button { width: 100%; padding: 14px; background: #007bff; color: white; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; }" +
+                "button:hover { background: #0056b3; }" +
+                ".status { text-align: center; margin-top: 12px; font-size: 14px; color: #28a745; }" +
+                ".back-link { display: block; text-align: center; margin-top: 16px; color: #6c757d; text-decoration: none; font-size: 14px; }" +
+                "</style></head><body>" +
+                "<div class='container'>" +
+                "<h1>📱 配置远程输入</h1>" +
+                "<label for='fieldSelect'>选择配置项：</label>" +
+                "<select id='fieldSelect'></select>" +
+                "<div class='current-value' id='currentValue'>当前值: </div>" +
+                "<label for='valueInput'>输入新值：</label>" +
+                "<input type='text' id='valueInput' placeholder='请输入新值...' autofocus>" +
+                "<button onclick='send()'>发送到TV</button>" +
+                "<div class='status' id='status'></div>" +
+                "<a href='/' class='back-link'>返回弹幕搜索</a>" +
+                "</div>" +
+                "<script>" +
+                "let fields = [];" +
+                "fetch('/api/config_fields').then(r=>r.json()).then(data => {" +
+                "  fields = data;" +
+                "  const sel = document.getElementById('fieldSelect');" +
+                "  fields.forEach(f => {" +
+                "    const opt = document.createElement('option');" +
+                "    opt.value = f.id; opt.textContent = f.label;" +
+                "    sel.appendChild(opt);" +
+                "  });" +
+                "  updateCurrentValue();" +
+                "});" +
+                "document.getElementById('fieldSelect').onchange = updateCurrentValue;" +
+                "function updateCurrentValue() {" +
+                "  const sel = document.getElementById('fieldSelect');" +
+                "  const f = fields.find(x => x.id === sel.value);" +
+                "  document.getElementById('currentValue').textContent = '当前值: ' + (f ? f.value || '(空)' : '');" +
+                "}" +
+                "function send() {" +
+                "  const field = document.getElementById('fieldSelect').value;" +
+                "  const value = document.getElementById('valueInput').value.trim();" +
+                "  if (!value) { document.getElementById('status').textContent = '请输入值'; return; }" +
+                "  document.getElementById('status').textContent = '发送中...';" +
+                "  fetch('/send_config_value?field=' + encodeURIComponent(field) + '&value=' + encodeURIComponent(value))" +
+                "    .then(r => r.text()).then(html => { document.body.innerHTML = html; })" +
+                "    .catch(e => { document.getElementById('status').textContent = '发送失败: ' + e.message; });" +
+                "}" +
+                "document.getElementById('valueInput').addEventListener('keydown', function(e) {" +
+                "  if (e.key === 'Enter') { e.preventDefault(); send(); }" +
+                "});" +
+                "</script></body></html>";
     }
 
     /** 被 DanmakuUIHelper.cleanupAllResources() 通过反射调用 */

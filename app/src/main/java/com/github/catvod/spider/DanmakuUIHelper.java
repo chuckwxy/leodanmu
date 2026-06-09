@@ -111,6 +111,9 @@ public class DanmakuUIHelper {
     private static long lastToastTime = 0;
     private static final long MIN_POLL_INTERVAL = 1000;
 
+    // 配置远程输入轮询
+    private static Timer configRemoteInputTimer;
+
     private static final Map<Activity, Boolean> activeActivities = new WeakHashMap<>();
 
     // ========== 辅助方法：设置毛玻璃背景 ==========
@@ -190,6 +193,7 @@ public class DanmakuUIHelper {
                 remoteInputTimer = null;
                 Leodanmu.log("🛑 清理：远程输入轮询已停止");
             }
+            stopConfigRemoteInputPolling();
             currentRemoteToken = "";
             lastPollTime = 0;
             lastToastTime = 0;
@@ -1773,6 +1777,61 @@ public class DanmakuUIHelper {
                 }
             }
         }, 1000, 1000);
+    }
+
+    // ========== 配置远程输入轮询 ==========
+    public static void startConfigRemoteInputPolling(Activity activity, String fieldId, EditText targetInput) {
+        if (configRemoteInputTimer != null) {
+            configRemoteInputTimer.cancel();
+            configRemoteInputTimer = null;
+        }
+        configRemoteInputTimer = new Timer("ConfigRemoteInputTimer", true);
+        configRemoteInputTimer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                try {
+                    if (activity == null || activity.isFinishing() || activity.isDestroyed()) {
+                        stopConfigRemoteInputPolling();
+                        return;
+                    }
+                    String localIp = NetworkUtils.getLocalIpAddress();
+                    String url = "http://" + localIp + ":9888/get_config_value?field=" + fieldId;
+                    okhttp3.Response response = null;
+                    try {
+                        response = OkHttp.newCall(url, "config_remote_input");
+                        if (response != null && response.body() != null) {
+                            String value = response.body().string();
+                            if (!TextUtils.isEmpty(value)) {
+                                String finalValue = value;
+                                activity.runOnUiThread(() -> {
+                                    targetInput.setText(finalValue);
+                                    Utils.safeShowToast(activity, "已收到远程输入: " + fieldId);
+                                });
+                                stopConfigRemoteInputPolling();
+                            }
+                        }
+                    } catch (Exception e) {
+                        if (e.getMessage() != null && !e.getMessage().contains("closed")) {
+                            Leodanmu.log("配置远程输入轮询异常: " + e.getMessage());
+                        }
+                    } finally {
+                        if (response != null && response.body() != null) {
+                            try { response.body().close(); } catch (Exception ignored) {}
+                        }
+                    }
+                } catch (Exception e) {
+                    Leodanmu.log("配置远程输入轮询异常: " + e.getMessage());
+                }
+            }
+        }, 500, 1000);
+    }
+
+    public static void stopConfigRemoteInputPolling() {
+        if (configRemoteInputTimer != null) {
+            configRemoteInputTimer.cancel();
+            configRemoteInputTimer = null;
+            Leodanmu.log("🛑 停止配置远程输入轮询");
+        }
     }
 
     private static String formatOffsetMs(int ms) {

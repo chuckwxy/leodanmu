@@ -3,6 +3,12 @@ package com.github.catvod.spider;
 import android.app.Activity;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.InputType;
+import android.view.Gravity;
+import android.view.ViewGroup;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.LinearLayout;
 
 import com.github.catvod.crawler.Spider;
 
@@ -321,67 +327,83 @@ public class ConfigCenter extends Spider {
         return vod;
     }
 
-    private void showHttpProxyDialog(Activity ctx, DanmakuConfig config) {
+    private void showRemoteInputDialog(Activity ctx, DanmakuConfig config, String fieldId, String title, String hint, String currentValue) {
         android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(ctx);
-        builder.setTitle("HTTP代理");
+        builder.setTitle(title);
 
-        android.widget.EditText input = new android.widget.EditText(ctx);
-        input.setText(config.getHttpProxyUrl());
-        input.setHint("例如: http://192.168.31.77:7890");
-        input.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
-        input.setPadding(48, 24, 48, 24);
-        builder.setView(input);
+        LinearLayout layout = new LinearLayout(ctx);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(48, 24, 48, 24);
+
+        EditText input = new EditText(ctx);
+        input.setText(currentValue);
+        input.setHint(hint);
+        input.setInputType(InputType.TYPE_CLASS_TEXT);
+        input.setPadding(0, 0, 0, 16);
+        layout.addView(input);
+
+        Button qrBtn = new Button(ctx);
+        qrBtn.setText("📱 扫码输入");
+        qrBtn.setTextSize(14);
+        LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        btnParams.topMargin = 8;
+        qrBtn.setLayoutParams(btnParams);
+        layout.addView(qrBtn);
+
+        builder.setView(layout);
 
         builder.setPositiveButton("保存", (dialog, which) -> {
+            DanmakuUIHelper.stopConfigRemoteInputPolling();
             String val = input.getText().toString().trim();
-            config.setHttpProxyUrl(val);
-            DanmakuConfigManager.saveConfig(ctx, config);
-            Utils.safeShowToast(ctx, val.isEmpty() ? "已清除代理" : "代理已设置");
+            switch (fieldId) {
+                case "http_proxy":
+                    config.setHttpProxyUrl(val);
+                    DanmakuConfigManager.saveConfig(ctx, config);
+                    Utils.safeShowToast(ctx, val.isEmpty() ? "已清除代理" : "代理已设置");
+                    break;
+                case "ylhj_host":
+                    if (val.endsWith("/")) val = val.substring(0, val.length() - 1);
+                    config.setYlhjHost(val);
+                    DanmakuConfigManager.saveConfig(ctx, config);
+                    Utils.safeShowToast(ctx, val.isEmpty() ? "已恢复默认地址" : "不夜地址已设置");
+                    break;
+                case "ylhj_token":
+                    config.setYlhjToken(val);
+                    DanmakuConfigManager.saveConfig(ctx, config);
+                    Utils.safeShowToast(ctx, val.isEmpty() ? "已恢复默认Token" : "Token已设置");
+                    break;
+            }
         });
-        builder.setNegativeButton("取消", null);
-        builder.show();
+        builder.setNegativeButton("取消", (dialog, which) -> {
+            DanmakuUIHelper.stopConfigRemoteInputPolling();
+        });
+
+        android.app.AlertDialog dialog = builder.create();
+        dialog.setOnDismissListener(d -> DanmakuUIHelper.stopConfigRemoteInputPolling());
+
+        qrBtn.setOnClickListener(v -> {
+            String localIp = NetworkUtils.getLocalIpAddress();
+            String url = "http://" + localIp + ":9888/config_input";
+            DanmakuUIHelper.showFloatingQRCodeDialog(ctx, url, title);
+            DanmakuUIHelper.startConfigRemoteInputPolling(ctx, fieldId, input);
+        });
+
+        dialog.show();
+    }
+
+    private void showHttpProxyDialog(Activity ctx, DanmakuConfig config) {
+        showRemoteInputDialog(ctx, config, "http_proxy", "HTTP代理",
+                "例如: http://192.168.31.77:7890", config.getHttpProxyUrl());
     }
 
     private void showYlhjHostDialog(Activity ctx, DanmakuConfig config) {
-        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(ctx);
-        builder.setTitle("不夜地址");
-
-        android.widget.EditText input = new android.widget.EditText(ctx);
-        input.setText(config.getYlhjHost());
-        input.setHint("例如: http://192.168.10.10:3000");
-        input.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
-        input.setPadding(48, 24, 48, 24);
-        builder.setView(input);
-
-        builder.setPositiveButton("保存", (dialog, which) -> {
-            String val = input.getText().toString().trim();
-            if (val.endsWith("/")) val = val.substring(0, val.length() - 1);
-            config.setYlhjHost(val);
-            DanmakuConfigManager.saveConfig(ctx, config);
-            Utils.safeShowToast(ctx, val.isEmpty() ? "已恢复默认地址" : "不夜地址已设置");
-        });
-        builder.setNegativeButton("取消", null);
-        builder.show();
+        showRemoteInputDialog(ctx, config, "ylhj_host", "不夜地址",
+                "例如: http://192.168.10.10:3000", config.getYlhjHost());
     }
 
     private void showYlhjTokenDialog(Activity ctx, DanmakuConfig config) {
-        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(ctx);
-        builder.setTitle("不夜Token");
-
-        android.widget.EditText input = new android.widget.EditText(ctx);
-        input.setText(config.getYlhjToken());
-        input.setHint("例如: admin123");
-        input.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
-        input.setPadding(48, 24, 48, 24);
-        builder.setView(input);
-
-        builder.setPositiveButton("保存", (dialog, which) -> {
-            String val = input.getText().toString().trim();
-            config.setYlhjToken(val);
-            DanmakuConfigManager.saveConfig(ctx, config);
-            Utils.safeShowToast(ctx, val.isEmpty() ? "已恢复默认Token" : "Token已设置");
-        });
-        builder.setNegativeButton("取消", null);
-        builder.show();
+        showRemoteInputDialog(ctx, config, "ylhj_token", "不夜Token",
+                "例如: admin123", config.getYlhjToken());
     }
 }
