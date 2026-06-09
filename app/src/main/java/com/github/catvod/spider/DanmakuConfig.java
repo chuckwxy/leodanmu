@@ -30,6 +30,7 @@ public class DanmakuConfig {
     private Map<String, SourceProxyConfig> proxySourceConfig = new HashMap<>();
     private String httpProxyUrl = "";
     private String ylhjHost = "";
+    private String ylhjToken = "";
 
     public static class SourceProxyConfig {
         public int thread = 8;
@@ -207,6 +208,14 @@ public class DanmakuConfig {
         this.ylhjHost = ylhjHost != null ? ylhjHost.trim() : "";
     }
 
+    public String getYlhjToken() {
+        return ylhjToken;
+    }
+
+    public void setYlhjToken(String ylhjToken) {
+        this.ylhjToken = ylhjToken != null ? ylhjToken.trim() : "";
+    }
+
     /**
      * 从JSON对象更新配置
      * @param json JSON对象，可包含 apiUrls、autoPushEnabled、lpWidth、lpHeight、lpAlpha、pushToastEnabled、theme
@@ -302,6 +311,9 @@ public class DanmakuConfig {
         }
         if (json.has("ylhjHost")) {
             setYlhjHost(json.optString("ylhjHost"));
+        }
+        if (json.has("ylhjToken")) {
+            setYlhjToken(json.optString("ylhjToken"));
         }
     }
 }
