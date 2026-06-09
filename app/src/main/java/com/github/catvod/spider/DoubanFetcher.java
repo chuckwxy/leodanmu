@@ -252,8 +252,8 @@ public class DoubanFetcher {
     // ─── Categories ─────────────────────────────────────────────────────────
     public static JSONArray getCategories() throws Exception {
         JSONArray arr = new JSONArray();
+        arr.put(classObj("all", "\u6b63\u5728\u8ffd\u66f4"));
         arr.put(classObj("latest", "\u6700\u8fd1\u66f4\u65b0"));
-        arr.put(classObj("all", "\u5168\u90e8\u8ffd\u66f4"));
         arr.put(classObj("douban_hot", "\u8c46\u74e3\u70ed\u64ad"));
         arr.put(classObj("movie", "\u70ed\u95e8\u7535\u5f71"));
         arr.put(classObj("tv", "\u70ed\u95e8\u5267\u96c6"));
@@ -790,6 +790,21 @@ public class DoubanFetcher {
                 result.put("pagecount", 1);
                 result.put("limit", COUNT);
                 result.put("total", 0);
+            }
+            // 非「正在追更」分类的项改为 search:// 文件夹，让 TVBox 点击走搜索
+            if (!"all".equals(id)) {
+                JSONArray list = result.optJSONArray("list");
+                if (list != null) {
+                    for (int i = 0; i < list.length(); i++) {
+                        JSONObject item = list.optJSONObject(i);
+                        if (item == null) continue;
+                        String name = item.optString("vod_name", "");
+                        if (!TextUtils.isEmpty(name)) {
+                            item.put("vod_id", "search://" + URLEncoder.encode(name, "UTF-8"));
+                            item.put("vod_tag", "folder");
+                        }
+                    }
+                }
             }
             return result;
         } catch (Exception e) {
