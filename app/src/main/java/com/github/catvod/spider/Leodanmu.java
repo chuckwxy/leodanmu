@@ -621,14 +621,28 @@ public class Leodanmu extends Spider {
                     if (list != null && list.length() > 0) {
                         String title = list.optJSONObject(0).optString("vod_name", "");
                         if (!TextUtils.isEmpty(title)) {
+                            log("cross-site: searching for " + title);
                             String enriched = enrichWithCloudSources(bridgeResult, title);
-                            if (enriched != null) return enriched;
+                            if (enriched != null) {
+                                log("cross-site: enriched with cloud sources");
+                                return enriched;
+                            } else {
+                                log("cross-site: enrichment returned null");
+                            }
+                        } else {
+                            log("cross-site: no title in bridge result");
                         }
+                    } else {
+                        log("cross-site: no list in bridge result");
                     }
                 } catch (Exception e) {
                     log("detailContent cross-site error: " + e.getMessage());
                 }
+            } else {
+                log("cross-site: id is YLHJ type, skipping");
             }
+        } else {
+            log("cross-site: condition not met: ids=" + (ids == null ? "null" : String.valueOf(ids.size())) + " bridgeResult=" + (TextUtils.isEmpty(bridgeResult) ? "empty" : "ok"));
         }
         return bridgeResult;
     }
@@ -848,17 +862,26 @@ public class Leodanmu extends Spider {
     private static String enrichWithCloudSources(String bridgeResult, String title) {
         try {
             String searchUrl = YLHJ_HOST + "/api/search?q=" + java.net.URLEncoder.encode(title, "UTF-8") + "&page=1";
+            log("cross-site: search URL: " + searchUrl);
             Map<String, String> headers = new HashMap<>();
             headers.put("token", YLHJ_TOKEN);
             String searchBody = OkHttp.string(searchUrl, headers);
-            if (TextUtils.isEmpty(searchBody)) return null;
+            if (TextUtils.isEmpty(searchBody)) {
+                log("cross-site: search returned empty body");
+                return null;
+            }
+            log("cross-site: search body length: " + searchBody.length());
 
             JSONArray searchItems = new JSONArray(searchBody);
-            if (searchItems.length() == 0) return null;
+            if (searchItems.length() == 0) {
+                log("cross-site: search returned 0 items");
+                return null;
+            }
+            log("cross-site: search returned " + searchItems.length() + " items");
 
             // 遍历搜索到的云盘链接，构造 link:// 并拉取可播放剧集
             JSONArray extraSources = new JSONArray();
-            for (int i = 0; i < Math.min(searchItems.length(), 5); i++) {
+            for (int i = 0; i < Math.min(searchItems.length(), 3); i++) {
                 JSONObject item = searchItems.optJSONObject(i);
                 if (item == null) continue;
                 String url = item.optString("url", "");
@@ -867,13 +890,23 @@ public class Leodanmu extends Spider {
                 String encodedUrl = java.net.URLEncoder.encode(url, "UTF-8");
                 String linkId = "link://" + cloudType + "/" + encodedUrl + "?title=" + java.net.URLEncoder.encode(title, "UTF-8");
                 String detailUrl = YLHJ_HOST + "/video/ylhj_tracking?id=" + java.net.URLEncoder.encode(linkId, "UTF-8");
+                log("cross-site: fetch detail for cloud " + i + ": " + cloudType);
                 String detailBody = OkHttp.string(detailUrl, headers);
-                if (TextUtils.isEmpty(detailBody)) continue;
+                if (TextUtils.isEmpty(detailBody)) {
+                    log("cross-site: detail fetch returned empty");
+                    continue;
+                }
                 JSONObject detailData = new JSONObject(detailBody);
                 JSONArray list = detailData.optJSONArray("list");
+                int epCount = (list != null) ? list.length() : 0;
+                log("cross-site: detail has " + epCount + " episodes");
                 if (list != null && list.length() > 0) extraSources.put(list.optJSONObject(0));
             }
-            if (extraSources.length() == 0) return null;
+            if (extraSources.length() == 0) {
+                log("cross-site: no extra sources found");
+                return null;
+            }
+            log("cross-site: got " + extraSources.length() + " cloud sources");
 
             // 合并到原始详情
             JSONObject bridgeData = new JSONObject(bridgeResult);
