@@ -887,18 +887,19 @@ public class Leodanmu extends Spider {
             }
             log("cross-site: search returned " + searchItems.length() + " items");
 
-            // 遍历搜索到的云盘链接，构造 link:// 并拉取可播放剧集
-            JSONArray extraSources = new JSONArray(); // 每个元素: {cloudType, vod_play_url, vod_play_from}
-            for (int i = 0; i < Math.min(searchItems.length(), 3); i++) {
+            // 遍历搜索到的云盘链接，每种网盘只取第一个 URL，构造 link:// 拉取剧集
+            Map<String, JSONObject> resolved = new HashMap<>(); // key: cloudType
+            for (int i = 0; i < searchItems.length() && resolved.size() < 5; i++) {
                 JSONObject item = searchItems.optJSONObject(i);
                 if (item == null) continue;
-                String url = item.optString("url", "");
+                String cloudUrl = item.optString("url", "");
                 String cloudType = item.optString("cloudType", "");
-                if (TextUtils.isEmpty(url) || TextUtils.isEmpty(cloudType)) continue;
-                String encodedUrl = java.net.URLEncoder.encode(url, "UTF-8");
+                if (TextUtils.isEmpty(cloudUrl) || TextUtils.isEmpty(cloudType)) continue;
+                if (resolved.containsKey(cloudType)) continue; // 每种网盘只取一个
+                String encodedUrl = java.net.URLEncoder.encode(cloudUrl, "UTF-8");
                 String linkId = "link://" + cloudType + "/" + encodedUrl + "?title=" + java.net.URLEncoder.encode(title, "UTF-8");
                 String detailUrl = YLHJ_HOST + "/video/ylhj_tracking?id=" + java.net.URLEncoder.encode(linkId, "UTF-8");
-                log("cross-site: fetch detail for cloud " + i + ": " + cloudType);
+                log("cross-site: fetch detail for " + cloudType);
                 String detailBody = OkHttp.string(detailUrl, headers);
                 if (TextUtils.isEmpty(detailBody)) {
                     log("cross-site: detail fetch returned empty");
@@ -918,16 +919,16 @@ public class Leodanmu extends Spider {
                             entry.put("cloudType", cloudType);
                             entry.put("vod_play_url", subPlayUrl);
                             entry.put("vod_play_from", TextUtils.isEmpty(subPlayFrom) ? cloudType : subPlayFrom);
-                            extraSources.put(entry);
+                            resolved.put(cloudType, entry);
                         }
                     }
                 }
             }
-            if (extraSources.length() == 0) {
+            if (resolved.isEmpty()) {
                 log("cross-site: no extra sources found");
                 return null;
             }
-            log("cross-site: got " + extraSources.length() + " cloud sources");
+            log("cross-site: got " + resolved.size() + " cloud sources");
 
             // 合并到原始详情
             JSONObject bridgeData = new JSONObject(bridgeResult);
@@ -940,24 +941,23 @@ public class Leodanmu extends Spider {
             vod.put("vod_name", title);
             vod.put("vod_remarks", "");
 
+            // 按 baidu → quark → 其他 顺序输出
             StringBuilder playFrom = new StringBuilder();
             StringBuilder playUrl = new StringBuilder();
-            String existingFrom = vod.optString("vod_play_from", "");
-            String existingUrl = vod.optString("vod_play_url", "");
-            if (!TextUtils.isEmpty(existingFrom)) {
-                playFrom.append(existingFrom);
-                playUrl.append(existingUrl);
-            }
-            for (int i = 0; i < extraSources.length(); i++) {
-                JSONObject src = extraSources.optJSONObject(i);
-                if (src == null) continue;
-                String srcName = src.optString("vod_play_from", "");
-                String srcUrl = src.optString("vod_play_url", "");
-                if (TextUtils.isEmpty(srcUrl)) continue;
+            String[] priority = {"baidu", "quark"};
+            for (String pt : priority) {
+                JSONObject entry = resolved.remove(pt);
+                if (entry == null) continue;
                 if (playFrom.length() > 0) { playFrom.append("$$$"); playUrl.append("$$$"); }
-                // 源名显示云盘类型
-                playFrom.append(srcName);
-                playUrl.append(srcUrl);
+                playFrom.append(entry.optString("vod_play_from", pt));
+                playUrl.append(entry.optString("vod_play_url", ""));
+            }
+            // 剩余的（阿里云盘等）
+            for (Map.Entry<String, JSONObject> e : resolved.entrySet()) {
+                JSONObject entry = e.getValue();
+                if (playFrom.length() > 0) { playFrom.append("$$$"); playUrl.append("$$$"); }
+                playFrom.append(entry.optString("vod_play_from", e.getKey()));
+                playUrl.append(entry.optString("vod_play_url", ""));
             }
             vod.put("vod_play_from", playFrom.toString());
             vod.put("vod_play_url", playUrl.toString());
