@@ -370,7 +370,7 @@ public class ConfigCenter extends Spider {
 
         android.widget.EditText input = new android.widget.EditText(ctx);
         input.setText(config.getYlhjToken());
-        input.setHint("例如: sfahefjkahskjfha");
+        input.setHint("例如: admin123");
         input.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
         input.setPadding(48, 24, 48, 24);
         builder.setView(input);
