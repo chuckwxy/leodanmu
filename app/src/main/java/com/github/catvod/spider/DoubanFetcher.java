@@ -852,10 +852,11 @@ public class DoubanFetcher {
             String safeU = u.replaceAll("^/+", "");
             if ("ALL".equals(safeU)) {
                 String[] eps = {"movie/hot_gaia", "subject_collection/tv_hot/items", "subject_collection/show_hot/items", "subject_collection/tv_animation/items"};
+                int perSource = Math.max(COUNT / eps.length, 10);
                 for (String ep : eps) {
                     String epUrl = ep.startsWith("subject_collection/")
-                        ? HOST + "/" + ep + "?start=" + start + "&count=" + COUNT
-                        : HOST + "/" + ep + "?area=\u5168\u90e8&sort=recommend&playable=0&loc_id=0&start=" + start + "&count=" + COUNT;
+                        ? HOST + "/" + ep + "?start=0&count=" + perSource
+                        : HOST + "/" + ep + "?area=\u5168\u90e8&sort=recommend&playable=0&loc_id=0&start=0&count=" + perSource;
                     JSONObject epData = requestDouban(epUrl);
                     if (epData != null) {
                         JSONArray epArr = epData.optJSONArray("subject_collection_items");
