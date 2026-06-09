@@ -859,8 +859,18 @@ public class Leodanmu extends Spider {
     }
 
     // ─── 追更助手代理：识别 track:// 协议，转发到 77 的 API ──────────────
-    private static final String YLHJ_HOST = "http://192.168.31.77:8160";
     private static final String YLHJ_TOKEN = "sfahefjkahskjfha";
+    private static final String YLHJ_DEFAULT_HOST = "http://192.168.31.77:8160";
+
+    private static String getYlhjHost() {
+        Activity activity = Utils.getTopActivity();
+        if (activity != null) {
+            DanmakuConfig config = DanmakuConfigManager.getConfig(activity);
+            String host = config.getYlhjHost();
+            if (!TextUtils.isEmpty(host)) return host;
+        }
+        return YLHJ_DEFAULT_HOST;
+    }
 
     private static boolean isYlhjCategoryId(String id) {
         return id != null && (id.startsWith("track://") || id.startsWith("trackdrive://") || id.startsWith("tracksmart://"));
@@ -869,7 +879,7 @@ public class Leodanmu extends Spider {
     // ─── 跨站搜索：为豆瓣条目追加云盘播放源 ──────────────────────────────
     private static String enrichWithCloudSources(String bridgeResult, String title) {
         try {
-            String searchUrl = YLHJ_HOST + "/api/search?q=" + java.net.URLEncoder.encode(title, "UTF-8") + "&page=1";
+            String searchUrl = getYlhjHost() + "/api/search?q=" + java.net.URLEncoder.encode(title, "UTF-8") + "&page=1";
             log("cross-site: search URL: " + searchUrl);
             Map<String, String> headers = new HashMap<>();
             headers.put("token", YLHJ_TOKEN);
@@ -898,7 +908,7 @@ public class Leodanmu extends Spider {
                 if (resolved.containsKey(cloudType)) continue; // 每种网盘只取一个
                 String encodedUrl = java.net.URLEncoder.encode(cloudUrl, "UTF-8");
                 String linkId = "link://" + cloudType + "/" + encodedUrl + "?title=" + java.net.URLEncoder.encode(title, "UTF-8");
-                String detailUrl = YLHJ_HOST + "/video/ylhj_tracking?id=" + java.net.URLEncoder.encode(linkId, "UTF-8");
+                String detailUrl = getYlhjHost() + "/video/ylhj_tracking?id=" + java.net.URLEncoder.encode(linkId, "UTF-8");
                 log("cross-site: fetch detail for " + cloudType);
                 String detailBody = OkHttp.string(detailUrl, headers);
                 if (TextUtils.isEmpty(detailBody)) {
@@ -971,7 +981,7 @@ public class Leodanmu extends Spider {
     private static String proxyYlhjCategory(String tid, String pg) {
         if (!isYlhjCategoryId(tid)) return null;
         try {
-            String url = YLHJ_HOST + "/video/ylhj_tracking?id=" + java.net.URLEncoder.encode(tid, "UTF-8") + "&pg=" + pg;
+            String url = getYlhjHost() + "/video/ylhj_tracking?id=" + java.net.URLEncoder.encode(tid, "UTF-8") + "&pg=" + pg;
             Map<String, String> headers = new HashMap<>();
             headers.put("token", YLHJ_TOKEN);
             String body = OkHttp.string(url, headers);
@@ -1009,7 +1019,7 @@ public class Leodanmu extends Spider {
         String id = ids.get(0);
         if (!isYlhjId(id)) return null;
         try {
-            String url = YLHJ_HOST + "/video/ylhj_tracking?id=" + java.net.URLEncoder.encode(id, "UTF-8");
+            String url = getYlhjHost() + "/video/ylhj_tracking?id=" + java.net.URLEncoder.encode(id, "UTF-8");
             Map<String, String> headers = new HashMap<>();
             headers.put("token", YLHJ_TOKEN);
             String body = OkHttp.string(url, headers);
@@ -1031,7 +1041,7 @@ public class Leodanmu extends Spider {
         // 但避免拦截 HTTP URL（它们应走普通播放流程）
         if (TextUtils.isEmpty(id) || id.startsWith("http")) return null;
         try {
-            String url = YLHJ_HOST + "/video/ylhj_tracking?play=" + java.net.URLEncoder.encode(id, "UTF-8")
+            String url = getYlhjHost() + "/video/ylhj_tracking?play=" + java.net.URLEncoder.encode(id, "UTF-8")
                     + "&flag=" + (flag != null ? java.net.URLEncoder.encode(flag, "UTF-8") : "");
             Map<String, String> headers = new HashMap<>();
             headers.put("token", YLHJ_TOKEN);

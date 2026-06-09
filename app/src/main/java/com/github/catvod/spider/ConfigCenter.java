@@ -113,8 +113,11 @@ public class ConfigCenter extends Spider {
         Activity activity = Utils.getTopActivity();
         DanmakuConfig config = activity != null ? DanmakuConfigManager.getConfig(activity) : new DanmakuConfig();
         String proxy = config.getHttpProxyUrl();
+        String ylhj = config.getYlhjHost();
         list.put(createActionVod("http_proxy", "HTTP代理", "",
                 proxy.isEmpty() ? "未设置" : proxy));
+        list.put(createActionVod("ylhj_host", "不夜地址", "",
+                ylhj.isEmpty() ? "未设置" : ylhj));
     }
 
     @Override
@@ -176,6 +179,9 @@ public class ConfigCenter extends Spider {
                         case "http_proxy":
                             showHttpProxyDialog(ctx, config);
                             break;
+                        case "ylhj_host":
+                            showYlhjHostDialog(ctx, config);
+                            break;
                         default:
                             Utils.safeShowToast(ctx, "功能开发中");
                             break;
@@ -222,8 +228,8 @@ public class ConfigCenter extends Spider {
     private String searchContentShell(String key) {
         if (key == null || key.isEmpty()) return "";
         try {
-            String[] ids = {"config", "auto_push", "lp_config", "log", "auto_tune", "ali_thread", "quark_thread", "uc_thread", "http_proxy"};
-            String[] names = {"弹幕配置", "自动推送弹幕", "布局配置", "查看日志", "自动线程调优", "阿里云盘", "夸克云盘", "UC云盘", "HTTP代理"};
+            String[] ids = {"config", "auto_push", "lp_config", "log", "auto_tune", "ali_thread", "quark_thread", "uc_thread", "http_proxy", "ylhj_host"};
+            String[] names = {"弹幕配置", "自动推送弹幕", "布局配置", "查看日志", "自动线程调优", "阿里云盘", "夸克云盘", "UC云盘", "HTTP代理", "不夜地址"};
             for (int i = 0; i < ids.length; i++) {
                 if (!key.equals(names[i])) continue;
                 JSONObject vod = new JSONObject();
@@ -261,6 +267,7 @@ public class ConfigCenter extends Spider {
             case "douban_cache": return "豆瓣缓存";
             case "douban_prewarm": return "豆瓣预热";
             case "http_proxy": return "HTTP代理";
+            case "ylhj_host": return "不夜地址";
             default: return "配置中心";
         }
     }
@@ -281,6 +288,7 @@ public class ConfigCenter extends Spider {
             case "douban_cache": return "已缓存 " + DoubanFetcher.getCacheSize() + " 个分类，点击清除";
             case "douban_prewarm": return "强制后台刷新所有分类缓存";
             case "http_proxy": return config.getHttpProxyUrl().isEmpty() ? "未设置" : config.getHttpProxyUrl();
+            case "ylhj_host": return config.getYlhjHost().isEmpty() ? "未设置" : config.getYlhjHost();
             default: return "";
         }
     }
@@ -318,6 +326,29 @@ public class ConfigCenter extends Spider {
             config.setHttpProxyUrl(val);
             DanmakuConfigManager.saveConfig(ctx, config);
             Utils.safeShowToast(ctx, val.isEmpty() ? "已清除代理" : "代理已设置");
+        });
+        builder.setNegativeButton("取消", null);
+        builder.show();
+    }
+
+    private void showYlhjHostDialog(Activity ctx, DanmakuConfig config) {
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(ctx);
+        builder.setTitle("不夜地址");
+
+        android.widget.EditText input = new android.widget.EditText(ctx);
+        input.setText(config.getYlhjHost());
+        input.setHint("例如: http://192.168.10.10:3000");
+        input.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
+        input.setPadding(48, 24, 48, 24);
+        builder.setView(input);
+
+        builder.setPositiveButton("保存", (dialog, which) -> {
+            String val = input.getText().toString().trim();
+            // 去掉末尾斜杠
+            if (val.endsWith("/")) val = val.substring(0, val.length() - 1);
+            config.setYlhjHost(val);
+            DanmakuConfigManager.saveConfig(ctx, config);
+            Utils.safeShowToast(ctx, val.isEmpty() ? "已恢复默认地址" : "不夜地址已设置");
         });
         builder.setNegativeButton("取消", null);
         builder.show();
