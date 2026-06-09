@@ -888,7 +888,7 @@ public class Leodanmu extends Spider {
             log("cross-site: search returned " + searchItems.length() + " items");
 
             // 遍历搜索到的云盘链接，构造 link:// 并拉取可播放剧集
-            JSONArray extraSources = new JSONArray();
+            JSONArray extraSources = new JSONArray(); // 每个元素: {cloudType, vod_play_url, vod_play_from}
             for (int i = 0; i < Math.min(searchItems.length(), 3); i++) {
                 JSONObject item = searchItems.optJSONObject(i);
                 if (item == null) continue;
@@ -908,7 +908,20 @@ public class Leodanmu extends Spider {
                 JSONArray list = detailData.optJSONArray("list");
                 int epCount = (list != null) ? list.length() : 0;
                 log("cross-site: detail has " + epCount + " episodes");
-                if (list != null && list.length() > 0) extraSources.put(list.optJSONObject(0));
+                if (list != null && list.length() > 0) {
+                    JSONObject first = list.optJSONObject(0);
+                    if (first != null) {
+                        String subPlayUrl = first.optString("vod_play_url", "");
+                        String subPlayFrom = first.optString("vod_play_from", "");
+                        if (!TextUtils.isEmpty(subPlayUrl)) {
+                            JSONObject entry = new JSONObject();
+                            entry.put("cloudType", cloudType);
+                            entry.put("vod_play_url", subPlayUrl);
+                            entry.put("vod_play_from", TextUtils.isEmpty(subPlayFrom) ? cloudType : subPlayFrom);
+                            extraSources.put(entry);
+                        }
+                    }
+                }
             }
             if (extraSources.length() == 0) {
                 log("cross-site: no extra sources found");
@@ -923,6 +936,10 @@ public class Leodanmu extends Spider {
             JSONObject vod = bridgeList.optJSONObject(0);
             if (vod == null) return null;
 
+            // 更新标题为真实片名
+            vod.put("vod_name", title);
+            vod.put("vod_remarks", "");
+
             StringBuilder playFrom = new StringBuilder();
             StringBuilder playUrl = new StringBuilder();
             String existingFrom = vod.optString("vod_play_from", "");
@@ -934,10 +951,11 @@ public class Leodanmu extends Spider {
             for (int i = 0; i < extraSources.length(); i++) {
                 JSONObject src = extraSources.optJSONObject(i);
                 if (src == null) continue;
-                String srcName = src.optString("vod_name", "");
+                String srcName = src.optString("vod_play_from", "");
                 String srcUrl = src.optString("vod_play_url", "");
-                if (TextUtils.isEmpty(srcName) || TextUtils.isEmpty(srcUrl)) continue;
+                if (TextUtils.isEmpty(srcUrl)) continue;
                 if (playFrom.length() > 0) { playFrom.append("$$$"); playUrl.append("$$$"); }
+                // 源名显示云盘类型
                 playFrom.append(srcName);
                 playUrl.append(srcUrl);
             }
@@ -1009,7 +1027,9 @@ public class Leodanmu extends Spider {
     }
 
     private static String proxyYlhjPlay(String id, String flag) {
-        if (!isYlhjId(id)) return null;
+        // 允许任意 ID 走 YLHJ 播放代理（包括 link:// 和云盘解析后的编码剧集 ID），
+        // 但避免拦截 HTTP URL（它们应走普通播放流程）
+        if (TextUtils.isEmpty(id) || id.startsWith("http")) return null;
         try {
             String url = YLHJ_HOST + "/video/ylhj_tracking?play=" + java.net.URLEncoder.encode(id, "UTF-8")
                     + "&flag=" + (flag != null ? java.net.URLEncoder.encode(flag, "UTF-8") : "");
