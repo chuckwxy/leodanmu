@@ -589,7 +589,9 @@ public class Leodanmu extends Spider {
         if (tid != null && tid.startsWith("search://")) {
             try {
                 String keyword = java.net.URLDecoder.decode(tid.substring(9), "UTF-8");
-                return searchContent(keyword, false);
+                JSONObject result = DoubanFetcher.search(keyword, 1);
+                if (result != null) return result.toString();
+                return "";
             } catch (Exception e) {
                 log("search category error: " + e.getMessage());
                 return "";

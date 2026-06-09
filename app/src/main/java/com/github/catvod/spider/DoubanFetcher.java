@@ -1601,6 +1601,45 @@ public class DoubanFetcher {
         }
     }
 
+    // ─── 公开搜索方法（供 search:// 文件夹使用）────────────────────────
+    public static JSONObject search(String keyword, int page) {
+        try {
+            String searchHost = "https://frodo.douban.com/api/v2/search";
+            String url = searchHost + "?q=" + URLEncoder.encode(keyword, "UTF-8")
+                    + "&start=" + ((page - 1) * COUNT) + "&count=" + COUNT;
+            JSONObject data = requestDouban(url);
+            if (data == null) return null;
+            JSONArray items = new JSONArray();
+            JSONArray raw = data.optJSONArray("items");
+            if (raw == null) raw = data.optJSONArray("subject_collection_items");
+            if (raw != null) {
+                for (int i = 0; i < raw.length(); i++) {
+                    JSONObject rawItem = raw.optJSONObject(i);
+                    if (rawItem == null) continue;
+                    String id = rawItem.optString("id", "");
+                    String title = rawItem.optString("title", "");
+                    if (TextUtils.isEmpty(id) || TextUtils.isEmpty(title)) continue;
+                    JSONObject vod = new JSONObject();
+                    vod.put("vod_id", "m:" + title + ":" + id);
+                    vod.put("vod_name", title);
+                    vod.put("vod_pic", extractImage(rawItem, "pic"));
+                    vod.put("vod_remarks", rawItem.optString("year", ""));
+                    vod.put("vod_content", rawItem.optString("intro", ""));
+                    items.put(vod);
+                }
+            }
+            JSONObject result = new JSONObject();
+            result.put("list", items);
+            result.put("page", page);
+            result.put("pagecount", Math.max(1, (int) Math.ceil(items.length() / (double) COUNT)));
+            result.put("limit", COUNT);
+            result.put("total", data.optInt("total", items.length()));
+            return result;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     static {
         if (!sCacheInitialized) {
             sCacheInitialized = true;
