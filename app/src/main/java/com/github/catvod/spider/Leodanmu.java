@@ -610,7 +610,26 @@ public class Leodanmu extends Spider {
     public String detailContent(List<String> ids) {
         String result = proxyYlhjDetail(ids);
         if (result != null) return result;
-        return getPayloadBridge(Utils.getTopActivity()).detailContent(ids);
+        String bridgeResult = getPayloadBridge(Utils.getTopActivity()).detailContent(ids);
+        // 对豆瓣ID（m:名称:id）追加云盘搜索结果作为播放源
+        if (ids != null && ids.size() == 1 && !TextUtils.isEmpty(bridgeResult)) {
+            String id = ids.get(0);
+            if (id.startsWith("m:")) {
+                int lastColon = id.lastIndexOf(":");
+                if (lastColon > 2) {
+                    try {
+                        String title = java.net.URLDecoder.decode(id.substring(2, lastColon), "UTF-8");
+                        if (!TextUtils.isEmpty(title)) {
+                            String enriched = enrichWithCloudSources(bridgeResult, title);
+                            if (enriched != null) return enriched;
+                        }
+                    } catch (Exception e) {
+                        log("detailContent cross-site error: " + e.getMessage());
+                    }
+                }
+            }
+        }
+        return bridgeResult;
     }
 
     public static String detailContentShellFallback(List<String> ids) {
@@ -822,6 +841,71 @@ public class Leodanmu extends Spider {
 
     private static boolean isYlhjCategoryId(String id) {
         return id != null && (id.startsWith("track://") || id.startsWith("trackdrive://") || id.startsWith("tracksmart://"));
+    }
+
+    // ─── 跨站搜索：为豆瓣条目追加云盘播放源 ──────────────────────────────
+    private static String enrichWithCloudSources(String bridgeResult, String title) {
+        try {
+            String searchUrl = YLHJ_HOST + "/api/search?q=" + java.net.URLEncoder.encode(title, "UTF-8") + "&page=1";
+            Map<String, String> headers = new HashMap<>();
+            headers.put("token", YLHJ_TOKEN);
+            String searchBody = OkHttp.string(searchUrl, headers);
+            if (TextUtils.isEmpty(searchBody)) return null;
+
+            JSONArray searchItems = new JSONArray(searchBody);
+            if (searchItems.length() == 0) return null;
+
+            // 遍历搜索到的云盘链接，构造 link:// 并拉取可播放剧集
+            JSONArray extraSources = new JSONArray();
+            for (int i = 0; i < Math.min(searchItems.length(), 5); i++) {
+                JSONObject item = searchItems.optJSONObject(i);
+                if (item == null) continue;
+                String url = item.optString("url", "");
+                String cloudType = item.optString("cloudType", "");
+                if (TextUtils.isEmpty(url) || TextUtils.isEmpty(cloudType)) continue;
+                String encodedUrl = java.net.URLEncoder.encode(url, "UTF-8");
+                String linkId = "link://" + cloudType + "/" + encodedUrl + "?title=" + java.net.URLEncoder.encode(title, "UTF-8");
+                String detailUrl = YLHJ_HOST + "/video/ylhj_tracking?id=" + java.net.URLEncoder.encode(linkId, "UTF-8");
+                String detailBody = OkHttp.string(detailUrl, headers);
+                if (TextUtils.isEmpty(detailBody)) continue;
+                JSONObject detailData = new JSONObject(detailBody);
+                JSONArray list = detailData.optJSONArray("list");
+                if (list != null && list.length() > 0) extraSources.put(list.optJSONObject(0));
+            }
+            if (extraSources.length() == 0) return null;
+
+            // 合并到原始详情
+            JSONObject bridgeData = new JSONObject(bridgeResult);
+            JSONArray bridgeList = bridgeData.optJSONArray("list");
+            if (bridgeList == null || bridgeList.length() == 0) return null;
+            JSONObject vod = bridgeList.optJSONObject(0);
+            if (vod == null) return null;
+
+            StringBuilder playFrom = new StringBuilder();
+            StringBuilder playUrl = new StringBuilder();
+            String existingFrom = vod.optString("vod_play_from", "");
+            String existingUrl = vod.optString("vod_play_url", "");
+            if (!TextUtils.isEmpty(existingFrom)) {
+                playFrom.append(existingFrom);
+                playUrl.append(existingUrl);
+            }
+            for (int i = 0; i < extraSources.length(); i++) {
+                JSONObject src = extraSources.optJSONObject(i);
+                if (src == null) continue;
+                String srcName = src.optString("vod_name", "");
+                String srcUrl = src.optString("vod_play_url", "");
+                if (TextUtils.isEmpty(srcName) || TextUtils.isEmpty(srcUrl)) continue;
+                if (playFrom.length() > 0) { playFrom.append("$$$"); playUrl.append("$$$"); }
+                playFrom.append(srcName);
+                playUrl.append(srcUrl);
+            }
+            vod.put("vod_play_from", playFrom.toString());
+            vod.put("vod_play_url", playUrl.toString());
+            return bridgeData.toString();
+        } catch (Exception e) {
+            log("enrichWithCloudSources error: " + e.getMessage());
+            return null;
+        }
     }
 
     private static String proxyYlhjCategory(String tid, String pg) {
