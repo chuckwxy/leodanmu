@@ -830,9 +830,9 @@ public class DoubanFetcher {
                 if ("tv".equals(contentType)) tParam = "tv";
                 else if ("anime".equals(contentType)) tParam = "anime";
                 else if ("movie".equals(contentType)) tParam = "movie";
-                String url = "http://192.168.31.77:8160/video/ylhj_tracking?t=" + tParam + "&pg=" + pg;
+                String url = Leodanmu.getYlhjHost() + "/video/ylhj_tracking?t=" + tParam + "&pg=" + pg;
                 Map<String, String> headers = new HashMap<>();
-                headers.put("token", "sfahefjkahskjfha");
+                headers.put("token", Leodanmu.getYlhjToken());
                 String body = OkHttp.string(url, headers);
                 if (!TextUtils.isEmpty(body)) {
                     JSONObject data = new JSONObject(body);
@@ -851,7 +851,7 @@ public class DoubanFetcher {
             String u = getFilter(filters, "分类", "ALL");
             String safeU = u.replaceAll("^/+", "");
             if ("ALL".equals(safeU)) {
-                String[] eps = {"movie/hot_gaia", "subject_collection/tv_hot/items"};
+                String[] eps = {"movie/hot_gaia", "subject_collection/tv_hot/items", "subject_collection/show_hot/items", "subject_collection/tv_animation/items"};
                 for (String ep : eps) {
                     String epUrl = ep.startsWith("subject_collection/")
                         ? HOST + "/" + ep + "?start=" + start + "&count=" + COUNT
@@ -1441,6 +1441,15 @@ public class DoubanFetcher {
                     if (sub != null) yearStr = sub.optString("year", "");
                     if (TextUtils.isEmpty(yearStr)) yearStr = raw.optString("year", "");
                 }
+                // 从 card_subtitle 提取年份（部分 douban API 不返回独立字段）
+                if (TextUtils.isEmpty(pubdate) && TextUtils.isEmpty(yearStr)) {
+                    String cardSub = raw.optString("card_subtitle", "");
+                    if (TextUtils.isEmpty(cardSub) && sub != null) cardSub = sub.optString("card_subtitle", "");
+                    if (!TextUtils.isEmpty(cardSub)) {
+                        Matcher cm = Pattern.compile("\\d{4}").matcher(cardSub);
+                        if (cm.find()) pubdate = cm.group();
+                    }
+                }
 
                 if (!TextUtils.isEmpty(pubdate) || !TextUtils.isEmpty(yearStr)) {
                     String dateStr = !TextUtils.isEmpty(pubdate) ? pubdate : yearStr;
@@ -1448,13 +1457,28 @@ public class DoubanFetcher {
                     if (m.find()) pubdate = m.group();
                 }
 
+                // 从 card_subtitle 提取剧集信息（如 "48集全"、"连载中"、"更新至xx集"）
+                String epInfo = "";
+                String cardSub = raw.optString("card_subtitle", "");
+                if (TextUtils.isEmpty(cardSub) && sub != null) cardSub = sub.optString("card_subtitle", "");
+                if (!TextUtils.isEmpty(cardSub)) {
+                    Matcher em = Pattern.compile("(\\d+集(全|完结)?|连载中|更新至\\d+集|已完结)").matcher(cardSub);
+                    if (em.find()) epInfo = em.group(1);
+                }
+
                 String remarks;
                 if (ratingVal > 0) {
                     remarks = "\u8bc4\u5206: " + String.format("%.1f", ratingVal) + "\u5206";
                     if (!TextUtils.isEmpty(pubdate)) remarks += " \u00b7 " + pubdate;
+                    if (!TextUtils.isEmpty(epInfo)) remarks += " \u00b7 " + epInfo;
                 } else {
-                    remarks = "\u6682\u65e0\u8bc4\u5206";
-                    if (!TextUtils.isEmpty(pubdate)) remarks += " \u00b7 " + pubdate;
+                    remarks = "";
+                    if (!TextUtils.isEmpty(pubdate)) remarks += pubdate;
+                    if (!TextUtils.isEmpty(epInfo)) {
+                        if (!TextUtils.isEmpty(remarks)) remarks += " ";
+                        remarks += epInfo;
+                    }
+                    if (TextUtils.isEmpty(remarks)) remarks = "\u6682\u65e0\u8bc4\u5206";
                 }
 
                 String finalId = rawId.trim();

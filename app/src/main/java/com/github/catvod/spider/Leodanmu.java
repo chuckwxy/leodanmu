@@ -862,7 +862,11 @@ public class Leodanmu extends Spider {
     private static final String YLHJ_TOKEN = "sfahefjkahskjfha";
     private static final String YLHJ_DEFAULT_HOST = "http://192.168.31.77:8160";
 
-    private static String getYlhjHost() {
+    public static String getYlhjToken() {
+        return YLHJ_TOKEN;
+    }
+
+    public static String getYlhjHost() {
         Activity activity = Utils.getTopActivity();
         if (activity != null) {
             DanmakuConfig config = DanmakuConfigManager.getConfig(activity);
