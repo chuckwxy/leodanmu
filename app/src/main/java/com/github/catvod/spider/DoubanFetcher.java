@@ -791,21 +791,6 @@ public class DoubanFetcher {
                 result.put("limit", COUNT);
                 result.put("total", 0);
             }
-            // 非「正在追更」分类的项改为 search:// 文件夹，让 TVBox 点击走搜索
-            if (!"all".equals(id)) {
-                JSONArray list = result.optJSONArray("list");
-                if (list != null) {
-                    for (int i = 0; i < list.length(); i++) {
-                        JSONObject item = list.optJSONObject(i);
-                        if (item == null) continue;
-                        String name = item.optString("vod_name", "");
-                        if (!TextUtils.isEmpty(name)) {
-                            item.put("vod_id", "search://" + URLEncoder.encode(name, "UTF-8"));
-                            item.put("vod_tag", "folder");
-                        }
-                    }
-                }
-            }
             return result;
         } catch (Exception e) {
             return null;
@@ -1596,45 +1581,6 @@ public class DoubanFetcher {
             String body = OkHttp.string(url, headers);
             if (TextUtils.isEmpty(body)) return null;
             return new JSONObject(body);
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    // ─── 公开搜索方法（供 search:// 文件夹使用）────────────────────────
-    public static JSONObject search(String keyword, int page) {
-        try {
-            String searchHost = "https://frodo.douban.com/api/v2/search";
-            String url = searchHost + "?q=" + URLEncoder.encode(keyword, "UTF-8")
-                    + "&start=" + ((page - 1) * COUNT) + "&count=" + COUNT;
-            JSONObject data = requestDouban(url);
-            if (data == null) return null;
-            JSONArray items = new JSONArray();
-            JSONArray raw = data.optJSONArray("items");
-            if (raw == null) raw = data.optJSONArray("subject_collection_items");
-            if (raw != null) {
-                for (int i = 0; i < raw.length(); i++) {
-                    JSONObject rawItem = raw.optJSONObject(i);
-                    if (rawItem == null) continue;
-                    String id = rawItem.optString("id", "");
-                    String title = rawItem.optString("title", "");
-                    if (TextUtils.isEmpty(id) || TextUtils.isEmpty(title)) continue;
-                    JSONObject vod = new JSONObject();
-                    vod.put("vod_id", "m:" + title + ":" + id);
-                    vod.put("vod_name", title);
-                    vod.put("vod_pic", extractImage(rawItem, "pic"));
-                    vod.put("vod_remarks", rawItem.optString("year", ""));
-                    vod.put("vod_content", rawItem.optString("intro", ""));
-                    items.put(vod);
-                }
-            }
-            JSONObject result = new JSONObject();
-            result.put("list", items);
-            result.put("page", page);
-            result.put("pagecount", Math.max(1, (int) Math.ceil(items.length() / (double) COUNT)));
-            result.put("limit", COUNT);
-            result.put("total", data.optInt("total", items.length()));
-            return result;
         } catch (Exception e) {
             return null;
         }

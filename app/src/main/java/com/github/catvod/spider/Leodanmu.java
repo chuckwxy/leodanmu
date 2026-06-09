@@ -585,18 +585,6 @@ public class Leodanmu extends Spider {
 
     @Override
     public String categoryContent(String tid, String pg, boolean filter, HashMap<String, String> extend) {
-        // search:// 前缀 — 非追更分类的项点击后走搜索
-        if (tid != null && tid.startsWith("search://")) {
-            try {
-                String keyword = java.net.URLDecoder.decode(tid.substring(9), "UTF-8");
-                JSONObject result = DoubanFetcher.search(keyword, 1);
-                if (result != null) return result.toString();
-                return "";
-            } catch (Exception e) {
-                log("search category error: " + e.getMessage());
-                return "";
-            }
-        }
         String ylhj = proxyYlhjCategory(tid, pg);
         if (ylhj != null) return ylhj;
         return getPayloadBridge(Utils.getTopActivity()).categoryContent(tid, pg, filter, extend);
