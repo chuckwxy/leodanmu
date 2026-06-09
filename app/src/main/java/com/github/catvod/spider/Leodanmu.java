@@ -832,7 +832,24 @@ public class Leodanmu extends Spider {
             headers.put("token", YLHJ_TOKEN);
             String body = OkHttp.string(url, headers);
             if (TextUtils.isEmpty(body)) return "";
-            return body;
+            // ── 对非 folder 的可播放项写入 vod_play_url，让 TVBox 直接播放 ──
+            JSONObject data = new JSONObject(body);
+            JSONArray list = data.optJSONArray("list");
+            if (list != null) {
+                for (int i = 0; i < list.length(); i++) {
+                    JSONObject item = list.optJSONObject(i);
+                    if (item == null) continue;
+                    String tag = item.optString("vod_tag", "");
+                    if ("folder".equals(tag)) continue;
+                    String vid = item.optString("vod_id", "");
+                    if (!vid.startsWith("link://")) continue;
+                    String name = item.optString("vod_name", "");
+                    if (!TextUtils.isEmpty(name) && !TextUtils.isEmpty(vid)) {
+                        item.put("vod_play_url", name + "$" + vid);
+                    }
+                }
+            }
+            return data.toString();
         } catch (Exception e) {
             log("proxyYlhjCategory error: " + e.getMessage());
             return "";

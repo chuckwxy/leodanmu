@@ -167,7 +167,7 @@ public class DoubanFetcher {
     }
 
     private static final Set<String> CATEGORIES = new HashSet<>(Arrays.asList(
-            "latest", "week_airing", "douban_hot", "movie", "tv", "show", "anime", "douban_anime",
+            "latest", "all", "douban_hot", "movie", "tv", "show", "anime", "douban_anime",
             "hot_movie", "hot_tv", "hot_show",
             "movie_filter", "tv_filter", "top_250", "douban_playlist"
     ));
@@ -253,7 +253,7 @@ public class DoubanFetcher {
     public static JSONArray getCategories() throws Exception {
         JSONArray arr = new JSONArray();
         arr.put(classObj("latest", "\u6700\u8fd1\u66f4\u65b0"));
-        arr.put(classObj("week_airing", "\u6b63\u5728\u8ffd\u66f4"));
+        arr.put(classObj("all", "\u5168\u90e8\u8ffd\u66f4"));
         arr.put(classObj("douban_hot", "\u8c46\u74e3\u70ed\u64ad"));
         arr.put(classObj("movie", "\u70ed\u95e8\u7535\u5f71"));
         arr.put(classObj("tv", "\u70ed\u95e8\u5267\u96c6"));
@@ -285,8 +285,8 @@ public class DoubanFetcher {
                 })
         ));
 
-        // ── 正在追更 ──────────────────────────────────────────────────────
-        root.put("week_airing", buildFilters(
+        // ── 全部追更 ──────────────────────────────────────────────────────
+        root.put("all", buildFilters(
                 filter("类型", "类型", "", new String[][]{
                         {"全部", ""},
                         {"剧集", "tv"},
@@ -595,7 +595,7 @@ public class DoubanFetcher {
                 })
         ));
 
-        root.put("week_airing", new JSONArray());
+        root.put("all", new JSONArray());
 
         return root;
     }
@@ -814,12 +814,12 @@ public class DoubanFetcher {
             fetchLatest(platform, contentType, pg, sort, items);
             total = items.length() + COUNT;
 
-        // ── 正在追更（追更助手 week_airing ─ 完整走追更助手逻辑）─────────
-        } else if ("week_airing".equals(id)) {
+        // ── 全部追更（追更助手 all ─ 完整走追更助手逻辑）────────────
+        } else if ("all".equals(id)) {
             try {
                 String contentType = getFilter(filters, "类型", "");
                 String sortType = getFilter(filters, "排序", "U");
-                String tParam = "week_airing";
+                String tParam = "all";
                 if ("tv".equals(contentType)) tParam = "tv";
                 else if ("anime".equals(contentType)) tParam = "anime";
                 else if ("movie".equals(contentType)) tParam = "movie";
