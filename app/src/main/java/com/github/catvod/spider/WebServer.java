@@ -6,12 +6,11 @@ import com.github.catvod.spider.entity.DanmakuItem;
 import com.google.gson.Gson;
 import fi.iki.elonen.NanoHTTPD;
 
+import org.greenrobot.eventbus.EventBus;
+
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.util.*;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -47,60 +46,7 @@ public class WebServer extends NanoHTTPD {
         return null;
     }
 
-    // 【修复】使用固定的Token，确保手机端和TV端一致
-    private static final String FIXED_REMOTE_TOKEN = "default_remote_input";
-
-    // 配置远程输入前缀
-    private static final String CONFIG_REMOTE_PREFIX = "config:";
-
-    // 存储远程输入的关键词
-    private static final Map<String, RemoteInputData> remoteInputMap = Collections.synchronizedMap(new HashMap<String, RemoteInputData>());
-    private static final long INPUT_EXPIRE_TIME = 5 * 60 * 1000; // 5分钟过期
-    private static final ScheduledExecutorService inputCleaner = Executors.newSingleThreadScheduledExecutor();
-
-    private static class RemoteInputData {
-        String keyword;
-        long timestamp;
-
-        RemoteInputData(String keyword) {
-            this.keyword = keyword;
-            this.timestamp = System.currentTimeMillis();
-        }
-    }
-
-    static {
-        // 启动清理线程，每1分钟清理一次过期的远程输入数据
-        inputCleaner.scheduleAtFixedRate(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    cleanExpiredInputs();
-                } catch (Exception e) {
-                    // 忽略异常，继续运行
-                }
-            }
-        }, 1, 1, TimeUnit.MINUTES);
-    }
-
-    // 清理过期输入的兼容方法
-    private static void cleanExpiredInputs() {
-        long now = System.currentTimeMillis();
-        List<String> toRemove = new ArrayList<>();
-
-        // 先收集需要删除的key
-        synchronized (remoteInputMap) {
-            for (Map.Entry<String, RemoteInputData> entry : remoteInputMap.entrySet()) {
-                if (now - entry.getValue().timestamp > INPUT_EXPIRE_TIME) {
-                    toRemove.add(entry.getKey());
-                }
-            }
-
-            // 删除过期的数据
-            for (String key : toRemove) {
-                remoteInputMap.remove(key);
-            }
-        }
-    }
+    // 远程输入已改为 EventBus 直发直收，不再使用存储 + 轮询方案
 
     public WebServer(int port) throws IOException {
         super(port);
@@ -121,20 +67,11 @@ public class WebServer extends NanoHTTPD {
             return newFixedLengthResponse(getInputHtml());
         }
         else if (uri.equals("/send_input")) {
-            // 接收手机端输入的关键词
             Map<String, String> params = session.getParms();
             String keyword = params.get("keyword");
-
-    //        Leodanmu.log("📱 收到远程输入请求，关键词: " + (keyword != null ? keyword : "空"));
-
             if (!TextUtils.isEmpty(keyword)) {
-                // 【修复】使用固定的Token
-                remoteInputMap.put(FIXED_REMOTE_TOKEN, new RemoteInputData(keyword));
-
-                Leodanmu.log("💾 保存远程输入，使用固定Token: " + FIXED_REMOTE_TOKEN + ", 关键词: " + keyword);
-                Leodanmu.log("💾 当前远程输入Map大小: " + remoteInputMap.size());
-
-                // 返回一个确认页面，告诉用户操作成功
+                EventBus.getDefault().post(new InputEvent.Remote(keyword));
+                Leodanmu.log("📱 远程输入已通过 EventBus 发送: " + keyword);
                 String responseHtml = "<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>" +
                         "<style>body { font-family: sans-serif; padding: 20px; text-align: center; } .success { color: green; margin: 20px 0; }</style></head>" +
                         "<body><h2>输入成功</h2><div class='success'>已发送到TV端: " + keyword + "</div>" +
@@ -142,30 +79,10 @@ public class WebServer extends NanoHTTPD {
                         "<p><a href='/'>返回搜索</a> | <a href='/input'>继续输入</a></p></body></html>";
                 return newFixedLengthResponse(responseHtml);
             } else {
-        //        Leodanmu.log("⚠️ 远程输入关键词为空");
                 return newFixedLengthResponse("请输入有效关键词");
             }
         }
-        else if (uri.equals("/get_input")) {
-            // TV端轮询获取输入的关键词
-            // 【修复】不再需要token参数，直接使用固定的Token
-          //  Leodanmu.log("📺 TV端轮询远程输入，使用固定Token: " + FIXED_REMOTE_TOKEN);
-         //   Leodanmu.log("📺 当前远程输入Map内容: " + remoteInputMap.toString());
 
-            if (remoteInputMap.containsKey(FIXED_REMOTE_TOKEN)) {
-                RemoteInputData data = remoteInputMap.get(FIXED_REMOTE_TOKEN);
-                String keyword = data.keyword;
-                remoteInputMap.remove(FIXED_REMOTE_TOKEN); // 获取后删除，避免重复使用
-
-        //        Leodanmu.log("✅ 找到远程输入数据: " + keyword);
-        //        Leodanmu.log("🗑️ 移除Token: " + FIXED_REMOTE_TOKEN);
-
-                return newFixedLengthResponse(keyword);
-            } else {
-    //            Leodanmu.log("❌ 未找到远程输入数据");
-            }
-            return newFixedLengthResponse("");
-        }
         else if (uri.equals("/search")) {
             Map<String, String> params = session.getParms();
             String keyword = params.get("keyword");
@@ -323,8 +240,8 @@ public class WebServer extends NanoHTTPD {
             String field = params.get("field");
             String value = params.get("value");
             if (!TextUtils.isEmpty(field) && value != null) {
-                remoteInputMap.put(CONFIG_REMOTE_PREFIX + field, new RemoteInputData(value));
-                Leodanmu.log("📱 收到配置远程输入: " + field + " = " + value);
+                EventBus.getDefault().post(new InputEvent.Config(field, value));
+                Leodanmu.log("📱 配置远程输入已通过 EventBus 发送: " + field + " = " + value);
                 String confirmHtml = "<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>" +
                         "<style>body { font-family: sans-serif; padding: 20px; text-align: center; } .success { color: green; }</style></head>" +
                         "<body><h2>已发送</h2><div class='success'>" + field + " = " + value + "</div>" +
@@ -333,18 +250,7 @@ public class WebServer extends NanoHTTPD {
             }
             return newFixedLengthResponse(Response.Status.BAD_REQUEST, MIME_PLAINTEXT, "Missing field or value");
         }
-        else if (uri.equals("/get_config_value")) {
-            Map<String, String> params = session.getParms();
-            String field = params.get("field");
-            if (!TextUtils.isEmpty(field)) {
-                String key = CONFIG_REMOTE_PREFIX + field;
-                RemoteInputData data = remoteInputMap.remove(key);
-                if (data != null) {
-                    return newFixedLengthResponse(data.keyword);
-                }
-            }
-            return newFixedLengthResponse("");
-        }
+
         return newFixedLengthResponse(Response.Status.NOT_FOUND, MIME_PLAINTEXT, "Not Found");
     }
 
@@ -650,9 +556,6 @@ public class WebServer extends NanoHTTPD {
 
     /** 被 DanmakuUIHelper.cleanupAllResources() 通过反射调用 */
     public static void cleanupResources() {
-        synchronized (remoteInputMap) {
-            remoteInputMap.clear();
-        }
         Leodanmu.log("🛑 WebServer资源已清理");
     }
 }
