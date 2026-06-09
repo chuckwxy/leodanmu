@@ -46,6 +46,13 @@ public class DoubanFetcher {
 
     private static boolean sDebugLogged = false;
 
+    // ─── id→title 缓存（供 cross-site enrichment 查询真实片名） ──────────
+    private static final Map<String, String> sIdTitleCache = new ConcurrentHashMap<>();
+
+    public static String getTitleById(String id) {
+        return id != null ? sIdTitleCache.get(id) : null;
+    }
+
     // ─── 分页缓存 ──────────────────────────────────────────────────────────
     private static final long CACHE_CLEAN_INTERVAL = 24 * 60 * 60 * 1000;
     private static final long HOME_LIST_CACHE_TTL = 5 * 60 * 1000;
@@ -1382,6 +1389,7 @@ public class DoubanFetcher {
             try {
                 JSONObject raw = items.getJSONObject(i);
                 if (raw.has("vod_id") && raw.has("vod_name")) {
+                    sIdTitleCache.put(raw.optString("vod_id", ""), raw.optString("vod_name", ""));
                     list.put(raw);
                     continue;
                 }
@@ -1449,8 +1457,11 @@ public class DoubanFetcher {
                     if (!TextUtils.isEmpty(pubdate)) remarks += " \u00b7 " + pubdate;
                 }
 
+                String finalId = rawId.trim();
+                sIdTitleCache.put(finalId, title);
+
                 JSONObject vod = new JSONObject();
-                vod.put("vod_id", rawId.trim());
+                vod.put("vod_id", finalId);
                 vod.put("vod_name", title);
                 vod.put("vod_pic", pic);
                 vod.put("vod_remarks", remarks);

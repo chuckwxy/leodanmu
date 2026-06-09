@@ -620,6 +620,14 @@ public class Leodanmu extends Spider {
                     JSONArray list = bridgeData.optJSONArray("list");
                     if (list != null && list.length() > 0) {
                         String title = list.optJSONObject(0).optString("vod_name", "");
+                        // 如果 bridge 返回的是占位名（未识别该 ID），尝试从 DoubanFetcher 缓存取真实片名
+                        if ("Leo弹幕设置".equals(title) || TextUtils.isEmpty(title)) {
+                            String cachedTitle = DoubanFetcher.getTitleById(id);
+                            if (!TextUtils.isEmpty(cachedTitle)) {
+                                log("cross-site: using cached title '" + cachedTitle + "' instead of placeholder '" + title + "'");
+                                title = cachedTitle;
+                            }
+                        }
                         if (!TextUtils.isEmpty(title)) {
                             log("cross-site: searching for " + title);
                             String enriched = enrichWithCloudSources(bridgeResult, title);
