@@ -624,33 +624,33 @@ public class Leodanmu extends Spider {
                         if ("Leo弹幕设置".equals(title) || TextUtils.isEmpty(title)) {
                             String cachedTitle = DoubanFetcher.getTitleById(id);
                             if (!TextUtils.isEmpty(cachedTitle)) {
-                                log("cross-site: using cached title '" + cachedTitle + "' instead of placeholder '" + title + "'");
+                                //log("cross-site: using cached title '" + cachedTitle + "' instead of placeholder '" + title + "'");
                                 title = cachedTitle;
                             }
                         }
                         if (!TextUtils.isEmpty(title)) {
-                            log("cross-site: searching for " + title);
+                            //log("cross-site: searching for " + title);
                             String enriched = enrichWithCloudSources(bridgeResult, title);
                             if (enriched != null) {
-                                log("cross-site: enriched with cloud sources");
+                                //log("cross-site: enriched with cloud sources");
                                 return enriched;
                             } else {
-                                log("cross-site: enrichment returned null");
+                                //log("cross-site: enrichment returned null");
                             }
                         } else {
-                            log("cross-site: no title in bridge result");
+                            //log("cross-site: no title in bridge result");
                         }
                     } else {
-                        log("cross-site: no list in bridge result");
+                        //log("cross-site: no list in bridge result");
                     }
                 } catch (Exception e) {
                     log("detailContent cross-site error: " + e.getMessage());
                 }
             } else {
-                log("cross-site: id is YLHJ type, skipping");
+                //log("cross-site: id is YLHJ type, skipping");
             }
         } else {
-            log("cross-site: condition not met: ids=" + (ids == null ? "null" : String.valueOf(ids.size())) + " bridgeResult=" + (TextUtils.isEmpty(bridgeResult) ? "empty" : "ok"));
+            //log("cross-site: condition not met: ids=" + (ids == null ? "null" : String.valueOf(ids.size())) + " bridgeResult=" + (TextUtils.isEmpty(bridgeResult) ? "empty" : "ok"));
         }
         return bridgeResult;
     }
@@ -890,22 +890,22 @@ public class Leodanmu extends Spider {
     private static String enrichWithCloudSources(String bridgeResult, String title) {
         try {
             String searchUrl = getYlhjHost() + "/api/search?q=" + java.net.URLEncoder.encode(title, "UTF-8") + "&page=1";
-            log("cross-site: search URL: " + searchUrl);
+            //log("cross-site: search URL: " + searchUrl);
             Map<String, String> headers = new HashMap<>();
             headers.put("token", YLHJ_TOKEN);
             String searchBody = OkHttp.string(searchUrl, headers);
             if (TextUtils.isEmpty(searchBody)) {
-                log("cross-site: search returned empty body");
+                //log("cross-site: search returned empty body");
                 return null;
             }
-            log("cross-site: search body length: " + searchBody.length());
+            //log("cross-site: search body length: " + searchBody.length());
 
             JSONArray searchItems = new JSONArray(searchBody);
             if (searchItems.length() == 0) {
-                log("cross-site: search returned 0 items");
+                //log("cross-site: search returned 0 items");
                 return null;
             }
-            log("cross-site: search returned " + searchItems.length() + " items");
+            //log("cross-site: search returned " + searchItems.length() + " items");
 
             // 遍历搜索到的云盘链接，每种网盘只取第一个 URL，构造 link:// 拉取剧集
             Map<String, JSONObject> resolved = new HashMap<>(); // key: cloudType
@@ -919,16 +919,16 @@ public class Leodanmu extends Spider {
                 String encodedUrl = java.net.URLEncoder.encode(cloudUrl, "UTF-8");
                 String linkId = "link://" + cloudType + "/" + encodedUrl + "?title=" + java.net.URLEncoder.encode(title, "UTF-8");
                 String detailUrl = getYlhjHost() + "/video/ylhj_tracking?id=" + java.net.URLEncoder.encode(linkId, "UTF-8");
-                log("cross-site: fetch detail for " + cloudType);
+                //log("cross-site: fetch detail for " + cloudType);
                 String detailBody = OkHttp.string(detailUrl, headers);
                 if (TextUtils.isEmpty(detailBody)) {
-                    log("cross-site: detail fetch returned empty");
+                    //log("cross-site: detail fetch returned empty");
                     continue;
                 }
                 JSONObject detailData = new JSONObject(detailBody);
                 JSONArray list = detailData.optJSONArray("list");
                 int epCount = (list != null) ? list.length() : 0;
-                log("cross-site: detail has " + epCount + " episodes");
+                //log("cross-site: detail has " + epCount + " episodes");
                 if (list != null && list.length() > 0) {
                     JSONObject first = list.optJSONObject(0);
                     if (first != null) {
@@ -945,10 +945,10 @@ public class Leodanmu extends Spider {
                 }
             }
             if (resolved.isEmpty()) {
-                log("cross-site: no extra sources found");
+                //log("cross-site: no extra sources found");
                 return null;
             }
-            log("cross-site: got " + resolved.size() + " cloud sources");
+            //log("cross-site: got " + resolved.size() + " cloud sources");
 
             // 合并到原始详情
             JSONObject bridgeData = new JSONObject(bridgeResult);
