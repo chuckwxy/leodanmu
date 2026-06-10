@@ -68,6 +68,28 @@ public class BaiduDriveResolver implements CloudDrive {
         return "";
     }
 
+    private void transferToDrive(String shareid, String fsId) throws Exception {
+        if (bduss.isEmpty()) return;
+
+        Map<String, String> headers = buildHeaders();
+        JSONObject body = new JSONObject();
+        body.put("shareid", shareid);
+        body.put("fs_id", fsId);
+        body.put("path", "/");
+
+        JSONObject resp = OkHttp.postJson(API_BASE + "/share/transfer?shareid=" + shareid + "&from=web&v=2", body.toString(), headers);
+        if (resp != null) {
+            int errno = resp.optInt("errno", -1);
+            if (errno != 0) {
+                String msg = resp.optString("errmsg", resp.optString("errno", "unknown"));
+                SpiderDebug.log("Baidu transfer: " + msg + " (" + errno + ")");
+                if (errno != 12) throw new Exception("transfer failed: " + msg);
+            }
+        }
+
+        DriveManager.cleanupRegistry.scheduleDelete("baidu", fsId);
+    }
+
     @Override
     public JSONObject getVod(String url) {
         try {
@@ -107,6 +129,12 @@ public class BaiduDriveResolver implements CloudDrive {
             JSONObject first = list.optJSONObject(0);
             String fileName = first != null ? first.optString("server_filename", "") : "";
             String fsId = first != null ? first.optString("fs_id", "") : "";
+
+            try {
+                transferToDrive(shareid, fsId);
+            } catch (Exception e) {
+                SpiderDebug.log("Baidu transfer (non-fatal): " + e.getMessage());
+            }
 
             JSONObject downloadBody = new JSONObject();
             downloadBody.put("shareid", shareid);

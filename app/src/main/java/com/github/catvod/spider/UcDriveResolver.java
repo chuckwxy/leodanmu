@@ -48,6 +48,29 @@ public class UcDriveResolver implements CloudDrive {
         return "";
     }
 
+    private void transferToDrive(String shareId, String fileId) throws Exception {
+        if (TextUtils.isEmpty(cookie)) return;
+
+        Map<String, String> headers = buildHeaders();
+        JSONObject body = new JSONObject();
+        body.put("share_id", shareId);
+        body.put("fid", fileId);
+
+        OkResult result = OkHttp.post(API_BASE + "/share/save", body.toString(), headers);
+        String resp = result != null ? result.getBody() : "";
+        if (TextUtils.isEmpty(resp)) throw new Exception("save response empty");
+
+        JSONObject json = new JSONObject(resp);
+        int code = json.optInt("status", json.optInt("code", -1));
+        if (code != 0 && code != 200) {
+            String msg = json.optString("message", json.optString("msg", "unknown"));
+            SpiderDebug.log("UC transferToDrive: " + msg + " (" + code + ")");
+            if (code != 40008) throw new Exception("save failed: " + msg);
+        }
+
+        DriveManager.cleanupRegistry.scheduleDelete("uc", fileId);
+    }
+
     @Override
     public JSONObject getVod(String url) {
         try {
@@ -129,6 +152,13 @@ public class UcDriveResolver implements CloudDrive {
     @Override
     public JSONObject play(String input, String flag) {
         try {
+            String shareId = flag;
+            try {
+                transferToDrive(shareId, input);
+            } catch (Exception e) {
+                SpiderDebug.log("UC transfer (non-fatal): " + e.getMessage());
+            }
+
             JSONObject result = new JSONObject();
             result.put("parse", 0);
             result.put("url", input);

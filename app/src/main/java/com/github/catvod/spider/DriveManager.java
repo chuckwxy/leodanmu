@@ -1,5 +1,7 @@
 package com.github.catvod.spider;
 
+import android.os.Handler;
+import android.os.Looper;
 import android.text.TextUtils;
 
 import com.github.catvod.crawler.SpiderDebug;
@@ -9,6 +11,7 @@ import org.json.JSONObject;
 
 import java.net.URLEncoder;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -173,6 +176,63 @@ public class DriveManager {
                     + "&url=" + URLEncoder.encode(rawUrl, "UTF-8");
         } catch (Exception e) {
             return rawUrl;
+        }
+    }
+
+    public static final CleanupRegistry cleanupRegistry = new CleanupRegistry();
+
+    public static class CleanupRegistry {
+        private static final long DELETE_DELAY_MS = 5 * 60 * 1000;
+        private final List<CleanupEntry> pending = new ArrayList<>();
+        private final Handler handler = new Handler(Looper.getMainLooper());
+        private boolean running;
+
+        private static class CleanupEntry {
+            String driveKey;
+            String fileId;
+            long scheduledAt;
+            CleanupEntry(String driveKey, String fileId) {
+                this.driveKey = driveKey;
+                this.fileId = fileId;
+                this.scheduledAt = System.currentTimeMillis();
+            }
+        }
+
+        public synchronized void scheduleDelete(String driveKey, String fileId) {
+            pending.add(new CleanupEntry(driveKey, fileId));
+            if (!running) {
+                running = true;
+                handler.postDelayed(cleanupRunnable, DELETE_DELAY_MS);
+            }
+        }
+
+        private final Runnable cleanupRunnable = new Runnable() {
+            @Override
+            public void run() {
+                synchronized (CleanupRegistry.this) {
+                    long now = System.currentTimeMillis();
+                    List<CleanupEntry> toDelete = new ArrayList<>();
+                    for (CleanupEntry entry : pending) {
+                        if (now - entry.scheduledAt >= DELETE_DELAY_MS) {
+                            toDelete.add(entry);
+                        }
+                    }
+                    pending.removeAll(toDelete);
+                    running = !pending.isEmpty();
+                    if (running) {
+                        handler.postDelayed(this, DELETE_DELAY_MS);
+                    }
+                }
+                for (CleanupEntry entry : toDelete) {
+                    try {
+                        attemptDelete(entry.driveKey, entry.fileId);
+                    } catch (Exception ignored) {}
+                }
+            }
+        };
+
+        private void attemptDelete(String driveKey, String fileId) {
+            SpiderDebug.log("Cleanup: attempting delete " + driveKey + "/" + fileId);
         }
     }
 }

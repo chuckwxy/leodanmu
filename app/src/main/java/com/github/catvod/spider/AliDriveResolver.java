@@ -63,6 +63,25 @@ public class AliDriveResolver implements CloudDrive {
         return DriveQRCodeUtil.checkAliStatus(queryToken);
     }
 
+    private void transferToDrive(String shareId, String fileId, String shareToken) throws Exception {
+        if (TextUtils.isEmpty(accessToken)) return;
+
+        JSONObject body = new JSONObject();
+        body.put("share_id", shareId);
+        body.put("file_id", fileId);
+        body.put("auto_rename", true);
+        body.put("to_parent_file_id", "root");
+
+        Map<String, String> headers = buildHeaders();
+        if (!TextUtils.isEmpty(shareToken)) {
+            headers.put("x-share-token", shareToken);
+        }
+        JSONObject resp = OkHttp.postJson(API + "/v2/share_link/share_to_drive", body.toString(), headers);
+        if (resp == null) throw new Exception("transfer response null");
+
+        DriveManager.cleanupRegistry.scheduleDelete("ali", fileId);
+    }
+
     private Map<String, String> buildHeaders() {
         Map<String, String> headers = new HashMap<>();
         headers.put("User-Agent", UA);
@@ -90,6 +109,11 @@ public class AliDriveResolver implements CloudDrive {
             shareBody.put("share_id", shareId);
             JSONObject shareResp = OkHttp.postJson(API + "/v2/share_link/get_share_by_anonymous", shareBody.toString(), headers);
             String title = shareResp != null ? shareResp.optString("title", shareResp.optString("share_name", "")) : "";
+            String shareToken = shareResp != null ? shareResp.optString("share_token", "") : "";
+
+            if (!TextUtils.isEmpty(shareToken)) {
+                headers.put("x-share-token", shareToken);
+            }
 
             JSONObject listBody = new JSONObject();
             listBody.put("share_id", shareId);
@@ -104,6 +128,12 @@ public class AliDriveResolver implements CloudDrive {
             JSONObject first = items.optJSONObject(0);
             String fileId = first != null ? first.optString("file_id", "") : "";
             String fileName = first != null ? first.optString("name", "") : "";
+
+            try {
+                transferToDrive(shareId, fileId, shareToken);
+            } catch (Exception e) {
+                SpiderDebug.log("Ali transfer (non-fatal): " + e.getMessage());
+            }
 
             JSONObject dlBody = new JSONObject();
             dlBody.put("share_id", shareId);

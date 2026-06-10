@@ -34,6 +34,25 @@ public class Pan115DriveResolver implements CloudDrive {
         return url.contains("115.com");
     }
 
+    private void transferToDrive(String shareCode, String fid) throws Exception {
+        if (TextUtils.isEmpty(cookie)) return;
+
+        Map<String, String> headers = buildHeaders();
+        JSONObject body = new JSONObject();
+        body.put("share_code", shareCode);
+        body.put("file_id", fid);
+
+        JSONObject resp = OkHttp.postJson(API + "/share/save", body.toString(), headers);
+        if (resp == null) throw new Exception("115 save response null");
+        if (resp.optInt("state", 0) != 1) {
+            String msg = resp.optString("message", resp.optString("error", "unknown"));
+            SpiderDebug.log("115 transferToDrive: " + msg);
+            if (resp.optInt("state", 0) != 0) throw new Exception("save failed: " + msg);
+        }
+
+        DriveManager.cleanupRegistry.scheduleDelete("a115", fid);
+    }
+
     @Override
     public JSONObject getVod(String url) {
         try {
@@ -53,6 +72,12 @@ public class Pan115DriveResolver implements CloudDrive {
             JSONObject first = data.optJSONObject(0);
             String fid = first.optString("fid", first.optString("file_id", ""));
             String fileName = first.optString("n", first.optString("name", ""));
+
+            try {
+                transferToDrive(shareCode, fid);
+            } catch (Exception e) {
+                SpiderDebug.log("115 transfer (non-fatal): " + e.getMessage());
+            }
 
             JSONObject dlBody = new JSONObject();
             dlBody.put("pickcode", fid);

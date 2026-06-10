@@ -247,6 +247,47 @@ public class QuarkDriveResolver implements CloudDrive {
         }
     }
 
+    private void transferToDrive(ShareInfo info, TokenResult tokenResult, String fileId) throws Exception {
+        if (TextUtils.isEmpty(cookie)) return;
+
+        JSONObject body = new JSONObject();
+        JSONArray fidList = new JSONArray();
+        fidList.put(fileId);
+        body.put("fid_list", fidList);
+        body.put("fid_token_list", new JSONArray());
+        body.put("to_pdir_fid", "0");
+        body.put("pwd_id", info.pwdId);
+        body.put("stoken", tokenResult.stoken);
+        body.put("pdir_fid", info.pdirFid != null ? info.pdirFid : "0");
+        body.put("scene", "scene");
+
+        Map<String, String> headers = buildHeaders();
+        OkResult result = OkHttp.post(API_BASE + "/1/clouddrive/share/sharepage/save?pr=ucpro&fr=pc&__dt=" + System.currentTimeMillis(),
+                body.toString(), headers);
+        String resp = result != null ? result.getBody() : "";
+        if (TextUtils.isEmpty(resp)) throw new Exception("save response empty");
+
+        JSONObject json = new JSONObject(resp);
+        int code = json.optInt("status", json.optInt("code", -1));
+        if (code != 0 && code != 200) {
+            String msg = json.optString("message", json.optString("msg", "unknown"));
+            SpiderDebug.log("Quark transferToDrive: " + msg + " (" + code + ")");
+            if (code != 40008) throw new Exception("save failed: " + msg);
+        }
+
+        JSONObject data = json.optJSONObject("data");
+        if (data != null) {
+            JSONArray fids = data.optJSONArray("save_as_top_fids");
+            if (fids != null && fids.length() > 0) {
+                String savedFileId = fids.optString(0, "");
+                if (!TextUtils.isEmpty(savedFileId)) {
+                    Leodanmu.log("Quark saved to drive: " + savedFileId);
+                    DriveManager.cleanupRegistry.scheduleDelete("quark", savedFileId);
+                }
+            }
+        }
+    }
+
     public JSONObject play(String input, String flag) {
         try {
             PlayToken token = decodePlayToken(input);
@@ -260,6 +301,12 @@ public class QuarkDriveResolver implements CloudDrive {
             info.pdirFid = token.folderId;
 
             TokenResult tokenResult = getToken(info);
+
+            try {
+                transferToDrive(info, tokenResult, token.fileId);
+            } catch (Exception e) {
+                SpiderDebug.log("Quark transfer (non-fatal): " + e.getMessage());
+            }
 
             JSONObject body = new JSONObject();
             body.put("stoken", tokenResult.stoken);

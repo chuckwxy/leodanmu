@@ -863,12 +863,17 @@ public class ConfigCenter extends Spider {
     private void showDriveScanDialog(Activity ctx, DanmakuConfig config, String driveKey, String displayName, EditText targetInput) {
         JSONObject qrResult;
         try {
+            Leodanmu.log("ConfigCenter: generating QR for " + driveKey);
             qrResult = DriveQRCodeUtil.generateQRCode(driveKey);
+            Leodanmu.log("ConfigCenter: QR result " + (qrResult != null ? qrResult.toString() : "null"));
         } catch (Exception e) {
+            Leodanmu.log("ConfigCenter: QR failed for " + driveKey + ": " + e.getMessage());
+            e.printStackTrace();
             Utils.safeShowToast(ctx, displayName + " 获取二维码失败: " + e.getMessage());
             return;
         }
         if (qrResult == null) {
+            Leodanmu.log("ConfigCenter: QR result null for " + driveKey);
             Utils.safeShowToast(ctx, displayName + " 获取二维码失败");
             return;
         }
