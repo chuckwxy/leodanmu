@@ -116,6 +116,7 @@ public class QuarkDriveResolver implements CloudDrive {
         public boolean isDir;
         public boolean isVideo;
         public String path;
+        public String shareFidToken;
     }
 
     public List<FileEntry> listFiles(TokenResult token, ShareInfo info) throws Exception {
@@ -153,6 +154,10 @@ public class QuarkDriveResolver implements CloudDrive {
                 String category = item.optString("category", "").toLowerCase();
                 entry.isDir = item.optBoolean("dir", false) || item.optBoolean("is_dir", false) || "dir".equals(category) || "folder".equals(category);
                 entry.isVideo = detectVideo(item);
+                entry.shareFidToken = item.optString("share_fid_token", item.optString("fid_token", item.optString("file_token", "")));
+                if (i == 0 && allFiles.size() == 0 && page == 1) {
+                    Leodanmu.log("Quark listFiles: first item keys=" + item.keySet().toString() + " shareFidToken=" + entry.shareFidToken);
+                }
                 allFiles.add(entry);
             }
 
@@ -208,6 +213,9 @@ public class QuarkDriveResolver implements CloudDrive {
             payload.put("pwd", info.passcode != null ? info.passcode : JSONObject.NULL);
             payload.put("type", "video");
             payload.put("subs", new JSONArray());
+            if (!TextUtils.isEmpty(file.shareFidToken)) {
+                payload.put("fidToken", file.shareFidToken);
+            }
             String json = payload.toString();
             StringBuilder hex = new StringBuilder();
             for (byte b : json.getBytes("UTF-8")) {
@@ -225,6 +233,7 @@ public class QuarkDriveResolver implements CloudDrive {
         public String folderId;
         public String pwd;
         public String type;
+        public String fidToken;
     }
 
     public PlayToken decodePlayToken(String hexToken) {
@@ -241,24 +250,27 @@ public class QuarkDriveResolver implements CloudDrive {
             token.folderId = obj.optString("folderId", "");
             token.pwd = obj.optString("pwd", "");
             token.type = obj.optString("type", "video");
+            token.fidToken = obj.optString("fidToken", "");
             return token;
         } catch (Exception e) {
             return null;
         }
     }
 
-    private void transferToDrive(ShareInfo info, TokenResult tokenResult, String fileId) throws Exception {
+    private void transferToDrive(ShareInfo info, TokenResult tokenResult, String fileId, String fidToken) throws Exception {
         if (TextUtils.isEmpty(cookie)) {
             Leodanmu.log("Quark transferToDrive: skipped, cookie empty");
             return;
         }
-        Leodanmu.log("Quark transferToDrive: shareId=" + info.pwdId + " fileId=" + fileId);
+        Leodanmu.log("Quark transferToDrive: shareId=" + info.pwdId + " fileId=" + fileId + " fidToken=" + (fidToken != null ? !fidToken.isEmpty() : "null"));
 
         JSONObject body = new JSONObject();
         JSONArray fidList = new JSONArray();
         fidList.put(fileId);
         body.put("fid_list", fidList);
-        body.put("fid_token_list", new JSONArray());
+        JSONArray fidTokenList = new JSONArray();
+        if (!TextUtils.isEmpty(fidToken)) fidTokenList.put(fidToken);
+        body.put("fid_token_list", fidTokenList);
         body.put("to_pdir_fid", "0");
         body.put("pwd_id", info.pwdId);
         body.put("stoken", tokenResult.stoken);
@@ -314,9 +326,9 @@ public class QuarkDriveResolver implements CloudDrive {
             TokenResult tokenResult = getToken(info);
 
             try {
-                transferToDrive(info, tokenResult, token.fileId);
+                transferToDrive(info, tokenResult, token.fileId, token.fidToken);
             } catch (Exception e) {
-                SpiderDebug.log("Quark transfer (non-fatal): " + e.getMessage());
+                Leodanmu.log("Quark transfer (non-fatal): " + e.getMessage());
             }
 
             JSONObject body = new JSONObject();
@@ -325,6 +337,9 @@ public class QuarkDriveResolver implements CloudDrive {
             body.put("pdir_fid", info.pdirFid);
             body.put("file_id", token.fileId);
             body.put("force_update", false);
+            if (!TextUtils.isEmpty(token.fidToken)) {
+                body.put("fid_token", token.fidToken);
+            }
 
             Map<String, String> headers = buildHeaders();
             OkResult okPlayResult = OkHttp.post(API_BASE + "/1/clouddrive/share/sharepage/video?pr=ucpro&fr=pc&__dt=" + System.currentTimeMillis(),
@@ -332,6 +347,7 @@ public class QuarkDriveResolver implements CloudDrive {
             String resp = okPlayResult != null ? okPlayResult.getBody() : "";
             if (!TextUtils.isEmpty(resp)) {
                 JSONObject json = new JSONObject(resp);
+                Leodanmu.log("Quark play: video API resp=" + json.toString());
                 JSONObject data = json.optJSONObject("data");
                 if (data != null) {
                     String videoUrl = data.optString("video_url", "");
@@ -351,7 +367,7 @@ public class QuarkDriveResolver implements CloudDrive {
                     }
                     Leodanmu.log("Quark play: no video_url in response");
                 } else {
-                    Leodanmu.log("Quark play: no data in response");
+                    Leodanmu.log("Quark play: no data in response, msg=" + json.optString("message", ""));
                 }
             } else {
                 Leodanmu.log("Quark play: empty response from video API");
