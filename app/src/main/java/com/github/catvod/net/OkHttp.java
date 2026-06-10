@@ -3,6 +3,7 @@ package com.github.catvod.net;
 import android.annotation.SuppressLint;
 
 import com.github.catvod.crawler.Spider;
+import com.github.catvod.crawler.SpiderDebug;
 
 import java.io.IOException;
 import java.security.SecureRandom;

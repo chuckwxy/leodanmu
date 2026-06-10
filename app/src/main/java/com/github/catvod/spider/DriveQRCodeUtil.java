@@ -224,7 +224,7 @@ public class DriveQRCodeUtil {
         return resp;
     }
 
-    private static JSONObject checkUcLikeStatus(String platform, String queryToken) throws Exception {
+    public static JSONObject checkUcLikeStatus(String platform, String queryToken) throws Exception {
         boolean isUc = platform.equals("uc");
         String clientId = isUc ? UC_CLIENT_ID : QUARK_CLIENT_ID;
         String version = isUc ? UC_VERSION : QUARK_VERSION;
@@ -383,7 +383,7 @@ public class DriveQRCodeUtil {
         return resp;
     }
 
-    private static JSONObject checkAliStatus(String queryToken) throws Exception {
+    public static JSONObject checkAliStatus(String queryToken) throws Exception {
         SessionData session = getSession(queryToken, "ali");
         if (session == null) {
             JSONObject resp = new JSONObject();
@@ -497,7 +497,7 @@ public class DriveQRCodeUtil {
         return resp;
     }
 
-    private static JSONObject check115Status(String queryToken) throws Exception {
+    public static JSONObject check115Status(String queryToken) throws Exception {
         SessionData session = getSession(queryToken, "115");
         if (session == null) {
             JSONObject resp = new JSONObject();
@@ -630,7 +630,7 @@ public class DriveQRCodeUtil {
         return resp;
     }
 
-    private static JSONObject checkBaiduStatus(String queryToken) throws Exception {
+    public static JSONObject checkBaiduStatus(String queryToken) throws Exception {
         SessionData session = getSession(queryToken, "baidu");
         if (session == null) {
             JSONObject resp = new JSONObject();
