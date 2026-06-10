@@ -883,12 +883,9 @@ public class ConfigCenter extends Spider {
 
         // If no qr_image_url, generate QR from qr_text via external service
         if (TextUtils.isEmpty(qrImageUrl) && !TextUtils.isEmpty(qrText)) {
-            final String encodedQrContent;
-            try {
-                encodedQrContent = java.net.URLEncoder.encode(qrText, "UTF-8");
-            } catch (Exception e) {
-                encodedQrContent = qrText;
-            }
+            String encodedQrContent;
+            try { encodedQrContent = java.net.URLEncoder.encode(qrText, "UTF-8"); }
+            catch (Exception e) { encodedQrContent = qrText; }
             final String qrApiUrl = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=" + encodedQrContent;
             android.os.AsyncTask.SERIAL_EXECUTOR.execute(() -> {
                 try {
