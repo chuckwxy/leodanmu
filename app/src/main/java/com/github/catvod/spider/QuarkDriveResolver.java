@@ -301,10 +301,10 @@ public class QuarkDriveResolver implements CloudDrive {
         }
     }
 
-    private void transferToDrive(ShareInfo info, TokenResult tokenResult, String fileId, String fidToken) throws Exception {
+    private String transferToDrive(ShareInfo info, TokenResult tokenResult, String fileId, String fidToken) throws Exception {
         if (TextUtils.isEmpty(cookie)) {
             Leodanmu.log("Quark transferToDrive: skipped, cookie empty");
-            return;
+            return "";
         }
         Leodanmu.log("Quark transferToDrive: shareId=" + info.pwdId + " fileId=" + fileId + " fidToken='" + fidToken + "'");
 
@@ -315,7 +315,6 @@ public class QuarkDriveResolver implements CloudDrive {
         JSONArray fidTokenList = new JSONArray();
         if (!TextUtils.isEmpty(fidToken)) fidTokenList.put(fidToken);
         body.put("fid_token_list", fidTokenList);
-        Leodanmu.log("Quark transferToDrive: body=" + body.toString());
         body.put("to_pdir_fid", "0");
         body.put("pwd_id", info.pwdId);
         body.put("stoken", tokenResult.stoken);
@@ -340,21 +339,29 @@ public class QuarkDriveResolver implements CloudDrive {
             String msg = json.optString("message", json.optString("msg", "unknown"));
             Leodanmu.log("Quark transferToDrive: failed " + msg + " (" + code + ")");
             if (code != 40008 && code != 400) throw new Exception("save failed: " + msg);
-        } else {
-            Leodanmu.log("Quark transferToDrive: success code=" + code);
+            return "";
         }
+        Leodanmu.log("Quark transferToDrive: success code=" + code);
 
-        JSONObject data = json.optJSONObject("data");
-        if (data != null) {
-            JSONArray fids = data.optJSONArray("save_as_top_fids");
-            if (fids != null && fids.length() > 0) {
-                String savedFileId = fids.optString(0, "");
-                if (!TextUtils.isEmpty(savedFileId)) {
-                    Leodanmu.log("Quark transferToDrive: saved fileId=" + savedFileId);
-                    DriveManager.cleanupRegistry.scheduleDelete("quark", savedFileId);
+        String savedFileId = "";
+        JSONObject saveData = json.optJSONObject("data");
+        if (saveData != null) {
+            JSONObject taskResp = saveData.optJSONObject("task_resp");
+            if (taskResp != null) {
+                JSONObject taskData = taskResp.optJSONObject("data");
+                if (taskData != null) {
+                    JSONArray fids = taskData.optJSONArray("save_as_top_fids");
+                    if (fids != null && fids.length() > 0) {
+                        savedFileId = fids.optString(0, "");
+                    }
                 }
             }
         }
+        if (!TextUtils.isEmpty(savedFileId)) {
+            Leodanmu.log("Quark transferToDrive: saved fileId=" + savedFileId);
+            DriveManager.cleanupRegistry.scheduleDelete("quark", savedFileId);
+        }
+        return savedFileId;
     }
 
     public JSONObject play(String input, String flag) {
@@ -381,52 +388,45 @@ public class QuarkDriveResolver implements CloudDrive {
                 Leodanmu.log("Quark play: getFreshFidToken failed, using stale token: " + e.getMessage());
             }
 
+            String savedFileId = "";
             try {
-                transferToDrive(info, tokenResult, token.fileId, freshFidToken);
+                savedFileId = transferToDrive(info, tokenResult, token.fileId, freshFidToken);
             } catch (Exception e) {
-                Leodanmu.log("Quark transfer (non-fatal): " + e.getMessage());
+                Leodanmu.log("Quark play: transfer failed (non-fatal): " + e.getMessage());
             }
 
-            JSONObject body = new JSONObject();
-            body.put("stoken", tokenResult.stoken);
-            body.put("pwd_id", info.pwdId);
-            body.put("pdir_fid", info.pdirFid);
-            body.put("file_id", token.fileId);
-            body.put("force_update", false);
-            if (!TextUtils.isEmpty(token.fidToken)) {
-                body.put("fid_token", token.fidToken);
-            }
-
-            Map<String, String> headers = buildHeaders();
-            OkResult okPlayResult = OkHttp.post(API_BASE + "/1/clouddrive/share/sharepage/video?pr=ucpro&fr=pc&__dt=" + System.currentTimeMillis(),
-                    body.toString(), headers);
-            String resp = okPlayResult != null ? okPlayResult.getBody() : "";
-            if (!TextUtils.isEmpty(resp)) {
-                JSONObject json = new JSONObject(resp);
-                Leodanmu.log("Quark play: video API resp=" + json.toString());
-                JSONObject data = json.optJSONObject("data");
-                if (data != null) {
-                    String videoUrl = data.optString("video_url", "");
-                    if (!TextUtils.isEmpty(videoUrl)) {
-                        Leodanmu.log("Quark play: got video_url=" + videoUrl.substring(0, Math.min(videoUrl.length(), 120)));
-                        JSONObject result = new JSONObject();
-                        result.put("parse", 0);
-                        result.put("url", videoUrl);
-                        JSONObject respHeaders = new JSONObject();
-                        respHeaders.put("Referer", "https://pan.quark.cn/");
-                        respHeaders.put("User-Agent", UA);
-                        if (!TextUtils.isEmpty(cookie)) {
-                            respHeaders.put("Cookie", cookie);
+            if (!TextUtils.isEmpty(savedFileId)) {
+                Leodanmu.log("Quark play: getting download URL for saved file " + savedFileId);
+                Map<String, String> headers = buildHeaders();
+                JSONObject dlBody = new JSONObject();
+                JSONArray fids = new JSONArray();
+                fids.put(savedFileId);
+                dlBody.put("fids", fids);
+                OkResult okDlResult = OkHttp.post(API_BASE + "/1/clouddrive/file/download?pr=ucpro&fr=pc&__dt=" + System.currentTimeMillis(),
+                        dlBody.toString(), headers);
+                String dlResp = okDlResult != null ? okDlResult.getBody() : "";
+                Leodanmu.log("Quark play: download API resp=" + (dlResp != null ? dlResp.substring(0, Math.min(dlResp.length(), 200)) : "null"));
+                if (!TextUtils.isEmpty(dlResp)) {
+                    JSONObject dlJson = new JSONObject(dlResp);
+                    JSONArray dlData = dlJson.optJSONArray("data");
+                    if (dlData != null && dlData.length() > 0) {
+                        String downloadUrl = dlData.optJSONObject(0).optString("download_url", "");
+                        if (!TextUtils.isEmpty(downloadUrl)) {
+                            Leodanmu.log("Quark play: got download_url=" + downloadUrl.substring(0, Math.min(downloadUrl.length(), 120)));
+                            JSONObject result = new JSONObject();
+                            result.put("parse", 0);
+                            result.put("url", downloadUrl);
+                            JSONObject respHeaders = new JSONObject();
+                            respHeaders.put("Referer", "https://pan.quark.cn/");
+                            respHeaders.put("User-Agent", UA);
+                            result.put("header", respHeaders);
+                            return result;
                         }
-                        result.put("header", respHeaders);
-                        return result;
                     }
-                    Leodanmu.log("Quark play: no video_url in response");
-                } else {
-                    Leodanmu.log("Quark play: no data in response, msg=" + json.optString("message", ""));
                 }
+                Leodanmu.log("Quark play: failed to get download_url from file API");
             } else {
-                Leodanmu.log("Quark play: empty response from video API");
+                Leodanmu.log("Quark play: no savedFileId, trying file/download with original fid");
             }
         } catch (Exception e) {
             SpiderDebug.log("Quark play error: " + e.getMessage());
