@@ -6,8 +6,6 @@ import com.github.catvod.spider.entity.DanmakuItem;
 import com.google.gson.Gson;
 import fi.iki.elonen.NanoHTTPD;
 
-import org.greenrobot.eventbus.EventBus;
-
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.util.*;
@@ -46,7 +44,7 @@ public class WebServer extends NanoHTTPD {
         return null;
     }
 
-    // 远程输入已改为 EventBus 直发直收，不再使用存储 + 轮询方案
+    // 远程输入已改为 RemoteInputBus 直发直收，不再使用存储 + 轮询方案
 
     public WebServer(int port) throws IOException {
         super(port);
@@ -70,8 +68,8 @@ public class WebServer extends NanoHTTPD {
             Map<String, String> params = session.getParms();
             String keyword = params.get("keyword");
             if (!TextUtils.isEmpty(keyword)) {
-                EventBus.getDefault().post(new InputEvent.Remote(keyword));
-                Leodanmu.log("📱 远程输入已通过 EventBus 发送: " + keyword);
+                RemoteInputBus.postSearch(keyword);
+                Leodanmu.log("📱 远程输入已通过 RemoteInputBus 发送: " + keyword);
                 String responseHtml = "<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>" +
                         "<style>body { font-family: sans-serif; padding: 20px; text-align: center; } .success { color: green; margin: 20px 0; }</style></head>" +
                         "<body><h2>输入成功</h2><div class='success'>已发送到TV端: " + keyword + "</div>" +
@@ -240,8 +238,8 @@ public class WebServer extends NanoHTTPD {
             String field = params.get("field");
             String value = params.get("value");
             if (!TextUtils.isEmpty(field) && value != null) {
-                EventBus.getDefault().post(new InputEvent.Config(field, value));
-                Leodanmu.log("📱 配置远程输入已通过 EventBus 发送: " + field + " = " + value);
+                RemoteInputBus.postConfig(field, value);
+                Leodanmu.log("📱 配置远程输入已通过 RemoteInputBus 发送: " + field + " = " + value);
                 String confirmHtml = "<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>" +
                         "<style>body { font-family: sans-serif; padding: 20px; text-align: center; } .success { color: green; }</style></head>" +
                         "<body><h2>已发送</h2><div class='success'>" + field + " = " + value + "</div>" +

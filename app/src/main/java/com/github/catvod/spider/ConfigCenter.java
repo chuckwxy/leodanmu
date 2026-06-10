@@ -11,7 +11,6 @@ import android.widget.EditText;
 import android.widget.LinearLayout;
 
 import com.github.catvod.crawler.Spider;
-import org.greenrobot.eventbus.EventBus;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -378,30 +377,18 @@ public class ConfigCenter extends Spider {
         builder.setNegativeButton("取消", (dialog, which) -> {});
 
         final String capturedFieldId = fieldId;
-        final boolean[] registered = {false};
-        Object subscriber = new Object() {
-            @org.greenrobot.eventbus.Subscribe(threadMode = org.greenrobot.eventbus.ThreadMode.MAIN)
-            public void onConfigInput(InputEvent.Config event) {
-                if (event.field.equals(capturedFieldId)) {
-                    input.setText(event.value);
-                    Utils.safeShowToast(ctx, "已收到远程输入: " + event.field);
-                }
+        java.util.function.BiConsumer<String, String> configListener = (f, v) -> {
+            if (f.equals(capturedFieldId)) {
+                input.setText(v);
+                Utils.safeShowToast(ctx, "已收到远程输入: " + f);
             }
         };
 
         android.app.AlertDialog dialog = builder.create();
-        dialog.setOnDismissListener(d -> {
-            if (registered[0]) {
-                EventBus.getDefault().unregister(subscriber);
-                registered[0] = false;
-            }
-        });
+        dialog.setOnDismissListener(d -> RemoteInputBus.removeConfigInput());
 
         qrBtn.setOnClickListener(v -> {
-            if (!registered[0]) {
-                EventBus.getDefault().register(subscriber);
-                registered[0] = true;
-            }
+            RemoteInputBus.onConfigInput(configListener);
             String localIp = NetworkUtils.getLocalIpAddress();
             String url = "http://" + localIp + ":9888/config_input";
             DanmakuUIHelper.showFloatingQRCodeDialog(ctx, url, title);

@@ -31,7 +31,7 @@ import android.widget.TextView;
 import com.github.catvod.spider.entity.DanmakuItem;
 import com.github.catvod.spider.danmu.SharedPreferencesService;
 import com.github.catvod.net.OkHttp;
-import org.greenrobot.eventbus.EventBus;
+
 
 import java.io.InputStream;
 import java.net.URLEncoder;
@@ -1670,20 +1670,17 @@ public class DanmakuUIHelper {
                 lp.alpha = config.getLpAlpha();
                 dialog.getWindow().setAttributes(lp);
 
-                Object remoteSubscriber = new Object() {
-                    @org.greenrobot.eventbus.Subscribe(threadMode = org.greenrobot.eventbus.ThreadMode.MAIN)
-                    public void onRemoteInput(InputEvent.Remote event) {
-                        if (dialog != null && dialog.isShowing() && !activity.isFinishing()) {
-                            searchInput.setText(event.keyword);
-                            searchBtn.performClick();
-                            Leodanmu.log("✅ 通过 EventBus 收到远程输入关键词: " + event.keyword);
-                        }
+                java.util.function.Consumer<String> searchListener = keyword -> {
+                    if (dialog != null && dialog.isShowing() && !activity.isFinishing()) {
+                        searchInput.setText(keyword);
+                        searchBtn.performClick();
+                        Leodanmu.log("✅ 通过 RemoteInputBus 收到远程输入关键词: " + keyword);
                     }
                 };
-                EventBus.getDefault().register(remoteSubscriber);
+                RemoteInputBus.onSearchInput(searchListener);
 
                 dialog.setOnDismissListener(dialogInterface -> {
-                    EventBus.getDefault().unregister(remoteSubscriber);
+                    RemoteInputBus.removeSearchInput();
                     unregisterActivity(activity);
                 });
 
