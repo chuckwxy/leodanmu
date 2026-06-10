@@ -5,6 +5,7 @@ import android.text.TextUtils;
 import com.github.catvod.spider.entity.DanmakuItem;
 import com.google.gson.Gson;
 import fi.iki.elonen.NanoHTTPD;
+import fi.iki.elonen.NanoHTTPD.IHTTPSession;
 
 import java.io.IOException;
 import java.net.URLEncoder;
@@ -605,19 +606,11 @@ public class WebServer extends NanoHTTPD {
                 "</script></body></html>";
     }
 
-    private Response handleDriveScanCheck(HTTPSession session) {
+    private Response handleDriveScanCheck(IHTTPSession session) {
         try {
             Map<String, String> params = session.getParms();
             String drive = params.get("drive");
             String token = params.get("token");
-            if (TextUtils.isEmpty(drive) || TextUtils.isEmpty(token)) {
-                String body = session.getBody() != null ? new String(session.getBody(), "UTF-8") : "";
-                if (!TextUtils.isEmpty(body)) {
-                    JSONObject jb = new JSONObject(body);
-                    drive = jb.optString("drive", drive);
-                    token = jb.optString("token", token);
-                }
-            }
             if (TextUtils.isEmpty(drive) || TextUtils.isEmpty(token)) {
                 return newFixedLengthResponse(Response.Status.BAD_REQUEST, "application/json; charset=utf-8", "{\"error\":\"missing params\"}");
             }
@@ -628,7 +621,7 @@ public class WebServer extends NanoHTTPD {
         }
     }
 
-    private Response handleDriveScanSave(HTTPSession session) {
+    private Response handleDriveScanSave(IHTTPSession session) {
         try {
             Map<String, String> params = session.getParms();
             String field = params.get("field");
@@ -650,7 +643,7 @@ public class WebServer extends NanoHTTPD {
         }
     }
 
-    private Response handleDriveScan(String driveKey, HTTPSession session) {
+    private Response handleDriveScan(String driveKey, IHTTPSession session) {
         try {
             String qrResult = OkHttp.string("http://192.168.31.77:8160/api/admin/drive-scan/" + driveKey + "/account/loginqrcode");
             if (TextUtils.isEmpty(qrResult)) {
@@ -703,7 +696,7 @@ public class WebServer extends NanoHTTPD {
             + "const drive='" + driveKey + "';"
             + "async function poll(){"
             + "  try{"
-            + "    const r=await fetch('/api/drive-scan-check',{method:'POST',body:JSON.stringify({drive,token}),headers:{'Content-Type':'application/json'}});"
+            + "    const r=await fetch('/api/drive-scan-check?drive='+encodeURIComponent(drive)+'&token='+encodeURIComponent(token));"
             + "    const d=await r.json();"
             + "    if(d.status==='CONFIRMED'){"
             + "      document.getElementById('status').className='success';"

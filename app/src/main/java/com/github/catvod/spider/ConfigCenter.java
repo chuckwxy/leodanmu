@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.InputType;
+import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.ViewGroup;
 import android.widget.Button;
