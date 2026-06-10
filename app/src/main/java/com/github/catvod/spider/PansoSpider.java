@@ -40,7 +40,7 @@ public class PansoSpider extends Spider {
     }
 
     private static final String[] DRIVE_ORDER = {
-        "quark", "baidu", "a123", "a189", "a139", "ali", "uc", "xunlei", "a115", "pikpak"
+        "quark", "baidu", "uc", "a115", "ali", "a123", "a189", "a139", "xunlei", "pikpak"
     };
 
     @Override

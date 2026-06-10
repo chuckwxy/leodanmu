@@ -25,6 +25,7 @@ public class ConfigCenter extends Spider {
     private static final String SECTION_THREAD = "thread";
     private static final String SECTION_DOUBAN = "douban";
     private static final String SECTION_NETWORK = "network";
+    private static final String SECTION_DRIVE = "drive";
 
     @Override
     public String homeContent(boolean filter) {
@@ -36,6 +37,7 @@ public class ConfigCenter extends Spider {
             classes.put(createClass(SECTION_THREAD, "线程管理"));
             classes.put(createClass(SECTION_DOUBAN, "豆瓣配置"));
             classes.put(createClass(SECTION_NETWORK, "网络配置"));
+            classes.put(createClass(SECTION_DRIVE, "网盘驱动"));
 
             result.put("class", classes);
             result.put("list", new JSONArray());
@@ -66,6 +68,9 @@ public class ConfigCenter extends Spider {
                     break;
                 case SECTION_NETWORK:
                     buildNetworkSection(list);
+                    break;
+                case SECTION_DRIVE:
+                    buildDriveSection(list);
                     break;
             }
 
@@ -128,6 +133,33 @@ public class ConfigCenter extends Spider {
                 ylhj.isEmpty() ? "未设置" : ylhj));
         list.put(createActionVod("ylhj_token", "不夜Token", "",
                 token.isEmpty() ? "未设置" : token.substring(0, Math.min(token.length(), 8)) + "..."));
+    }
+
+    private void buildDriveSection(JSONArray list) throws Exception {
+        Activity activity = Utils.getTopActivity();
+        DanmakuConfig config = activity != null ? DanmakuConfigManager.getConfig(activity) : new DanmakuConfig();
+
+        Object[][] drives = {
+            {"quarkCookie", "夸克云盘", config.getQuarkCookie()},
+            {"ucCookie", "UC云盘", config.getUcCookie()},
+            {"baiduCookie", "百度云盘", config.getBaiduCookie()},
+            {"aliRefreshToken", "阿里云盘", config.getAliRefreshToken()},
+            {"pan115Cookie", "115云盘", config.getPan115Cookie()},
+            {"pan123Username", "123云盘", config.getPan123Username() + " / " + (config.getPan123Password().isEmpty() ? "" : "****")},
+            {"xunleiUsername", "迅雷云盘", config.getXunleiUsername() + " / " + (config.getXunleiPassword().isEmpty() ? "" : "****")},
+            {"pikpakUsername", "Pikpak", config.getPikpakUsername() + " / " + (config.getPikpakPassword().isEmpty() ? "" : "****")},
+            {"tianyiAccount", "天翼云盘", config.getTianyiAccount()},
+            {"pansouApiUrl", "盘搜API地址", config.getPansouApiUrl()},
+            {"pancheckApiUrl", "盘检API地址", config.getPancheckApiUrl()},
+        };
+
+        for (Object[] d : drives) {
+            String field = (String) d[0];
+            String name = (String) d[1];
+            String val = (String) d[2];
+            String remark = val.isEmpty() ? "未设置，点击配置" : val.length() > 40 ? val.substring(0, 40) + "..." : val;
+            list.put(createActionVod("drive_" + field, name, "", remark));
+        }
     }
 
     @Override
@@ -195,6 +227,39 @@ public class ConfigCenter extends Spider {
                         case "ylhj_token":
                             showYlhjTokenDialog(ctx, config);
                             break;
+                        case "drive_quarkCookie":
+                            showDriveCookieDialog(ctx, config, "quarkCookie", "夸克云盘Cookie");
+                            break;
+                        case "drive_ucCookie":
+                            showDriveCookieDialog(ctx, config, "ucCookie", "UC云盘Cookie");
+                            break;
+                        case "drive_baiduCookie":
+                            showDriveCookieDialog(ctx, config, "baiduCookie", "百度云盘Cookie(BDUSS+STOKEN)");
+                            break;
+                        case "drive_aliRefreshToken":
+                            showDriveCookieDialog(ctx, config, "aliRefreshToken", "阿里云盘RefreshToken");
+                            break;
+                        case "drive_pan115Cookie":
+                            showDriveCookieDialog(ctx, config, "pan115Cookie", "115云盘Cookie");
+                            break;
+                        case "drive_pan123Username":
+                            showDriveAccountDialog(ctx, config, "pan123Username", "pan123Password", "123云盘", "请输入手机号");
+                            break;
+                        case "drive_xunleiUsername":
+                            showDriveAccountDialog(ctx, config, "xunleiUsername", "xunleiPassword", "迅雷云盘", "请输入手机号");
+                            break;
+                        case "drive_pikpakUsername":
+                            showDriveAccountDialog(ctx, config, "pikpakUsername", "pikpakPassword", "Pikpak", "请输入邮箱/手机号");
+                            break;
+                        case "drive_tianyiAccount":
+                            showDriveCookieDialog(ctx, config, "tianyiAccount", "天翼云盘Cookie");
+                            break;
+                        case "drive_pansouApiUrl":
+                            showDriveCookieDialog(ctx, config, "pansouApiUrl", "盘搜API地址（含端口）");
+                            break;
+                        case "drive_pancheckApiUrl":
+                            showDriveCookieDialog(ctx, config, "pancheckApiUrl", "盘检API地址（含端口）");
+                            break;
                         default:
                             Utils.safeShowToast(ctx, "功能开发中");
                             break;
@@ -241,8 +306,8 @@ public class ConfigCenter extends Spider {
     private String searchContentShell(String key) {
         if (key == null || key.isEmpty()) return "";
         try {
-            String[] ids = {"config", "auto_push", "lp_config", "log", "auto_tune", "ali_thread", "quark_thread", "uc_thread", "http_proxy", "ylhj_host", "ylhj_token"};
-            String[] names = {"弹幕配置", "自动推送弹幕", "布局配置", "查看日志", "自动线程调优", "阿里云盘", "夸克云盘", "UC云盘", "HTTP代理", "不夜地址", "不夜Token"};
+            String[] ids = {"config", "auto_push", "lp_config", "log", "auto_tune", "ali_thread", "quark_thread", "uc_thread", "http_proxy", "ylhj_host", "ylhj_token", "drive_quarkCookie", "drive_ucCookie", "drive_baiduCookie", "drive_aliRefreshToken", "drive_pan115Cookie", "drive_pan123Username", "drive_xunleiUsername", "drive_pikpakUsername", "drive_tianyiAccount", "drive_pansouApiUrl", "drive_pancheckApiUrl"};
+            String[] names = {"弹幕配置", "自动推送弹幕", "布局配置", "查看日志", "自动线程调优", "阿里云盘", "夸克云盘", "UC云盘", "HTTP代理", "不夜地址", "不夜Token", "夸克云盘", "UC云盘", "百度云盘", "阿里云盘", "115云盘", "123云盘", "迅雷云盘", "Pikpak", "天翼云盘", "盘搜API地址", "盘检API地址"};
             for (int i = 0; i < ids.length; i++) {
                 if (!key.equals(names[i])) continue;
                 JSONObject vod = new JSONObject();
@@ -282,6 +347,17 @@ public class ConfigCenter extends Spider {
             case "http_proxy": return "HTTP代理";
             case "ylhj_host": return "不夜地址";
             case "ylhj_token": return "不夜Token";
+            case "drive_quarkCookie": return "夸克云盘";
+            case "drive_ucCookie": return "UC云盘";
+            case "drive_baiduCookie": return "百度云盘";
+            case "drive_aliRefreshToken": return "阿里云盘";
+            case "drive_pan115Cookie": return "115云盘";
+            case "drive_pan123Username": return "123云盘";
+            case "drive_xunleiUsername": return "迅雷云盘";
+            case "drive_pikpakUsername": return "Pikpak";
+            case "drive_tianyiAccount": return "天翼云盘";
+            case "drive_pansouApiUrl": return "盘搜API地址";
+            case "drive_pancheckApiUrl": return "盘检API地址";
             default: return "配置中心";
         }
     }
@@ -307,6 +383,29 @@ public class ConfigCenter extends Spider {
                 String t = config.getYlhjToken();
                 return t.isEmpty() ? "未设置" : t.substring(0, Math.min(t.length(), 8)) + "...";
             }
+            case "drive_quarkCookie": return summarize(config.getQuarkCookie());
+            case "drive_ucCookie": return summarize(config.getUcCookie());
+            case "drive_baiduCookie": return summarize(config.getBaiduCookie());
+            case "drive_aliRefreshToken": return summarize(config.getAliRefreshToken());
+            case "drive_pan115Cookie": return summarize(config.getPan115Cookie());
+            case "drive_pan123Username": {
+                String u = config.getPan123Username();
+                String p = config.getPan123Password();
+                return u.isEmpty() ? "未设置" : u + " / " + (p.isEmpty() ? "" : "****");
+            }
+            case "drive_xunleiUsername": {
+                String u = config.getXunleiUsername();
+                String p = config.getXunleiPassword();
+                return u.isEmpty() ? "未设置" : u + " / " + (p.isEmpty() ? "" : "****");
+            }
+            case "drive_pikpakUsername": {
+                String u = config.getPikpakUsername();
+                String p = config.getPikpakPassword();
+                return u.isEmpty() ? "未设置" : u + " / " + (p.isEmpty() ? "" : "****");
+            }
+            case "drive_tianyiAccount": return summarize(config.getTianyiAccount());
+            case "drive_pansouApiUrl": return config.getPansouApiUrl().isEmpty() ? "未设置" : config.getPansouApiUrl();
+            case "drive_pancheckApiUrl": return config.getPancheckApiUrl().isEmpty() ? "未设置" : config.getPancheckApiUrl();
             default: return "";
         }
     }
@@ -488,6 +587,46 @@ public class ConfigCenter extends Spider {
                     DanmakuConfigManager.saveConfig(ctx, config);
                     Utils.safeShowToast(ctx, val.isEmpty() ? "已恢复默认Token" : "buye token 已设置");
                     break;
+                case "drive_quarkCookie":
+                    config.setQuarkCookie(val);
+                    DanmakuConfigManager.saveConfig(ctx, config);
+                    Utils.safeShowToast(ctx, val.isEmpty() ? "夸克Cookie已清除" : "夸克Cookie已设置");
+                    break;
+                case "drive_ucCookie":
+                    config.setUcCookie(val);
+                    DanmakuConfigManager.saveConfig(ctx, config);
+                    Utils.safeShowToast(ctx, val.isEmpty() ? "UC Cookie已清除" : "UC Cookie已设置");
+                    break;
+                case "drive_baiduCookie":
+                    config.setBaiduCookie(val);
+                    DanmakuConfigManager.saveConfig(ctx, config);
+                    Utils.safeShowToast(ctx, val.isEmpty() ? "百度Cookie已清除" : "百度Cookie已设置");
+                    break;
+                case "drive_aliRefreshToken":
+                    config.setAliRefreshToken(val);
+                    DanmakuConfigManager.saveConfig(ctx, config);
+                    Utils.safeShowToast(ctx, val.isEmpty() ? "阿里Token已清除" : "阿里Token已设置");
+                    break;
+                case "drive_pan115Cookie":
+                    config.setPan115Cookie(val);
+                    DanmakuConfigManager.saveConfig(ctx, config);
+                    Utils.safeShowToast(ctx, val.isEmpty() ? "115 Cookie已清除" : "115 Cookie已设置");
+                    break;
+                case "drive_tianyiAccount":
+                    config.setTianyiAccount(val);
+                    DanmakuConfigManager.saveConfig(ctx, config);
+                    Utils.safeShowToast(ctx, val.isEmpty() ? "天翼Cookie已清除" : "天翼Cookie已设置");
+                    break;
+                case "drive_pansouApiUrl":
+                    config.setPansouApiUrl(val);
+                    DanmakuConfigManager.saveConfig(ctx, config);
+                    Utils.safeShowToast(ctx, val.isEmpty() ? "盘搜API已恢复默认" : "盘搜API已设置");
+                    break;
+                case "drive_pancheckApiUrl":
+                    config.setPancheckApiUrl(val);
+                    DanmakuConfigManager.saveConfig(ctx, config);
+                    Utils.safeShowToast(ctx, val.isEmpty() ? "盘检API已恢复默认" : "盘检API已设置");
+                    break;
             }
             dialog.dismiss();
         });
@@ -515,5 +654,151 @@ public class ConfigCenter extends Spider {
     private void showYlhjTokenDialog(Activity ctx, DanmakuConfig config) {
         showRemoteInputDialog(ctx, config, "ylhj_token", "不夜Token",
                 "例如: admin123", config.getYlhjToken());
+    }
+
+    private String summarize(String val) {
+        if (val == null || val.isEmpty()) return "未设置，点击配置";
+        return val.length() > 40 ? val.substring(0, 40) + "..." : val;
+    }
+
+    private void showDriveCookieDialog(Activity ctx, DanmakuConfig config, String fieldId, String title) {
+        String current = "";
+        switch (fieldId) {
+            case "quarkCookie": current = config.getQuarkCookie(); break;
+            case "ucCookie": current = config.getUcCookie(); break;
+            case "baiduCookie": current = config.getBaiduCookie(); break;
+            case "aliRefreshToken": current = config.getAliRefreshToken(); break;
+            case "pan115Cookie": current = config.getPan115Cookie(); break;
+            case "tianyiAccount": current = config.getTianyiAccount(); break;
+            case "pansouApiUrl": current = config.getPansouApiUrl(); break;
+            case "pancheckApiUrl": current = config.getPancheckApiUrl(); break;
+        }
+        showRemoteInputDialog(ctx, config, "drive_" + fieldId, title,
+                "粘贴" + title.replace("Cookie", "").replace("地址", "").trim() + "配置", current);
+    }
+
+    private void showDriveAccountDialog(Activity ctx, DanmakuConfig config, String usernameField, String passwordField, String displayName, String usernameHint) {
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(ctx);
+
+        LinearLayout outer = new LinearLayout(ctx);
+        outer.setOrientation(LinearLayout.VERTICAL);
+
+        TextView titleView = new TextView(ctx);
+        titleView.setText(displayName + " 账号配置");
+        titleView.setTextSize(18);
+        titleView.setTypeface(null, android.graphics.Typeface.BOLD);
+        titleView.setTextColor(0xFF333333);
+        titleView.setPadding(48, 32, 48, 0);
+        outer.addView(titleView);
+
+        android.view.View separator = new android.view.View(ctx);
+        LinearLayout.LayoutParams sepParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 1);
+        sepParams.setMargins(48, 24, 48, 24);
+        separator.setLayoutParams(sepParams);
+        separator.setBackgroundColor(0xFFE0E0E0);
+        outer.addView(separator);
+
+        LinearLayout layout = new LinearLayout(ctx);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(48, 0, 48, 32);
+
+        EditText userInput = new EditText(ctx);
+        userInput.setText(getAccountField(config, usernameField));
+        userInput.setHint(usernameHint);
+        userInput.setInputType(InputType.TYPE_CLASS_TEXT);
+        userInput.setPadding(0, 0, 0, 16);
+        layout.addView(userInput);
+
+        EditText passInput = new EditText(ctx);
+        passInput.setText(getAccountField(config, passwordField));
+        passInput.setHint("密码");
+        passInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        passInput.setPadding(0, 0, 0, 16);
+        layout.addView(passInput);
+
+        outer.addView(layout);
+
+        android.view.View btnSep = new android.view.View(ctx);
+        LinearLayout.LayoutParams btnSepParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 1);
+        btnSepParams.setMargins(48, 0, 48, 16);
+        btnSep.setLayoutParams(btnSepParams);
+        btnSep.setBackgroundColor(0xFFE0E0E0);
+        outer.addView(btnSep);
+
+        LinearLayout btnRow = new LinearLayout(ctx);
+        btnRow.setOrientation(LinearLayout.HORIZONTAL);
+        btnRow.setPadding(48, 0, 48, 28);
+
+        builder.setView(outer);
+
+        final android.app.AlertDialog[] dialogRef = new android.app.AlertDialog[1];
+
+        Button cancelBtn = new Button(ctx);
+        cancelBtn.setText("取消");
+        cancelBtn.setTextSize(16);
+        cancelBtn.setTextColor(0xFF666666);
+        cancelBtn.setAllCaps(false);
+        LinearLayout.LayoutParams cancelParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
+        cancelParams.rightMargin = 8;
+        cancelBtn.setLayoutParams(cancelParams);
+        cancelBtn.setOnClickListener(v -> { if (dialogRef[0] != null) dialogRef[0].dismiss(); });
+
+        Button saveBtn = new Button(ctx);
+        saveBtn.setText("保存");
+        saveBtn.setTextSize(16);
+        saveBtn.setTextColor(0xFFFFFFFF);
+        saveBtn.setAllCaps(false);
+        LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
+        saveParams.leftMargin = 8;
+        saveBtn.setLayoutParams(saveParams);
+        android.graphics.drawable.GradientDrawable saveBg = new android.graphics.drawable.GradientDrawable();
+        saveBg.setCornerRadius(8);
+        saveBg.setColor(0xFF007AFF);
+        saveBtn.setBackground(saveBg);
+
+        btnRow.addView(cancelBtn);
+        btnRow.addView(saveBtn);
+        outer.addView(btnRow);
+
+        android.app.AlertDialog dialog = builder.create();
+        dialogRef[0] = dialog;
+        dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+
+        saveBtn.setOnClickListener(v -> {
+            String user = userInput.getText().toString().trim();
+            String pass = passInput.getText().toString().trim();
+            setAccountField(config, usernameField, user);
+            setAccountField(config, passwordField, pass);
+            DanmakuConfigManager.saveConfig(ctx, config);
+            Utils.safeShowToast(ctx, displayName + " 账号已保存");
+            dialog.dismiss();
+        });
+
+        dialog.show();
+    }
+
+    private String getAccountField(DanmakuConfig config, String field) {
+        switch (field) {
+            case "pan123Username": return config.getPan123Username();
+            case "pan123Password": return config.getPan123Password();
+            case "xunleiUsername": return config.getXunleiUsername();
+            case "xunleiPassword": return config.getXunleiPassword();
+            case "pikpakUsername": return config.getPikpakUsername();
+            case "pikpakPassword": return config.getPikpakPassword();
+            default: return "";
+        }
+    }
+
+    private void setAccountField(DanmakuConfig config, String field, String val) {
+        switch (field) {
+            case "pan123Username": config.setPan123Username(val); break;
+            case "pan123Password": config.setPan123Password(val); break;
+            case "xunleiUsername": config.setXunleiUsername(val); break;
+            case "xunleiPassword": config.setXunleiPassword(val); break;
+            case "pikpakUsername": config.setPikpakUsername(val); break;
+            case "pikpakPassword": config.setPikpakPassword(val); break;
+        }
     }
 }
