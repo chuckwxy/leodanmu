@@ -334,6 +334,11 @@ public class ConfigCenter extends Spider {
         LinearLayout layout = new LinearLayout(ctx);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(48, 24, 48, 24);
+        android.graphics.drawable.GradientDrawable remoteBg = new android.graphics.drawable.GradientDrawable();
+        remoteBg.setColor(android.graphics.Color.WHITE);
+        remoteBg.setCornerRadius(android.util.TypedValue.applyDimension(
+                android.util.TypedValue.COMPLEX_UNIT_DIP, 16, ctx.getResources().getDisplayMetrics()));
+        layout.setBackground(remoteBg);
 
         EditText input = new EditText(ctx);
         input.setText(currentValue);
@@ -386,6 +391,7 @@ public class ConfigCenter extends Spider {
 
         android.app.AlertDialog dialog = builder.create();
         dialog.setOnDismissListener(d -> RemoteInputBus.removeConfigInput());
+        dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
 
         qrBtn.setOnClickListener(v -> {
             RemoteInputBus.onConfigInput(configCb);
@@ -403,12 +409,12 @@ public class ConfigCenter extends Spider {
     }
 
     private void showYlhjHostDialog(Activity ctx, DanmakuConfig config) {
-        showRemoteInputDialog(ctx, config, "ylhj_host", "不夜地址",
+        showRemoteInputDialog(ctx, config, "ylhj_host", "buye host",
                 "例如: http://192.168.10.10:3000", config.getYlhjHost());
     }
 
     private void showYlhjTokenDialog(Activity ctx, DanmakuConfig config) {
-        showRemoteInputDialog(ctx, config, "ylhj_token", "不夜Token",
+        showRemoteInputDialog(ctx, config, "ylhj_token", "buye token",
                 "例如: admin123", config.getYlhjToken());
     }
 }

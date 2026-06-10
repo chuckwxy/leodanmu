@@ -502,6 +502,7 @@ public class DanmakuUIHelper {
                 TextView apiLabel = new TextView(activity);
                 apiLabel.setText("弹幕API地址");
                 apiLabel.setTextSize(14);
+                apiLabel.setTextColor(colors.textPrimary);
                 LinearLayout apiHeaderRow = new LinearLayout(activity);
                 apiHeaderRow.setOrientation(LinearLayout.HORIZONTAL);
                 apiHeaderRow.setGravity(Gravity.CENTER_VERTICAL);
@@ -511,29 +512,32 @@ public class DanmakuUIHelper {
                 apiSpacer.setLayoutParams(new LinearLayout.LayoutParams(0, 0, 1));
                 apiHeaderRow.addView(apiSpacer);
                 Button apiQrBtn = new Button(activity);
-                apiQrBtn.setText("📱");
-                apiQrBtn.setTextSize(14);
+                apiQrBtn.setText("✏远程输入API");
+                apiQrBtn.setTextSize(12);
                 apiQrBtn.setFocusable(true);
                 apiQrBtn.setFocusableInTouchMode(true);
-                int apiQrSize = dpToPx(activity, 36);
-                LinearLayout.LayoutParams apiQrParams = new LinearLayout.LayoutParams(apiQrSize, apiQrSize);
+                apiQrBtn.setMinWidth(0);
+                apiQrBtn.setMinHeight(0);
+                int qrBtnWidth = dpToPx(activity, 110);
+                int qrBtnHeight = dpToPx(activity, 30);
+                LinearLayout.LayoutParams apiQrParams = new LinearLayout.LayoutParams(qrBtnWidth, qrBtnHeight);
                 apiQrBtn.setLayoutParams(apiQrParams);
-                apiQrBtn.setPadding(0, 0, 0, 0);
+                apiQrBtn.setPadding(dpToPx(activity, 8), 0, dpToPx(activity, 8), 0);
+                apiQrBtn.setAllCaps(false);
+                apiQrBtn.setSingleLine(true);
                 GradientDrawable apiQrBg = new GradientDrawable();
-                apiQrBg.setShape(GradientDrawable.OVAL);
+                apiQrBg.setShape(GradientDrawable.RECTANGLE);
+                apiQrBg.setCornerRadius(dpToPx(activity, 14));
                 apiQrBg.setColor(colors.bgSecondary);
                 apiQrBg.setStroke(dpToPx(activity, 1), colors.divider);
                 apiQrBtn.setBackground(apiQrBg);
                 apiQrBtn.setOnFocusChangeListener((v, hasFocus) -> {
                     GradientDrawable focusBg = new GradientDrawable();
-                    focusBg.setShape(GradientDrawable.OVAL);
+                    focusBg.setShape(GradientDrawable.RECTANGLE);
+                    focusBg.setCornerRadius(dpToPx(activity, 14));
                     focusBg.setColor(colors.bgSecondary);
                     if (hasFocus) {
                         focusBg.setStroke(dpToPx(activity, 2), colors.focusBorder);
-                        v.animate().scaleX(1.1f).scaleY(1.1f).setDuration(150).start();
-                    } else {
-                        focusBg.setStroke(dpToPx(activity, 1), colors.divider);
-                        v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start();
                     }
                     v.setBackground(focusBg);
                 });
@@ -541,7 +545,7 @@ public class DanmakuUIHelper {
                 mainLayout.addView(apiHeaderRow);
 
                 EditText apiInput = new EditText(activity);
-                apiInput.setText(TextUtils.join("\n", config.getApiUrls()));
+                apiInput.setText(config.getApiUrls() != null ? TextUtils.join("\n", config.getApiUrls()) : "");
                 apiInput.setHint("例如: https://example.com/87654321");
                 apiInput.setMinLines(2);
                 apiInput.setMaxLines(3);
@@ -555,7 +559,9 @@ public class DanmakuUIHelper {
 
                 final EditText apiInputRef = apiInput;
                 apiQrBtn.setOnClickListener(v -> {
+                    Leodanmu.log("📱 弹幕API地址: QR按钮点击，注册ConfigCallback");
                     RemoteInputBus.ConfigCallback apiCb = (f, v2) -> activity.runOnUiThread(() -> {
+                        Leodanmu.log("📱 弹幕API地址: 收到回调 f=" + f + " v=" + v2);
                         if (f.equals("api_urls")) {
                             apiInputRef.setText(v2);
                             Utils.safeShowToast(activity, "已收到API地址输入");
@@ -1119,6 +1125,7 @@ public class DanmakuUIHelper {
                 builder.setView(rootScroll);
                 AlertDialog dialog = builder.create();
                 dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));
+                dialog.setOnDismissListener(d -> RemoteInputBus.removeConfigInput());
 
                 // 代理按钮点击监听器（必须在此处设置，以便引用 dialog）
                 autoProxyBtn.setOnClickListener(v -> {
@@ -1374,7 +1381,10 @@ public class DanmakuUIHelper {
 
                 LinearLayout mainLayout = new LinearLayout(activity);
                 mainLayout.setOrientation(LinearLayout.VERTICAL);
-                mainLayout.setBackgroundColor(colors.bgPrimary);
+                GradientDrawable logBg = new GradientDrawable();
+                logBg.setColor(colors.bgPrimary);
+                logBg.setCornerRadius(dpToPx(activity, 16));
+                mainLayout.setBackground(logBg);
 
                 LinearLayout titleLayout = new LinearLayout(activity);
                 titleLayout.setOrientation(LinearLayout.VERTICAL);
@@ -1437,6 +1447,7 @@ public class DanmakuUIHelper {
 
                 builder.setView(mainLayout);
                 AlertDialog dialog = builder.create();
+                dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));
 
                 clearButton.setOnClickListener(v -> {
                     Leodanmu.clearLogs();
@@ -1982,12 +1993,7 @@ public class DanmakuUIHelper {
                 mainLayout.setPadding(dpToPx(activity, 10), dpToPx(activity, 20),
                         dpToPx(activity, 10), dpToPx(activity, 20));
 
-                if (config.getTheme() == 1) { // 浅色主题：浅色背景
-                    GradientDrawable bg = new GradientDrawable();
-                    bg.setColor(colors.bgPrimary);
-                    bg.setCornerRadius(dpToPx(activity, 16));
-                    mainLayout.setBackground(bg);
-                } // 深色主题保持透明
+                // 保持透明背景（所有主题统一）
 
                 TextView titleView = new TextView(activity);
                 titleView.setText("📱 Leo远程输入");
@@ -2297,6 +2303,10 @@ public class DanmakuUIHelper {
                 layout.setOrientation(LinearLayout.VERTICAL);
                 layout.setPadding(dpToPx(activity, 24), dpToPx(activity, 16),
                         dpToPx(activity, 24), dpToPx(activity, 16));
+                GradientDrawable proxyBg = new GradientDrawable();
+                proxyBg.setColor(Color.WHITE);
+                proxyBg.setCornerRadius(dpToPx(activity, 16));
+                layout.setBackground(proxyBg);
 
                 // 线程行
                 LinearLayout threadRow = new LinearLayout(activity);
@@ -2348,7 +2358,7 @@ public class DanmakuUIHelper {
                 chunkRow.addView(chunkInput);
                 layout.addView(chunkRow);
 
-                new AlertDialog.Builder(activity)
+                AlertDialog proxyDialog = new AlertDialog.Builder(activity)
                         .setTitle(displayName + " 代理配置")
                         .setView(layout)
                         .setPositiveButton("保存", (dialog, which) -> {
@@ -2365,7 +2375,9 @@ public class DanmakuUIHelper {
                             }
                         })
                         .setNegativeButton("取消", null)
-                        .show();
+                        .create();
+                proxyDialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));
+                proxyDialog.show();
             } catch (Exception e) {
                 Leodanmu.log("显示网盘代理对话框异常: " + e.getMessage());
             }

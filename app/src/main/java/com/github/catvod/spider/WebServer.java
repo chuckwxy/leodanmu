@@ -464,8 +464,8 @@ public class WebServer extends NanoHTTPD {
             StringBuilder json = new StringBuilder("[");
             String[][] fields = {
                 {"http_proxy", "HTTP代理"},
-                {"ylhj_host", "不夜地址"},
-                {"ylhj_token", "不夜Token"},
+                {"ylhj_host", "buye host"},
+                {"ylhj_token", "buye token"},
                 {"api_urls", "弹幕API地址"}
             };
             for (int i = 0; i < fields.length; i++) {
@@ -477,7 +477,7 @@ public class WebServer extends NanoHTTPD {
                         case "http_proxy": val = config.getHttpProxyUrl(); break;
                         case "ylhj_host": val = config.getYlhjHost(); break;
                         case "ylhj_token": val = config.getYlhjToken(); break;
-                        case "api_urls": val = TextUtils.join("\n", config.getApiUrls()); break;
+                        case "api_urls": val = config.getApiUrls() != null ? TextUtils.join("\n", config.getApiUrls()) : ""; break;
                     }
                 }
                 json.append("{\"id\":\"").append(fields[i][0])
@@ -506,8 +506,8 @@ public class WebServer extends NanoHTTPD {
                     "  for (let i = 0; i < sel.options.length; i++) {" +
                     "    if (sel.options[i].value === urlField) { sel.selectedIndex = i; break; }" +
                     "  }" +
+                    "  if (sel.onchange) sel.onchange();" +
                     "  updateCurrentValue();" +
-                    "  document.getElementById('valueInput').focus();" +
                     "}, 200);";
         }
         return "<!DOCTYPE html><html><head><title>配置远程输入</title><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>" +
