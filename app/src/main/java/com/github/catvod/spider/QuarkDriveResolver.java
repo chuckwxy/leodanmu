@@ -79,7 +79,6 @@ public class QuarkDriveResolver implements CloudDrive {
     public static class TokenResult {
         public String stoken;
         public String title;
-        public String shareToken;
     }
 
     public TokenResult getToken(ShareInfo info) throws Exception {
@@ -110,28 +109,40 @@ public class QuarkDriveResolver implements CloudDrive {
         return result;
     }
 
-    public String getShareToken(String shareId) throws Exception {
-        JSONObject body = new JSONObject();
-        body.put("share_id", shareId);
-        body.put("share_pwd", "");
+    public String getFreshFidToken(TokenResult token, ShareInfo info, String targetFileId) throws Exception {
+        String stokenEncoded = URLEncoder.encode(token.stoken, "UTF-8");
+        String pdirEncoded = URLEncoder.encode(info.pdirFid != null ? info.pdirFid : "", "UTF-8");
+        String url = API_BASE + "/1/clouddrive/share/sharepage/detail?pr=ucpro&fr=pc"
+                + "&pwd_id=" + URLEncoder.encode(info.pwdId, "UTF-8")
+                + "&stoken=" + stokenEncoded
+                + "&pdir_fid=" + pdirEncoded
+                + "&_page=1&_size=100"
+                + "&_sort=file_type:asc,updated_at:desc&__dt=" + System.currentTimeMillis();
 
+        Leodanmu.log("Quark getFreshFidToken: fetching detail for fileId=" + targetFileId);
         Map<String, String> headers = buildHeaders();
-        String url = API_BASE + "/1/clouddrive/share/sharepage/share_token?pr=ucpro&fr=pc&__dt=" + System.currentTimeMillis();
-        Leodanmu.log("Quark getShareToken: url=" + url);
-        OkResult okResult = OkHttp.post(url, body.toString(), headers);
-        String resp = okResult != null ? okResult.getBody() : "";
-        Leodanmu.log("Quark getShareToken: resp=" + resp);
-        if (TextUtils.isEmpty(resp)) throw new Exception("empty share token response");
+        String resp = OkHttp.string(url, headers);
+        if (TextUtils.isEmpty(resp)) throw new Exception("empty detail response");
 
         JSONObject json = new JSONObject(resp);
         JSONObject data = json.optJSONObject("data");
-        if (data != null && data.has("share_token")) {
-            return data.optString("share_token", "");
+        if (data == null) throw new Exception("no data in detail response: " + json.optString("message", ""));
+
+        JSONArray list = data.optJSONArray("list");
+        if (list == null) throw new Exception("no list in detail response");
+
+        for (int i = 0; i < list.length(); i++) {
+            JSONObject item = list.optJSONObject(i);
+            if (item == null) continue;
+            String fid = item.optString("fid", "");
+            if (fid.equals(targetFileId)) {
+                String freshToken = item.optString("share_fid_token", "");
+                Leodanmu.log("Quark getFreshFidToken: found fileId=" + targetFileId + " freshToken=" + freshToken);
+                if (!TextUtils.isEmpty(freshToken)) return freshToken;
+                break;
+            }
         }
-        if (json.has("share_token")) {
-            return json.optString("share_token", "");
-        }
-        throw new Exception("no share_token in response");
+        throw new Exception("file not found in fresh detail listing");
     }
 
     public static class FileEntry {
@@ -311,14 +322,6 @@ public class QuarkDriveResolver implements CloudDrive {
         body.put("pdir_fid", info.pdirFid != null ? info.pdirFid : "0");
         body.put("scene", "SCENE_SAVE");
 
-        try {
-            String shareToken = getShareToken(info.pwdId);
-            body.put("stoken", shareToken);
-            Leodanmu.log("Quark transferToDrive: got shareToken=" + shareToken.substring(0, Math.min(shareToken.length(), 16)));
-        } catch (Exception e) {
-            Leodanmu.log("Quark transferToDrive: getShareToken failed: " + e.getMessage());
-        }
-
         Leodanmu.log("Quark transferToDrive: final body=" + body.toString());
 
         Map<String, String> headers = buildHeaders();
@@ -370,8 +373,16 @@ public class QuarkDriveResolver implements CloudDrive {
 
             TokenResult tokenResult = getToken(info);
 
+            String freshFidToken = token.fidToken;
             try {
-                transferToDrive(info, tokenResult, token.fileId, token.fidToken);
+                freshFidToken = getFreshFidToken(tokenResult, info, token.fileId);
+                Leodanmu.log("Quark play: freshFidToken=" + freshFidToken);
+            } catch (Exception e) {
+                Leodanmu.log("Quark play: getFreshFidToken failed, using stale token: " + e.getMessage());
+            }
+
+            try {
+                transferToDrive(info, tokenResult, token.fileId, freshFidToken);
             } catch (Exception e) {
                 Leodanmu.log("Quark transfer (non-fatal): " + e.getMessage());
             }
