@@ -1670,13 +1670,13 @@ public class DanmakuUIHelper {
                 lp.alpha = config.getLpAlpha();
                 dialog.getWindow().setAttributes(lp);
 
-                RemoteInputBus.SearchCallback searchCb = keyword -> {
+                RemoteInputBus.SearchCallback searchCb = keyword -> activity.runOnUiThread(() -> {
                     if (dialog != null && dialog.isShowing() && !activity.isFinishing()) {
                         searchInput.setText(keyword);
                         searchBtn.performClick();
                         Leodanmu.log("✅ 通过 RemoteInputBus 收到远程输入关键词: " + keyword);
                     }
-                };
+                });
                 RemoteInputBus.onSearchInput(searchCb);
 
                 dialog.setOnDismissListener(dialogInterface -> {

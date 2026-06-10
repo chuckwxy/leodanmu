@@ -377,12 +377,12 @@ public class ConfigCenter extends Spider {
         builder.setNegativeButton("取消", (dialog, which) -> {});
 
         final String capturedFieldId = fieldId;
-        RemoteInputBus.ConfigCallback configCb = (f, v) -> {
+        RemoteInputBus.ConfigCallback configCb = (f, v) -> ctx.runOnUiThread(() -> {
             if (f.equals(capturedFieldId)) {
                 input.setText(v);
                 Utils.safeShowToast(ctx, "已收到远程输入: " + f);
             }
-        };
+        });
 
         android.app.AlertDialog dialog = builder.create();
         dialog.setOnDismissListener(d -> RemoteInputBus.removeConfigInput());
