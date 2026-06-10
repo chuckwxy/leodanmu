@@ -79,6 +79,7 @@ public class QuarkDriveResolver implements CloudDrive {
     public static class TokenResult {
         public String stoken;
         public String title;
+        public String shareToken;
     }
 
     public TokenResult getToken(ShareInfo info) throws Exception {
@@ -93,6 +94,7 @@ public class QuarkDriveResolver implements CloudDrive {
         if (TextUtils.isEmpty(resp)) throw new Exception("empty token response");
 
         JSONObject json = new JSONObject(resp);
+        Leodanmu.log("Quark getToken: resp=" + json.toString());
         int code = json.optInt("code", -1);
         if (code == 31001) throw new Exception("share needs passcode");
         if (code == 31002) throw new Exception("share is invalid or removed");
@@ -106,6 +108,30 @@ public class QuarkDriveResolver implements CloudDrive {
         result.title = data.optString("title", "");
         if (TextUtils.isEmpty(result.stoken)) throw new Exception("empty stoken");
         return result;
+    }
+
+    public String getShareToken(String shareId) throws Exception {
+        JSONObject body = new JSONObject();
+        body.put("share_id", shareId);
+        body.put("share_pwd", "");
+
+        Map<String, String> headers = buildHeaders();
+        String url = API_BASE + "/1/clouddrive/share/sharepage/share_token?pr=ucpro&fr=pc&__dt=" + System.currentTimeMillis();
+        Leodanmu.log("Quark getShareToken: url=" + url);
+        OkResult okResult = OkHttp.post(url, body.toString(), headers);
+        String resp = okResult != null ? okResult.getBody() : "";
+        Leodanmu.log("Quark getShareToken: resp=" + resp);
+        if (TextUtils.isEmpty(resp)) throw new Exception("empty share token response");
+
+        JSONObject json = new JSONObject(resp);
+        JSONObject data = json.optJSONObject("data");
+        if (data != null && data.has("share_token")) {
+            return data.optString("share_token", "");
+        }
+        if (json.has("share_token")) {
+            return json.optString("share_token", "");
+        }
+        throw new Exception("no share_token in response");
     }
 
     public static class FileEntry {
@@ -283,12 +309,23 @@ public class QuarkDriveResolver implements CloudDrive {
         body.put("pwd_id", info.pwdId);
         body.put("stoken", tokenResult.stoken);
         body.put("pdir_fid", info.pdirFid != null ? info.pdirFid : "0");
-        body.put("scene", "scene");
+        body.put("scene", "SCENE_SAVE");
+
+        try {
+            String shareToken = getShareToken(info.pwdId);
+            body.put("stoken", shareToken);
+            Leodanmu.log("Quark transferToDrive: got shareToken=" + shareToken.substring(0, Math.min(shareToken.length(), 16)));
+        } catch (Exception e) {
+            Leodanmu.log("Quark transferToDrive: getShareToken failed: " + e.getMessage());
+        }
+
+        Leodanmu.log("Quark transferToDrive: final body=" + body.toString());
 
         Map<String, String> headers = buildHeaders();
         OkResult result = OkHttp.post(API_BASE + "/1/clouddrive/share/sharepage/save?pr=ucpro&fr=pc&__dt=" + System.currentTimeMillis(),
                 body.toString(), headers);
         String resp = result != null ? result.getBody() : "";
+        Leodanmu.log("Quark transferToDrive: response=" + resp);
         if (TextUtils.isEmpty(resp)) {
             Leodanmu.log("Quark transferToDrive: save response empty");
             throw new Exception("save response empty");
@@ -299,7 +336,7 @@ public class QuarkDriveResolver implements CloudDrive {
         if (code != 0 && code != 200) {
             String msg = json.optString("message", json.optString("msg", "unknown"));
             Leodanmu.log("Quark transferToDrive: failed " + msg + " (" + code + ")");
-            if (code != 40008) throw new Exception("save failed: " + msg);
+            if (code != 40008 && code != 400) throw new Exception("save failed: " + msg);
         } else {
             Leodanmu.log("Quark transferToDrive: success code=" + code);
         }
