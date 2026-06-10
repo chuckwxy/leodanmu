@@ -158,8 +158,13 @@ public class JavaProxyServer {
         Map<String, String> forwardHeaders = new HashMap<>();
         String ua = headers.get("user-agent");
         if (!TextUtils.isEmpty(ua)) forwardHeaders.put("User-Agent", ua);
-        String cookie = headers.get("cookie");
-        if (!TextUtils.isEmpty(cookie)) forwardHeaders.put("Cookie", cookie);
+        String paramCookie = params.get("cookie");
+        if (!TextUtils.isEmpty(paramCookie)) {
+            forwardHeaders.put("Cookie", paramCookie);
+        } else {
+            String cookieHdr = headers.get("cookie");
+            if (!TextUtils.isEmpty(cookieHdr)) forwardHeaders.put("Cookie", cookieHdr);
+        }
         String referer = headers.get("referer");
         if (!TextUtils.isEmpty(referer)) forwardHeaders.put("Referer", referer);
 

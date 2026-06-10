@@ -423,6 +423,9 @@ public class QuarkDriveResolver implements CloudDrive {
                             JSONObject respHeaders = new JSONObject();
                             respHeaders.put("Referer", "https://pan.quark.cn/");
                             respHeaders.put("User-Agent", UA);
+                            if (!TextUtils.isEmpty(cookie)) {
+                                respHeaders.put("Cookie", cookie);
+                            }
                             result.put("header", respHeaders);
                             return result;
                         }

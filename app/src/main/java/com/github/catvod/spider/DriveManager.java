@@ -175,14 +175,17 @@ public class DriveManager {
         int thread = spc != null ? spc.thread : 8;
         int chunkSize = spc != null ? spc.chunkSize : 256;
 
-        String proxyUrl = buildProxyUrl(directUrl, thread, chunkSize);
+        JSONObject h = result.optJSONObject("header");
+        String cookie = h != null ? h.optString("Cookie", "") : "";
+
+        String proxyUrl = buildProxyUrl(directUrl, thread, chunkSize, cookie);
         Leodanmu.log("DriveManager wrapWithDualTrack: " + driveKey + " thread=" + thread
                 + " chunk=" + chunkSize + " proxy=" + proxyUrl.substring(0, Math.min(proxyUrl.length(), 120)));
 
         JSONArray urls = new JSONArray();
 
         boolean proxyDefault = !"baidu".equals(driveKey) && !"a123".equals(driveKey);
-        if (proxyDefault) {
+        if (proxyDefault && TextUtils.isEmpty(cookie)) {
             urls.put("Leo\u4EE3\u7406");
             urls.put(proxyUrl);
             urls.put("\u76F4\u8FDE");
@@ -196,10 +199,14 @@ public class DriveManager {
         result.put("url", urls);
     }
 
-    public static String buildProxyUrl(String rawUrl, int thread, int chunkSize) {
+    public static String buildProxyUrl(String rawUrl, int thread, int chunkSize, String cookie) {
         try {
-            return "http://127.0.0.1:5575/proxy?thread=" + thread + "&chunkSize=" + chunkSize
+            String url = "http://127.0.0.1:5575/proxy?thread=" + thread + "&chunkSize=" + chunkSize
                     + "&url=" + URLEncoder.encode(rawUrl, "UTF-8");
+            if (!TextUtils.isEmpty(cookie)) {
+                url += "&cookie=" + URLEncoder.encode(cookie, "UTF-8");
+            }
+            return url;
         } catch (Exception e) {
             return rawUrl;
         }
