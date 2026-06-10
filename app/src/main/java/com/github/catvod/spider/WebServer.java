@@ -240,7 +240,7 @@ public class WebServer extends NanoHTTPD {
             String value = params.get("value");
             if (!TextUtils.isEmpty(field) && value != null) {
                 RemoteInputBus.postConfig(field, value);
-                String displayField = field.equals("ylhj_host") ? "buye host" : field.equals("ylhj_token") ? "buye token" : field;
+                String displayField = getDisplayFieldName(field);
                 Leodanmu.log("📱 配置远程输入已通过 RemoteInputBus 发送: " + displayField + " = " + value);
                 String confirmHtml = "<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>" +
                         "<style>body { font-family: sans-serif; padding: 20px; text-align: center; } .success { color: green; }</style></head>" +
@@ -249,6 +249,16 @@ public class WebServer extends NanoHTTPD {
                 return newFixedLengthResponse(confirmHtml);
             }
             return newFixedLengthResponse(Response.Status.BAD_REQUEST, MIME_PLAINTEXT, "Missing field or value");
+        }
+        else if (uri.startsWith("/drive-scan/")) {
+            String driveKey = uri.substring("/drive-scan/".length());
+            return handleDriveScan(driveKey, session);
+        }
+        else if (uri.equals("/api/drive-scan-check")) {
+            return handleDriveScanCheck(session);
+        }
+        else if (uri.equals("/drive-scan-save")) {
+            return handleDriveScanSave(session);
         }
 
         return newFixedLengthResponse(Response.Status.NOT_FOUND, MIME_PLAINTEXT, "Not Found");
@@ -467,7 +477,15 @@ public class WebServer extends NanoHTTPD {
                 {"http_proxy", "HTTP代理"},
                 {"ylhj_host", "不夜地址"},
                 {"ylhj_token", "不夜Token"},
-                {"api_urls", "弹幕API地址"}
+                {"api_urls", "弹幕API地址"},
+                {"quarkCookie", "夸克云盘Cookie"},
+                {"ucCookie", "UC云盘Cookie"},
+                {"baiduCookie", "百度云盘Cookie"},
+                {"aliRefreshToken", "阿里云盘RefreshToken"},
+                {"pan115Cookie", "115云盘Cookie"},
+                {"tianyiAccount", "天翼云盘Cookie"},
+                {"pansouApiUrl", "盘搜API地址"},
+                {"pancheckApiUrl", "盘检API地址"},
             };
             for (int i = 0; i < fields.length; i++) {
                 if (i > 0) json.append(",");
@@ -479,6 +497,14 @@ public class WebServer extends NanoHTTPD {
                         case "ylhj_host": val = config.getYlhjHost(); break;
                         case "ylhj_token": val = config.getYlhjToken(); break;
                         case "api_urls": val = config.getApiUrls() != null ? TextUtils.join("\n", config.getApiUrls()) : ""; break;
+                        case "quarkCookie": val = config.getQuarkCookie(); break;
+                        case "ucCookie": val = config.getUcCookie(); break;
+                        case "baiduCookie": val = config.getBaiduCookie(); break;
+                        case "aliRefreshToken": val = config.getAliRefreshToken(); break;
+                        case "pan115Cookie": val = config.getPan115Cookie(); break;
+                        case "tianyiAccount": val = config.getTianyiAccount(); break;
+                        case "pansouApiUrl": val = config.getPansouApiUrl(); break;
+                        case "pancheckApiUrl": val = config.getPancheckApiUrl(); break;
                     }
                 }
                 json.append("{\"id\":\"").append(fields[i][0])
@@ -577,6 +603,167 @@ public class WebServer extends NanoHTTPD {
                 "  if (e.key === 'Enter') { e.preventDefault(); send(); }" +
                 "});" +
                 "</script></body></html>";
+    }
+
+    private Response handleDriveScanCheck(HTTPSession session) {
+        try {
+            Map<String, String> params = session.getParms();
+            String drive = params.get("drive");
+            String token = params.get("token");
+            if (TextUtils.isEmpty(drive) || TextUtils.isEmpty(token)) {
+                String body = session.getBody() != null ? new String(session.getBody(), "UTF-8") : "";
+                if (!TextUtils.isEmpty(body)) {
+                    JSONObject jb = new JSONObject(body);
+                    drive = jb.optString("drive", drive);
+                    token = jb.optString("token", token);
+                }
+            }
+            if (TextUtils.isEmpty(drive) || TextUtils.isEmpty(token)) {
+                return newFixedLengthResponse(Response.Status.BAD_REQUEST, "application/json; charset=utf-8", "{\"error\":\"missing params\"}");
+            }
+            JSONObject result = DriveScanHelper.checkStatus(drive, token);
+            return newFixedLengthResponse(Response.Status.OK, "application/json; charset=utf-8", result != null ? result.toString() : "{\"status\":\"NEW\"}");
+        } catch (Exception e) {
+            return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "application/json; charset=utf-8", "{\"error\":\"" + e.getMessage() + "\"}");
+        }
+    }
+
+    private Response handleDriveScanSave(HTTPSession session) {
+        try {
+            Map<String, String> params = session.getParms();
+            String field = params.get("field");
+            String value = params.get("value");
+            if (TextUtils.isEmpty(field) || TextUtils.isEmpty(value)) {
+                return newFixedLengthResponse(Response.Status.BAD_REQUEST, MIME_PLAINTEXT, "Missing field or value");
+            }
+            RemoteInputBus.postConfig(field, value);
+            String displayField = getDisplayFieldName(field);
+            String html = "<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>"
+                + "<style>body{font-family:sans-serif;padding:20px;text-align:center;background:#f0f2f5}"
+                + ".success{color:green;background:#e8f5e9;padding:20px;border-radius:10px;margin:20px auto;max-width:400px}</style></head>"
+                + "<body><h2>✅ 登录成功</h2>"
+                + "<div class='success'>" + displayField + " 已保存到TV</div>"
+                + "<p><a href='/'>返回首页</a></p></body></html>";
+            return newFixedLengthResponse(Response.Status.OK, "text/html; charset=utf-8", html);
+        } catch (Exception e) {
+            return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, MIME_PLAINTEXT, "保存失败: " + e.getMessage());
+        }
+    }
+
+    private Response handleDriveScan(String driveKey, HTTPSession session) {
+        try {
+            String qrResult = OkHttp.string("http://192.168.31.77:8160/api/admin/drive-scan/" + driveKey + "/account/loginqrcode");
+            if (TextUtils.isEmpty(qrResult)) {
+                return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, MIME_PLAINTEXT, "获取二维码失败");
+            }
+            JSONObject jr = new JSONObject(qrResult);
+            String queryToken = jr.optString("query_token", "");
+            String qrText = jr.optString("qr_text", "");
+            String qrImageUrl = jr.optString("qr_image_url", "");
+            String driveName = getDriveName(driveKey);
+            if (TextUtils.isEmpty(queryToken) || TextUtils.isEmpty(qrText)) {
+                return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, MIME_PLAINTEXT, "二维码参数缺失");
+            }
+            String html = getDriveScanPollingHtml(driveKey, driveName, queryToken, qrText, qrImageUrl);
+            return newFixedLengthResponse(Response.Status.OK, "text/html; charset=utf-8", html);
+        } catch (Exception e) {
+            return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, MIME_PLAINTEXT, "扫码登录错误: " + e.getMessage());
+        }
+    }
+
+    private String getDriveScanPollingHtml(String driveKey, String driveName, String queryToken, String qrText, String qrImageUrl) {
+        boolean hasImage = !TextUtils.isEmpty(qrImageUrl);
+        String qrDisplay = hasImage
+            ? "<img id='qrImg' src='" + qrImageUrl + "' style='width:250px;height:250px;margin:20px auto;display:block;border:1px solid #ddd;border-radius:8px;'>"
+            : "<div id='qrContainer' style='margin:20px auto;width:250px;height:250px;display:flex;align-items:center;justify-content:center;border:1px solid #ddd;border-radius:8px;'>"
+            + "<div id='qrcode'></div></div>"
+            + "<script src='https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js'></script>"
+            + "<script>new QRCode(document.getElementById('qrcode'),{text:'" + qrText.replace("'", "\\'") + "',width:220,height:220});</script>";
+        String fieldId = getDriveFieldId(driveKey);
+        return "<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>"
+            + "<title>" + driveName + " 扫码登录</title>"
+            + "<style>"
+            + "body{font-family:sans-serif;background:#f0f2f5;margin:0;padding:20px;text-align:center}"
+            + ".container{max-width:400px;margin:0 auto;background:#fff;padding:30px;border-radius:10px;box-shadow:0 2px 10px rgba(0,0,0,0.1)}"
+            + "h1{color:#333;font-size:20px;margin-bottom:5px}"
+            + ".sub{color:#888;font-size:14px;margin-bottom:20px}"
+            + "#status{color:#666;font-size:14px;margin-top:15px;padding:10px;border-radius:5px}"
+            + ".success{color:#28a745;background:#e8f5e9}"
+            + ".error{color:#dc3545;background:#fce4ec}"
+            + ".pending{color:#ff9800;background:#fff3e0}"
+            + "</style></head><body>"
+            + "<div class='container'>"
+            + "<h1>" + driveName + "</h1>"
+            + "<div class='sub'>请用手机扫码登录</div>"
+            + qrDisplay
+            + "<div id='status' class='pending'>⏳ 等待扫码...</div>"
+            + "</div>"
+            + "<script>"
+            + "const token='" + queryToken + "';"
+            + "const drive='" + driveKey + "';"
+            + "async function poll(){"
+            + "  try{"
+            + "    const r=await fetch('/api/drive-scan-check',{method:'POST',body:JSON.stringify({drive,token}),headers:{'Content-Type':'application/json'}});"
+            + "    const d=await r.json();"
+            + "    if(d.status==='CONFIRMED'){"
+            + "      document.getElementById('status').className='success';"
+            + "      document.getElementById('status').textContent='✅ 登录成功！正在保存...';"
+            + "      const acc=encodeURIComponent(d.account||'');"
+            + "      window.location.href='/drive-scan-save?field=" + fieldId + "&value='+acc;"
+            + "    }else if(d.status==='SCANNED'){"
+            + "      document.getElementById('status').className='pending';"
+            + "      document.getElementById('status').textContent='📱 已扫码，请在手机上确认';"
+            + "      setTimeout(poll,2000);"
+            + "    }else if(d.status==='EXPIRED'||d.status==='CANCELED'){"
+            + "      document.getElementById('status').className='error';"
+            + "      document.getElementById('status').textContent='❌ 已过期或已取消，请刷新页面重试';"
+            + "    }else{"
+            + "      setTimeout(poll,2000);"
+            + "    }"
+            + "  }catch(e){"
+            + "    document.getElementById('status').className='error';"
+            + "    document.getElementById('status').textContent='❌ 轮询失败: '+e.message;"
+            + "  }"
+            + "}"
+            + "setTimeout(poll,2000);"
+            + "</script></body></html>";
+    }
+
+    private String getDriveName(String key) {
+        switch (key) {
+            case "quark": return "夸克云盘";
+            case "uc": return "UC云盘";
+            case "baidu": return "百度云盘";
+            case "ali": return "阿里云盘";
+            case "115": return "115云盘";
+            default: return key + "云盘";
+        }
+    }
+
+    private String getDriveFieldId(String key) {
+        switch (key) {
+            case "quark": return "quarkCookie";
+            case "uc": return "ucCookie";
+            case "baidu": return "baiduCookie";
+            case "ali": return "aliRefreshToken";
+            case "115": return "pan115Cookie";
+            default: return key + "Cookie";
+        }
+    }
+
+    private static String getDisplayFieldName(String field) {
+        if ("ylhj_host".equals(field)) return "buye host";
+        if ("ylhj_token".equals(field)) return "buye token";
+        if ("api_urls".equals(field)) return "弹幕API地址";
+        if ("quarkCookie".equals(field)) return "夸克Cookie";
+        if ("ucCookie".equals(field)) return "UC Cookie";
+        if ("baiduCookie".equals(field)) return "百度Cookie";
+        if ("aliRefreshToken".equals(field)) return "阿里RefreshToken";
+        if ("pan115Cookie".equals(field)) return "115 Cookie";
+        if ("tianyiAccount".equals(field)) return "天翼Cookie";
+        if ("pansouApiUrl".equals(field)) return "盘搜API";
+        if ("pancheckApiUrl".equals(field)) return "盘检API";
+        return field;
     }
 
     /** 被 DanmakuUIHelper.cleanupAllResources() 通过反射调用 */

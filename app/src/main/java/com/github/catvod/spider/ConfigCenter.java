@@ -8,6 +8,7 @@ import android.view.Gravity;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -140,25 +141,29 @@ public class ConfigCenter extends Spider {
         DanmakuConfig config = activity != null ? DanmakuConfigManager.getConfig(activity) : new DanmakuConfig();
 
         Object[][] drives = {
-            {"quarkCookie", "夸克云盘", config.getQuarkCookie()},
-            {"ucCookie", "UC云盘", config.getUcCookie()},
-            {"baiduCookie", "百度云盘", config.getBaiduCookie()},
-            {"aliRefreshToken", "阿里云盘", config.getAliRefreshToken()},
-            {"pan115Cookie", "115云盘", config.getPan115Cookie()},
-            {"pan123Username", "123云盘", config.getPan123Username() + " / " + (config.getPan123Password().isEmpty() ? "" : "****")},
-            {"xunleiUsername", "迅雷云盘", config.getXunleiUsername() + " / " + (config.getXunleiPassword().isEmpty() ? "" : "****")},
-            {"pikpakUsername", "Pikpak", config.getPikpakUsername() + " / " + (config.getPikpakPassword().isEmpty() ? "" : "****")},
-            {"tianyiAccount", "天翼云盘", config.getTianyiAccount()},
-            {"pansouApiUrl", "盘搜API地址", config.getPansouApiUrl()},
-            {"pancheckApiUrl", "盘检API地址", config.getPancheckApiUrl()},
+            {"quarkCookie", "夸克云盘", config.getQuarkCookie(), "quark"},
+            {"ucCookie", "UC云盘", config.getUcCookie(), "uc"},
+            {"baiduCookie", "百度云盘", config.getBaiduCookie(), "baidu"},
+            {"aliRefreshToken", "阿里云盘", config.getAliRefreshToken(), "ali"},
+            {"pan115Cookie", "115云盘", config.getPan115Cookie(), "115"},
+            {"pan123Username", "123云盘", config.getPan123Username() + " / " + (config.getPan123Password().isEmpty() ? "" : "****"), ""},
+            {"xunleiUsername", "迅雷云盘", config.getXunleiUsername() + " / " + (config.getXunleiPassword().isEmpty() ? "" : "****"), ""},
+            {"pikpakUsername", "Pikpak", config.getPikpakUsername() + " / " + (config.getPikpakPassword().isEmpty() ? "" : "****"), ""},
+            {"tianyiAccount", "天翼云盘", config.getTianyiAccount(), ""},
+            {"pansouApiUrl", "盘搜API地址", config.getPansouApiUrl(), ""},
+            {"pancheckApiUrl", "盘检API地址", config.getPancheckApiUrl(), ""},
         };
 
         for (Object[] d : drives) {
             String field = (String) d[0];
             String name = (String) d[1];
             String val = (String) d[2];
+            String scanKey = (String) d[3];
             String remark = val.isEmpty() ? "未设置，点击配置" : val.length() > 40 ? val.substring(0, 40) + "..." : val;
             list.put(createActionVod("drive_" + field, name, "", remark));
+            if (!TextUtils.isEmpty(scanKey)) {
+                list.put(createActionVod("drive_" + field + "_scan", "📷 " + name + " 扫码登录", "", "扫码登录"));
+            }
         }
     }
 
@@ -230,17 +235,32 @@ public class ConfigCenter extends Spider {
                         case "drive_quarkCookie":
                             showDriveCookieDialog(ctx, config, "quarkCookie", "夸克云盘Cookie");
                             break;
+                        case "drive_quarkCookie_scan":
+                            showDriveScanDialog(ctx, config, "quark", "夸克云盘");
+                            break;
                         case "drive_ucCookie":
                             showDriveCookieDialog(ctx, config, "ucCookie", "UC云盘Cookie");
+                            break;
+                        case "drive_ucCookie_scan":
+                            showDriveScanDialog(ctx, config, "uc", "UC云盘");
                             break;
                         case "drive_baiduCookie":
                             showDriveCookieDialog(ctx, config, "baiduCookie", "百度云盘Cookie(BDUSS+STOKEN)");
                             break;
+                        case "drive_baiduCookie_scan":
+                            showDriveScanDialog(ctx, config, "baidu", "百度云盘");
+                            break;
                         case "drive_aliRefreshToken":
                             showDriveCookieDialog(ctx, config, "aliRefreshToken", "阿里云盘RefreshToken");
                             break;
+                        case "drive_aliRefreshToken_scan":
+                            showDriveScanDialog(ctx, config, "ali", "阿里云盘");
+                            break;
                         case "drive_pan115Cookie":
                             showDriveCookieDialog(ctx, config, "pan115Cookie", "115云盘Cookie");
+                            break;
+                        case "drive_pan115Cookie_scan":
+                            showDriveScanDialog(ctx, config, "115", "115云盘");
                             break;
                         case "drive_pan123Username":
                             showDriveAccountDialog(ctx, config, "pan123Username", "pan123Password", "123云盘", "请输入手机号");
@@ -634,7 +654,8 @@ public class ConfigCenter extends Spider {
         qrBtn.setOnClickListener(v -> {
             RemoteInputBus.onConfigInput(configCb);
             String localIp = NetworkUtils.getLocalIpAddress();
-            String url = "http://" + localIp + ":9888/config_input?field=" + fieldId;
+            String qrFieldId = fieldId.startsWith("drive_") ? fieldId.substring(6) : fieldId;
+            String url = "http://" + localIp + ":9888/config_input?field=" + qrFieldId;
             DanmakuUIHelper.showFloatingQRCodeDialog(ctx, url, title);
         });
 
@@ -682,6 +703,11 @@ public class ConfigCenter extends Spider {
 
         LinearLayout outer = new LinearLayout(ctx);
         outer.setOrientation(LinearLayout.VERTICAL);
+        android.graphics.drawable.GradientDrawable outerBg = new android.graphics.drawable.GradientDrawable();
+        outerBg.setColor(android.graphics.Color.WHITE);
+        outerBg.setCornerRadius(android.util.TypedValue.applyDimension(
+                android.util.TypedValue.COMPLEX_UNIT_DIP, 16, ctx.getResources().getDisplayMetrics()));
+        outer.setBackground(outerBg);
 
         TextView titleView = new TextView(ctx);
         titleView.setText(displayName + " 账号配置");
@@ -777,6 +803,156 @@ public class ConfigCenter extends Spider {
         });
 
         dialog.show();
+    }
+
+    private void showDriveScanDialog(Activity ctx, DanmakuConfig config, String driveKey, String displayName) {
+        JSONObject qrResult = DriveScanHelper.generateQRCode(driveKey);
+        if (qrResult == null) {
+            Utils.safeShowToast(ctx, displayName + " 获取二维码失败，检查不夜地址");
+            return;
+        }
+        String queryToken = qrResult.optString("query_token", "");
+        String qrImageUrl = qrResult.optString("qr_image_url", "");
+        String qrText = qrResult.optString("qr_text", "");
+        if (TextUtils.isEmpty(queryToken) || (TextUtils.isEmpty(qrImageUrl) && TextUtils.isEmpty(qrText))) {
+            Utils.safeShowToast(ctx, displayName + " 二维码参数缺失");
+            return;
+        }
+
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(ctx);
+        LinearLayout outer = new LinearLayout(ctx);
+        outer.setOrientation(LinearLayout.VERTICAL);
+        outer.setPadding(48, 32, 48, 32);
+        android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+        bg.setColor(android.graphics.Color.WHITE);
+        bg.setCornerRadius(16);
+        outer.setBackground(bg);
+
+        TextView titleView = new TextView(ctx);
+        titleView.setText(displayName + " 扫码登录");
+        titleView.setTextSize(18);
+        titleView.setTypeface(null, android.graphics.Typeface.BOLD);
+        titleView.setTextColor(0xFF333333);
+        titleView.setGravity(android.view.Gravity.CENTER);
+        titleView.setPadding(0, 0, 0, 24);
+        outer.addView(titleView);
+
+        ImageView qrView = new ImageView(ctx);
+        qrView.setLayoutParams(new LinearLayout.LayoutParams(300, 300));
+        qrView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        if (!TextUtils.isEmpty(qrImageUrl)) {
+            android.os.AsyncTask.SERIAL_EXECUTOR.execute(() -> {
+                try {
+                    java.net.URL url = new java.net.URL(qrImageUrl);
+                    java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+                    conn.setConnectTimeout(5000);
+                    conn.setReadTimeout(5000);
+                    java.io.InputStream is = conn.getInputStream();
+                    android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeStream(is);
+                    is.close();
+                    ctx.runOnUiThread(() -> qrView.setImageBitmap(bmp));
+                } catch (Exception ignored) {}
+            });
+        }
+        outer.addView(qrView);
+
+        TextView statusView = new TextView(ctx);
+        statusView.setText("⏳ 等待扫码...");
+        statusView.setTextSize(14);
+        statusView.setTextColor(0xFF666666);
+        statusView.setGravity(android.view.Gravity.CENTER);
+        statusView.setPadding(0, 16, 0, 0);
+        outer.addView(statusView);
+
+        Button cancelBtn = new Button(ctx);
+        cancelBtn.setText("关闭");
+        cancelBtn.setTextSize(16);
+        cancelBtn.setTextColor(0xFF666666);
+        cancelBtn.setAllCaps(false);
+        cancelBtn.setOnClickListener(v -> {});
+        outer.addView(cancelBtn);
+
+        builder.setView(outer);
+        android.app.AlertDialog dialog = builder.create();
+        dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+        cancelBtn.setOnClickListener(v -> {
+            Handler h = statusView.getHandler();
+            if (h != null) h.removeCallbacksAndMessages(null);
+            dialog.dismiss();
+        });
+        dialog.show();
+
+        // Poll for scan status
+        Handler handler = new Handler(Looper.getMainLooper());
+        Handler.Callback callback = new Handler.Callback() {
+            @Override
+            public boolean handleMessage(android.os.Message msg) {
+                if (!dialog.isShowing()) return false;
+                if (msg.what == 0) {
+                    android.os.AsyncTask.SERIAL_EXECUTOR.execute(() -> {
+                        try {
+                            JSONObject result = DriveScanHelper.checkStatus(driveKey, queryToken);
+                            if (result != null) {
+                                String status = result.optString("status", "");
+                                ctx.runOnUiThread(() -> {
+                                    if ("CONFIRMED".equals(status)) {
+                                        String account = DriveScanHelper.extractAccount(result);
+                                        if (!TextUtils.isEmpty(account)) {
+                                            String field = getDriveFieldKey(driveKey);
+                                            setDriveField(config, field, account);
+                                            DanmakuConfigManager.saveConfig(ctx, config);
+                                            Leodanmu.log("ConfigCenter: " + displayName + " 扫码登录成功, field=" + field);
+                                            statusView.setText("✅ 登录成功");
+                                            statusView.setTextColor(0xFF28a745);
+                                        } else {
+                                            statusView.setText("✅ 已确认，但未获取到账号信息");
+                                        }
+                                        dialog.dismiss();
+                                        Utils.safeShowToast(ctx, displayName + " 扫码登录成功");
+                                    } else if ("SCANNED".equals(status)) {
+                                        statusView.setText("📱 已扫码，请在手机上确认");
+                                        statusView.setTextColor(0xFFff9800);
+                                        handler.sendEmptyMessageDelayed(0, 2000);
+                                    } else if ("EXPIRED".equals(status) || "CANCELED".equals(status)) {
+                                        statusView.setText("❌ 已过期或已取消");
+                                        statusView.setTextColor(0xFFdc3545);
+                                    } else {
+                                        handler.sendEmptyMessageDelayed(0, 2000);
+                                    }
+                                });
+                            } else {
+                                handler.sendEmptyMessageDelayed(0, 2000);
+                            }
+                        } catch (Exception e) {
+                            handler.sendEmptyMessageDelayed(0, 2000);
+                        }
+                    });
+                }
+                return false;
+            }
+        };
+        handler.sendEmptyMessageDelayed(0, 2000);
+    }
+
+    private String getDriveFieldKey(String driveKey) {
+        switch (driveKey) {
+            case "quark": return "quarkCookie";
+            case "uc": return "ucCookie";
+            case "baidu": return "baiduCookie";
+            case "ali": return "aliRefreshToken";
+            case "115": return "pan115Cookie";
+            default: return driveKey + "Cookie";
+        }
+    }
+
+    private void setDriveField(DanmakuConfig config, String field, String val) {
+        switch (field) {
+            case "quarkCookie": config.setQuarkCookie(val); break;
+            case "ucCookie": config.setUcCookie(val); break;
+            case "baiduCookie": config.setBaiduCookie(val); break;
+            case "aliRefreshToken": config.setAliRefreshToken(val); break;
+            case "pan115Cookie": config.setPan115Cookie(val); break;
+        }
     }
 
     private String getAccountField(DanmakuConfig config, String field) {
