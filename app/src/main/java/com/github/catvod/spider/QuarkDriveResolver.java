@@ -345,14 +345,18 @@ public class QuarkDriveResolver implements CloudDrive {
 
         String savedFileId = "";
         JSONObject saveData = json.optJSONObject("data");
+        Leodanmu.log("Quark transferToDrive: saveData keys=" + (saveData != null ? saveData.keySet().toString() : "null"));
         if (saveData != null) {
             JSONObject taskResp = saveData.optJSONObject("task_resp");
             if (taskResp != null) {
                 JSONObject taskData = taskResp.optJSONObject("data");
                 if (taskData != null) {
-                    JSONArray fids = taskData.optJSONArray("save_as_top_fids");
-                    if (fids != null && fids.length() > 0) {
-                        savedFileId = fids.optString(0, "");
+                    JSONObject saveAs = taskData.optJSONObject("save_as");
+                    if (saveAs != null) {
+                        JSONArray fids = saveAs.optJSONArray("save_as_top_fids");
+                        if (fids != null && fids.length() > 0) {
+                            savedFileId = fids.optString(0, "");
+                        }
                     }
                 }
             }
