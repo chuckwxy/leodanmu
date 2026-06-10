@@ -18,6 +18,8 @@ import javax.net.ssl.X509TrustManager;
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.SSLSession;
 
+import org.json.JSONObject;
+
 import okhttp3.Call;
 import okhttp3.Dns;
 import okhttp3.Headers;
@@ -80,6 +82,17 @@ public class OkHttp {
 
     public static OkResult post(String url, String json, Map<String, String> header) {
         return new OkRequest(POST, url, json, header).execute(client());
+    }
+
+    public static JSONObject postJson(String url, String json, Map<String, String> header) {
+        try {
+            OkResult result = post(url, json, header);
+            String body = result != null ? result.getBody() : "";
+            if (body.isEmpty()) return null;
+            return new JSONObject(body);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     public static String getLocation(String url, Map<String, String> header) throws IOException {

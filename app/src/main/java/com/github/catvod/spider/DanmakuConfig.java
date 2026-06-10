@@ -19,10 +19,20 @@ public class DanmakuConfig {
     private boolean pushToastEnabled = true;
     private int theme = 0;
     private int danmakuTimeOffsetMs = 0;
-    private String pansouApiUrl = "";
+    private String pansouApiUrl = "http://192.168.31.77:5888";
+    private String pancheckApiUrl = "http://192.168.31.77:8989";
     private String quarkCookie = "";
     private String ucCookie = "";
     private String baiduCookie = "";
+    private String aliRefreshToken = "";
+    private String pan115Cookie = "";
+    private String pan123Username = "";
+    private String pan123Password = "";
+    private String xunleiUsername = "";
+    private String xunleiPassword = "";
+    private String pikpakUsername = "";
+    private String pikpakPassword = "";
+    private String tianyiAccount = "";
     private int proxyType = 0; // 0=自动 1=Go代理 2=Java代理
     private boolean enableAutoTune = true;
     private int proxyThread = 8;
@@ -64,6 +74,14 @@ public class DanmakuConfig {
         this.pansouApiUrl = pansouApiUrl != null ? pansouApiUrl.trim() : "";
     }
 
+    public String getPancheckApiUrl() {
+        return pancheckApiUrl;
+    }
+
+    public void setPancheckApiUrl(String pancheckApiUrl) {
+        this.pancheckApiUrl = pancheckApiUrl != null ? pancheckApiUrl.trim() : "";
+    }
+
     public String getQuarkCookie() {
         return quarkCookie;
     }
@@ -86,6 +104,78 @@ public class DanmakuConfig {
 
     public void setBaiduCookie(String baiduCookie) {
         this.baiduCookie = baiduCookie != null ? baiduCookie.trim() : "";
+    }
+
+    public String getAliRefreshToken() {
+        return aliRefreshToken;
+    }
+
+    public void setAliRefreshToken(String aliRefreshToken) {
+        this.aliRefreshToken = aliRefreshToken != null ? aliRefreshToken.trim() : "";
+    }
+
+    public String getPan115Cookie() {
+        return pan115Cookie;
+    }
+
+    public void setPan115Cookie(String pan115Cookie) {
+        this.pan115Cookie = pan115Cookie != null ? pan115Cookie.trim() : "";
+    }
+
+    public String getPan123Username() {
+        return pan123Username;
+    }
+
+    public void setPan123Username(String pan123Username) {
+        this.pan123Username = pan123Username != null ? pan123Username.trim() : "";
+    }
+
+    public String getPan123Password() {
+        return pan123Password;
+    }
+
+    public void setPan123Password(String pan123Password) {
+        this.pan123Password = pan123Password != null ? pan123Password.trim() : "";
+    }
+
+    public String getXunleiUsername() {
+        return xunleiUsername;
+    }
+
+    public void setXunleiUsername(String xunleiUsername) {
+        this.xunleiUsername = xunleiUsername != null ? xunleiUsername.trim() : "";
+    }
+
+    public String getXunleiPassword() {
+        return xunleiPassword;
+    }
+
+    public void setXunleiPassword(String xunleiPassword) {
+        this.xunleiPassword = xunleiPassword != null ? xunleiPassword.trim() : "";
+    }
+
+    public String getPikpakUsername() {
+        return pikpakUsername;
+    }
+
+    public void setPikpakUsername(String pikpakUsername) {
+        this.pikpakUsername = pikpakUsername != null ? pikpakUsername.trim() : "";
+    }
+
+    public String getPikpakPassword() {
+        return pikpakPassword;
+    }
+
+    public void setPikpakPassword(String pikpakPassword) {
+        this.pikpakPassword = pikpakPassword != null ? pikpakPassword.trim() : "";
+    }
+
+    public String getTianyiAccount() {
+        return tianyiAccount;
+    }
+
+    public void setTianyiAccount(String tianyiAccount) {
+        this.tianyiAccount = tianyiAccount != null ? tianyiAccount.trim() : "";
     }
 
     public Set<String> getApiUrls() {
@@ -267,6 +357,9 @@ public class DanmakuConfig {
         if (json.has("pansouApiUrl")) {
             setPansouApiUrl(json.optString("pansouApiUrl"));
         }
+        if (json.has("pancheckApiUrl")) {
+            setPancheckApiUrl(json.optString("pancheckApiUrl"));
+        }
         if (json.has("quarkCookie")) {
             setQuarkCookie(json.optString("quarkCookie"));
         }
@@ -275,6 +368,33 @@ public class DanmakuConfig {
         }
         if (json.has("baiduCookie")) {
             setBaiduCookie(json.optString("baiduCookie"));
+        }
+        if (json.has("aliRefreshToken")) {
+            setAliRefreshToken(json.optString("aliRefreshToken"));
+        }
+        if (json.has("pan115Cookie")) {
+            setPan115Cookie(json.optString("pan115Cookie"));
+        }
+        if (json.has("pan123Username")) {
+            setPan123Username(json.optString("pan123Username"));
+        }
+        if (json.has("pan123Password")) {
+            setPan123Password(json.optString("pan123Password"));
+        }
+        if (json.has("xunleiUsername")) {
+            setXunleiUsername(json.optString("xunleiUsername"));
+        }
+        if (json.has("xunleiPassword")) {
+            setXunleiPassword(json.optString("xunleiPassword"));
+        }
+        if (json.has("pikpakUsername")) {
+            setPikpakUsername(json.optString("pikpakUsername"));
+        }
+        if (json.has("pikpakPassword")) {
+            setPikpakPassword(json.optString("pikpakPassword"));
+        }
+        if (json.has("tianyiAccount")) {
+            setTianyiAccount(json.optString("tianyiAccount"));
         }
         if (json.has("proxyType")) {
             setProxyType(json.optInt("proxyType", 0));
