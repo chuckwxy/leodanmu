@@ -156,7 +156,7 @@ public class QuarkDriveResolver implements CloudDrive {
                 entry.isVideo = detectVideo(item);
                 entry.shareFidToken = item.optString("share_fid_token", item.optString("fid_token", item.optString("file_token", "")));
                 if (i == 0 && allFiles.size() == 0 && page == 1) {
-                    Leodanmu.log("Quark listFiles: first item keys=" + item.keySet().toString() + " shareFidToken=" + entry.shareFidToken);
+                    Leodanmu.log("Quark listFiles: first item keys=" + (item.names() != null ? item.names().toString() : "{}") + " shareFidToken=" + entry.shareFidToken);
                 }
                 allFiles.add(entry);
             }
