@@ -1402,7 +1402,7 @@ public class DanmakuUIHelper {
                 mainLayout.addView(titleLayout);
 
                 ScrollView scrollView = new ScrollView(activity);
-                scrollView.setBackgroundColor(colors.bgPrimary);
+                scrollView.setBackgroundColor(Color.TRANSPARENT);
                 LinearLayout.LayoutParams scrollParams = new LinearLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT, 0, 1);
                 scrollView.setLayoutParams(scrollParams);
@@ -1428,7 +1428,7 @@ public class DanmakuUIHelper {
                 btnLayout.setGravity(Gravity.CENTER);
                 btnLayout.setPadding(dpToPx(activity, 16), dpToPx(activity, 12),
                         dpToPx(activity, 16), dpToPx(activity, 12));
-                btnLayout.setBackgroundColor(colors.bgPrimary);
+                btnLayout.setBackgroundColor(Color.TRANSPARENT);
 
                 Button clearButton = createBorderButton(activity, "清空", colors);
                 Button copyButton = createBorderButton(activity, "复制日志", colors);
@@ -2312,8 +2312,8 @@ public class DanmakuUIHelper {
                 proxyTitle.setTextSize(18);
                 proxyTitle.setTypeface(null, android.graphics.Typeface.BOLD);
                 proxyTitle.setTextColor(0xFF333333);
-                proxyTitle.setPadding(dpToPx(activity, 24), dpToPx(activity, 20),
-                        dpToPx(activity, 24), dpToPx(activity, 8));
+                proxyTitle.setPadding(dpToPx(activity, 24), dpToPx(activity, 24),
+                        dpToPx(activity, 24), dpToPx(activity, 0));
                 outer.addView(proxyTitle);
 
                 LinearLayout layout = new LinearLayout(activity);
@@ -2369,6 +2369,17 @@ public class DanmakuUIHelper {
                 chunkInput.setHint("256");
                 chunkRow.addView(chunkInput);
                 layout.addView(chunkRow);
+
+                // 标题和内容之间加分隔线
+                android.view.View proxySep = new android.view.View(activity);
+                android.widget.LinearLayout.LayoutParams proxySepParams = new android.widget.LinearLayout.LayoutParams(
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT, 1);
+                proxySepParams.setMargins(dpToPx(activity, 24), dpToPx(activity, 12),
+                        dpToPx(activity, 24), dpToPx(activity, 12));
+                proxySep.setLayoutParams(proxySepParams);
+                proxySep.setBackgroundColor(0xFFE0E0E0);
+                outer.addView(proxySep);
+                outer.addView(layout);
 
                 AlertDialog proxyDialog = new AlertDialog.Builder(activity)
                         .setView(outer)

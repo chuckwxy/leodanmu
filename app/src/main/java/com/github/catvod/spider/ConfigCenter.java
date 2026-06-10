@@ -344,20 +344,20 @@ public class ConfigCenter extends Spider {
         titleView.setTextSize(18);
         titleView.setTypeface(null, android.graphics.Typeface.BOLD);
         titleView.setTextColor(0xFF333333);
-        titleView.setPadding(48, 24, 48, 0);
+        titleView.setPadding(48, 32, 48, 0);
         outer.addView(titleView);
 
         android.view.View separator = new android.view.View(ctx);
         android.widget.LinearLayout.LayoutParams sepParams = new android.widget.LinearLayout.LayoutParams(
                 android.view.ViewGroup.LayoutParams.MATCH_PARENT, 1);
-        sepParams.setMargins(48, 16, 48, 12);
+        sepParams.setMargins(48, 24, 48, 24);
         separator.setLayoutParams(sepParams);
         separator.setBackgroundColor(0xFFE0E0E0);
         outer.addView(separator);
 
         LinearLayout layout = new LinearLayout(ctx);
         layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setPadding(48, 0, 48, 24);
+        layout.setPadding(48, 0, 48, 32);
 
         EditText input = new EditText(ctx);
         input.setText(currentValue);
