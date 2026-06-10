@@ -143,7 +143,9 @@ public class PansoSpider extends Spider {
             if (TextUtils.isEmpty(response)) return "{\"list\":[]}";
             JSONObject data = new JSONObject(response);
             if (data.optInt("code") != 0) return "{\"list\":[]}";
-            JSONObject merged = data.optJSONObject("data");
+            JSONObject dataObj = data.optJSONObject("data");
+            if (dataObj == null) return "{\"list\":[]}";
+            JSONObject merged = dataObj.optJSONObject("merged_by_type");
             if (merged == null) return "{\"list\":[]}";
             JSONArray results = new JSONArray();
             for (String dk : DRIVE_ORDER) {
