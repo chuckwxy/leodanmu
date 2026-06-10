@@ -1389,9 +1389,14 @@ public class DanmakuUIHelper {
 
                 LinearLayout titleLayout = new LinearLayout(activity);
                 titleLayout.setOrientation(LinearLayout.VERTICAL);
-                titleLayout.setBackgroundColor(Color.TRANSPARENT);
+                titleLayout.setBackgroundColor(colors.bgSecondary);
                 titleLayout.setPadding(dpToPx(activity, 20), dpToPx(activity, 16),
                         dpToPx(activity, 20), dpToPx(activity, 16));
+                float r16 = dpToPx(activity, 16);
+                android.graphics.drawable.GradientDrawable titleBg = new android.graphics.drawable.GradientDrawable();
+                titleBg.setColor(colors.bgSecondary);
+                titleBg.setCornerRadii(new float[]{r16, r16, r16, r16, 0, 0, 0, 0});
+                titleLayout.setBackground(titleBg);
 
                 TextView titleText = new TextView(activity);
                 titleText.setText("Leo弹幕日志");
