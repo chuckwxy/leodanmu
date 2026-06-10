@@ -396,7 +396,7 @@ public class ConfigCenter extends Spider {
         RemoteInputBus.ConfigCallback configCb = (f, v) -> ctx.runOnUiThread(() -> {
             if (f.equals(capturedFieldId)) {
                 input.setText(v);
-                String label = f.equals("ylhj_host") ? "ylhj host" : f.equals("ylhj_token") ? "ylhj token" : f;
+                String label = f.equals("ylhj_host") ? "buye host" : f.equals("ylhj_token") ? "buye token" : f;
                 Utils.safeShowToast(ctx, label + "=" + v);
             }
         });

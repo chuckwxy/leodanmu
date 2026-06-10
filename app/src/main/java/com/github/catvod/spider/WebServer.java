@@ -464,8 +464,8 @@ public class WebServer extends NanoHTTPD {
             StringBuilder json = new StringBuilder("[");
             String[][] fields = {
                 {"http_proxy", "HTTP代理"},
-                {"ylhj_host", "buye host"},
-                {"ylhj_token", "buye token"},
+                {"ylhj_host", "不夜地址"},
+                {"ylhj_token", "不夜Token"},
                 {"api_urls", "弹幕API地址"}
             };
             for (int i = 0; i < fields.length; i++) {
