@@ -38,7 +38,7 @@ public class QuarkDriveResolver implements CloudDrive {
     @Override
     public boolean matchShare(String url) {
         if (TextUtils.isEmpty(url)) return false;
-        return url.contains("pan.quark.cn");
+        return url.contains("pan.quark.cn") || url.contains("drive-hz.quark.cn");
     }
 
     public static class ShareInfo {

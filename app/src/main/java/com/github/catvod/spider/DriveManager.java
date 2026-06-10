@@ -4,8 +4,10 @@ import android.text.TextUtils;
 
 import com.github.catvod.crawler.SpiderDebug;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -15,6 +17,7 @@ public class DriveManager {
 
     private final Map<String, CloudDrive> drives = new LinkedHashMap<>();
     private final List<CloudDrive> driveList = new ArrayList<>();
+    private DanmakuConfig config;
 
     private static final String[] DRIVE_ORDER = {
         "quark", "baidu", "uc", "a115", "ali", "a123", "a189", "a139", "xunlei", "pikpak"
@@ -23,6 +26,7 @@ public class DriveManager {
     public void init(DanmakuConfig config) {
         drives.clear();
         driveList.clear();
+        this.config = config;
 
         if (config == null) {
             SpiderDebug.log("DriveManager: config is null");
@@ -124,11 +128,51 @@ public class DriveManager {
             }
             if (drive != null) {
                 SpiderDebug.log("DriveManager play: using " + drive.getKey() + " flag=" + flag);
-                return drive.play(id, flag);
+                JSONObject result = drive.play(id, flag);
+                if (result != null && result.has("url") && !(result.opt("url") instanceof JSONArray)) {
+                    String directUrl = result.optString("url", "");
+                    if (!TextUtils.isEmpty(directUrl)) {
+                        wrapWithDualTrack(result, drive.getKey(), directUrl);
+                    }
+                }
+                return result;
             }
         } catch (Exception e) {
             SpiderDebug.log("DriveManager play error: " + e.getMessage());
         }
         return null;
+    }
+
+    private void wrapWithDualTrack(JSONObject result, String driveKey, String directUrl) throws Exception {
+        if (config == null) return;
+        DanmakuConfig.SourceProxyConfig spc = config.getProxySourceConfig().get(driveKey);
+        int thread = spc != null ? spc.thread : 8;
+        int chunkSize = spc != null ? spc.chunkSize : 256;
+
+        String proxyUrl = buildProxyUrl(directUrl, thread, chunkSize);
+        JSONArray urls = new JSONArray();
+
+        boolean proxyDefault = !"baidu".equals(driveKey) && !"a123".equals(driveKey);
+        if (proxyDefault) {
+            urls.put("Leo\u4EE3\u7406");
+            urls.put(proxyUrl);
+            urls.put("\u76F4\u8FDE");
+            urls.put(directUrl);
+        } else {
+            urls.put("\u76F4\u8FDE");
+            urls.put(directUrl);
+            urls.put("Leo\u4EE3\u7406");
+            urls.put(proxyUrl);
+        }
+        result.put("url", urls);
+    }
+
+    public static String buildProxyUrl(String rawUrl, int thread, int chunkSize) {
+        try {
+            return "http://127.0.0.1:5575/proxy?thread=" + thread + "&chunkSize=" + chunkSize
+                    + "&url=" + URLEncoder.encode(rawUrl, "UTF-8");
+        } catch (Exception e) {
+            return rawUrl;
+        }
     }
 }

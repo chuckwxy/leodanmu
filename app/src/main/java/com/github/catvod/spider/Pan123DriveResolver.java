@@ -43,7 +43,8 @@ public class Pan123DriveResolver implements CloudDrive {
     @Override
     public boolean matchShare(String url) {
         if (TextUtils.isEmpty(url)) return false;
-        return url.contains("123pan.com") || url.contains("123684.com") || url.contains("123pan.cn");
+        return url.contains("123pan.com") || url.contains("123684.com") || url.contains("123pan.cn")
+                || url.contains("123865.com") || url.contains("123912.com") || url.contains("123592.com");
     }
 
     @Override

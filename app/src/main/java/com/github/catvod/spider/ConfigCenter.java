@@ -105,7 +105,12 @@ public class ConfigCenter extends Spider {
         list.put(createActionVod("auto_tune", "自动线程调优", "",
                 config.isEnableAutoTune() ? "已开启" : "已关闭"));
 
-        String[][] sources = {{"ali", "阿里云盘"}, {"quark", "夸克云盘"}, {"uc", "UC云盘"}};
+        String[][] sources = {
+            {"ali", "阿里云盘"}, {"quark", "夸克云盘"}, {"uc", "UC云盘"},
+            {"a115", "115云盘"}, {"a123", "123云盘"}, {"a189", "天翼云盘"},
+            {"a139", "中国移动云盘"}, {"xunlei", "迅雷云盘"}, {"pikpak", "Pikpak"},
+            {"baidu", "百度云盘"}
+        };
         for (String[] s : sources) {
             DanmakuConfig.SourceProxyConfig spc = config.getProxySourceConfig().get(s[0]);
             int t = spc != null ? spc.thread : 8;
@@ -213,6 +218,27 @@ public class ConfigCenter extends Spider {
                         case "uc_thread":
                             DanmakuUIHelper.showSourceProxyDialog(ctx, config, "uc", "UC云盘");
                             break;
+                        case "a115_thread":
+                            DanmakuUIHelper.showSourceProxyDialog(ctx, config, "a115", "115云盘");
+                            break;
+                        case "a123_thread":
+                            DanmakuUIHelper.showSourceProxyDialog(ctx, config, "a123", "123云盘");
+                            break;
+                        case "a189_thread":
+                            DanmakuUIHelper.showSourceProxyDialog(ctx, config, "a189", "天翼云盘");
+                            break;
+                        case "a139_thread":
+                            DanmakuUIHelper.showSourceProxyDialog(ctx, config, "a139", "中国移动云盘");
+                            break;
+                        case "xunlei_thread":
+                            DanmakuUIHelper.showSourceProxyDialog(ctx, config, "xunlei", "迅雷云盘");
+                            break;
+                        case "pikpak_thread":
+                            DanmakuUIHelper.showSourceProxyDialog(ctx, config, "pikpak", "Pikpak");
+                            break;
+                        case "baidu_thread":
+                            DanmakuUIHelper.showSourceProxyDialog(ctx, config, "baidu", "百度云盘");
+                            break;
                         case "douban_cache":
                             DoubanFetcher.clearCache();
                             Utils.safeShowToast(ctx, "豆瓣缓存已清除");
@@ -309,8 +335,8 @@ public class ConfigCenter extends Spider {
     private String searchContentShell(String key) {
         if (key == null || key.isEmpty()) return "";
         try {
-            String[] ids = {"config", "auto_push", "lp_config", "log", "auto_tune", "ali_thread", "quark_thread", "uc_thread", "http_proxy", "ylhj_host", "ylhj_token", "drive_quarkCookie", "drive_ucCookie", "drive_baiduCookie", "drive_aliRefreshToken", "drive_pan115Cookie", "drive_pan123Username", "drive_xunleiUsername", "drive_pikpakUsername", "drive_tianyiAccount", "drive_pansouApiUrl", "drive_pancheckApiUrl"};
-            String[] names = {"弹幕配置", "自动推送弹幕", "布局配置", "查看日志", "自动线程调优", "阿里云盘", "夸克云盘", "UC云盘", "HTTP代理", "不夜地址", "不夜Token", "夸克云盘", "UC云盘", "百度云盘", "阿里云盘", "115云盘", "123云盘", "迅雷云盘", "Pikpak", "天翼云盘", "盘搜API地址", "盘检API地址"};
+            String[] ids = {"config", "auto_push", "lp_config", "log", "auto_tune", "ali_thread", "quark_thread", "uc_thread", "a115_thread", "a123_thread", "a189_thread", "a139_thread", "xunlei_thread", "pikpak_thread", "baidu_thread", "http_proxy", "ylhj_host", "ylhj_token", "drive_quarkCookie", "drive_ucCookie", "drive_baiduCookie", "drive_aliRefreshToken", "drive_pan115Cookie", "drive_pan123Username", "drive_xunleiUsername", "drive_pikpakUsername", "drive_tianyiAccount", "drive_pansouApiUrl", "drive_pancheckApiUrl"};
+            String[] names = {"弹幕配置", "自动推送弹幕", "布局配置", "查看日志", "自动线程调优", "阿里云盘", "夸克云盘", "UC云盘", "115云盘", "123云盘", "天翼云盘", "中国移动云盘", "迅雷云盘", "Pikpak", "百度云盘", "HTTP代理", "不夜地址", "不夜Token", "夸克云盘", "UC云盘", "百度云盘", "阿里云盘", "115云盘", "123云盘", "迅雷云盘", "Pikpak", "天翼云盘", "盘搜API地址", "盘检API地址"};
             for (int i = 0; i < ids.length; i++) {
                 if (!key.equals(names[i])) continue;
                 JSONObject vod = new JSONObject();
@@ -345,6 +371,13 @@ public class ConfigCenter extends Spider {
             case "ali_thread": return "阿里云盘";
             case "quark_thread": return "夸克云盘";
             case "uc_thread": return "UC云盘";
+            case "a115_thread": return "115云盘";
+            case "a123_thread": return "123云盘";
+            case "a189_thread": return "天翼云盘";
+            case "a139_thread": return "中国移动云盘";
+            case "xunlei_thread": return "迅雷云盘";
+            case "pikpak_thread": return "Pikpak";
+            case "baidu_thread": return "百度云盘";
             case "douban_cache": return "豆瓣缓存";
             case "douban_prewarm": return "豆瓣预热";
             case "http_proxy": return "HTTP代理";
@@ -372,7 +405,10 @@ public class ConfigCenter extends Spider {
             case "lp_config": return "调整弹窗大小和透明度";
             case "log": return "查看运行日志与Hook诊断";
             case "auto_tune": return config.isEnableAutoTune() ? "已开启" : "已关闭";
-            case "ali_thread": case "quark_thread": case "uc_thread": {
+            case "ali_thread": case "quark_thread": case "uc_thread":
+            case "a115_thread": case "a123_thread": case "a189_thread":
+            case "a139_thread": case "xunlei_thread": case "pikpak_thread":
+            case "baidu_thread": {
                 DanmakuConfig.SourceProxyConfig spc = config.getProxySourceConfig().get(id.replace("_thread", ""));
                 int t = spc != null ? spc.thread : 8;
                 int c = spc != null ? spc.chunkSize : 256;

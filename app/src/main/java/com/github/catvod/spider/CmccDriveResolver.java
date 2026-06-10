@@ -34,7 +34,7 @@ public class CmccDriveResolver implements CloudDrive {
     @Override
     public boolean matchShare(String url) {
         if (TextUtils.isEmpty(url)) return false;
-        return url.contains("cloud.139.com");
+        return url.contains("cloud.139.com") || url.contains("caiyun.139.com") || url.contains("yun.139.com");
     }
 
     @Override

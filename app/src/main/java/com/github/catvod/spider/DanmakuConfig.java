@@ -1,5 +1,7 @@
 package com.github.catvod.spider;
 
+import com.google.gson.annotations.SerializedName;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 import java.util.HashMap;
@@ -7,9 +9,6 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * 弹幕配置实体类
- */
 public class DanmakuConfig {
     public Set<String> apiUrls;
     public float lpWidth;
@@ -21,19 +20,33 @@ public class DanmakuConfig {
     private int danmakuTimeOffsetMs = 0;
     private String pansouApiUrl = "http://192.168.31.77:5888";
     private String pancheckApiUrl = "http://192.168.31.77:8989";
-    private String quarkCookie = "";
-    private String ucCookie = "";
-    private String baiduCookie = "";
-    private String aliRefreshToken = "";
-    private String pan115Cookie = "";
-    private String pan123Username = "";
-    private String pan123Password = "";
-    private String xunleiUsername = "";
-    private String xunleiPassword = "";
-    private String pikpakUsername = "";
-    private String pikpakPassword = "";
-    private String tianyiAccount = "";
-    private int proxyType = 0; // 0=自动 1=Go代理 2=Java代理
+
+    @SerializedName(value = "leoQuarkCookie", alternate = {"quarkCookie"})
+    private String leoQuarkCookie = "";
+    @SerializedName(value = "leoUcCookie", alternate = {"ucCookie"})
+    private String leoUcCookie = "";
+    @SerializedName(value = "leoBaiduCookie", alternate = {"baiduCookie"})
+    private String leoBaiduCookie = "";
+    @SerializedName(value = "leoAliRefreshToken", alternate = {"aliRefreshToken"})
+    private String leoAliRefreshToken = "";
+    @SerializedName(value = "leoPan115Cookie", alternate = {"pan115Cookie"})
+    private String leoPan115Cookie = "";
+    @SerializedName(value = "leoPan123Username", alternate = {"pan123Username"})
+    private String leoPan123Username = "";
+    @SerializedName(value = "leoPan123Password", alternate = {"pan123Password"})
+    private String leoPan123Password = "";
+    @SerializedName(value = "leoXunleiUsername", alternate = {"xunleiUsername"})
+    private String leoXunleiUsername = "";
+    @SerializedName(value = "leoXunleiPassword", alternate = {"xunleiPassword"})
+    private String leoXunleiPassword = "";
+    @SerializedName(value = "leoPikpakUsername", alternate = {"pikpakUsername"})
+    private String leoPikpakUsername = "";
+    @SerializedName(value = "leoPikpakPassword", alternate = {"pikpakPassword"})
+    private String leoPikpakPassword = "";
+    @SerializedName(value = "leoTianyiAccount", alternate = {"tianyiAccount"})
+    private String leoTianyiAccount = "";
+
+    private int proxyType = 0;
     private boolean enableAutoTune = true;
     private int proxyThread = 8;
     private int proxyChunkSize = 256;
@@ -58,12 +71,16 @@ public class DanmakuConfig {
         lpHeight = 1.0f;
         lpAlpha = 1.0f;
         autoPushEnabled = true;
-        SourceProxyConfig ali = new SourceProxyConfig(8, 256);
-        proxySourceConfig.put("ali", ali);
-        SourceProxyConfig quark = new SourceProxyConfig(10, 256);
-        proxySourceConfig.put("quark", quark);
-        SourceProxyConfig uc = new SourceProxyConfig(10, 256);
-        proxySourceConfig.put("uc", uc);
+        proxySourceConfig.put("ali", new SourceProxyConfig(8, 256));
+        proxySourceConfig.put("quark", new SourceProxyConfig(10, 256));
+        proxySourceConfig.put("uc", new SourceProxyConfig(10, 256));
+        proxySourceConfig.put("a115", new SourceProxyConfig(5, 256));
+        proxySourceConfig.put("a123", new SourceProxyConfig(5, 256));
+        proxySourceConfig.put("a189", new SourceProxyConfig(5, 256));
+        proxySourceConfig.put("a139", new SourceProxyConfig(5, 256));
+        proxySourceConfig.put("xunlei", new SourceProxyConfig(5, 256));
+        proxySourceConfig.put("pikpak", new SourceProxyConfig(5, 256));
+        proxySourceConfig.put("baidu", new SourceProxyConfig(5, 256));
     }
 
     public String getPansouApiUrl() {
@@ -83,99 +100,99 @@ public class DanmakuConfig {
     }
 
     public String getQuarkCookie() {
-        return quarkCookie;
+        return leoQuarkCookie;
     }
 
-    public void setQuarkCookie(String quarkCookie) {
-        this.quarkCookie = quarkCookie != null ? quarkCookie.trim() : "";
+    public void setQuarkCookie(String leoQuarkCookie) {
+        this.leoQuarkCookie = leoQuarkCookie != null ? leoQuarkCookie.trim() : "";
     }
 
     public String getUcCookie() {
-        return ucCookie;
+        return leoUcCookie;
     }
 
-    public void setUcCookie(String ucCookie) {
-        this.ucCookie = ucCookie != null ? ucCookie.trim() : "";
+    public void setUcCookie(String leoUcCookie) {
+        this.leoUcCookie = leoUcCookie != null ? leoUcCookie.trim() : "";
     }
 
     public String getBaiduCookie() {
-        return baiduCookie;
+        return leoBaiduCookie;
     }
 
-    public void setBaiduCookie(String baiduCookie) {
-        this.baiduCookie = baiduCookie != null ? baiduCookie.trim() : "";
+    public void setBaiduCookie(String leoBaiduCookie) {
+        this.leoBaiduCookie = leoBaiduCookie != null ? leoBaiduCookie.trim() : "";
     }
 
     public String getAliRefreshToken() {
-        return aliRefreshToken;
+        return leoAliRefreshToken;
     }
 
-    public void setAliRefreshToken(String aliRefreshToken) {
-        this.aliRefreshToken = aliRefreshToken != null ? aliRefreshToken.trim() : "";
+    public void setAliRefreshToken(String leoAliRefreshToken) {
+        this.leoAliRefreshToken = leoAliRefreshToken != null ? leoAliRefreshToken.trim() : "";
     }
 
     public String getPan115Cookie() {
-        return pan115Cookie;
+        return leoPan115Cookie;
     }
 
-    public void setPan115Cookie(String pan115Cookie) {
-        this.pan115Cookie = pan115Cookie != null ? pan115Cookie.trim() : "";
+    public void setPan115Cookie(String leoPan115Cookie) {
+        this.leoPan115Cookie = leoPan115Cookie != null ? leoPan115Cookie.trim() : "";
     }
 
     public String getPan123Username() {
-        return pan123Username;
+        return leoPan123Username;
     }
 
-    public void setPan123Username(String pan123Username) {
-        this.pan123Username = pan123Username != null ? pan123Username.trim() : "";
+    public void setPan123Username(String leoPan123Username) {
+        this.leoPan123Username = leoPan123Username != null ? leoPan123Username.trim() : "";
     }
 
     public String getPan123Password() {
-        return pan123Password;
+        return leoPan123Password;
     }
 
-    public void setPan123Password(String pan123Password) {
-        this.pan123Password = pan123Password != null ? pan123Password.trim() : "";
+    public void setPan123Password(String leoPan123Password) {
+        this.leoPan123Password = leoPan123Password != null ? leoPan123Password.trim() : "";
     }
 
     public String getXunleiUsername() {
-        return xunleiUsername;
+        return leoXunleiUsername;
     }
 
-    public void setXunleiUsername(String xunleiUsername) {
-        this.xunleiUsername = xunleiUsername != null ? xunleiUsername.trim() : "";
+    public void setXunleiUsername(String leoXunleiUsername) {
+        this.leoXunleiUsername = leoXunleiUsername != null ? leoXunleiUsername.trim() : "";
     }
 
     public String getXunleiPassword() {
-        return xunleiPassword;
+        return leoXunleiPassword;
     }
 
-    public void setXunleiPassword(String xunleiPassword) {
-        this.xunleiPassword = xunleiPassword != null ? xunleiPassword.trim() : "";
+    public void setXunleiPassword(String leoXunleiPassword) {
+        this.leoXunleiPassword = leoXunleiPassword != null ? leoXunleiPassword.trim() : "";
     }
 
     public String getPikpakUsername() {
-        return pikpakUsername;
+        return leoPikpakUsername;
     }
 
-    public void setPikpakUsername(String pikpakUsername) {
-        this.pikpakUsername = pikpakUsername != null ? pikpakUsername.trim() : "";
+    public void setPikpakUsername(String leoPikpakUsername) {
+        this.leoPikpakUsername = leoPikpakUsername != null ? leoPikpakUsername.trim() : "";
     }
 
     public String getPikpakPassword() {
-        return pikpakPassword;
+        return leoPikpakPassword;
     }
 
-    public void setPikpakPassword(String pikpakPassword) {
-        this.pikpakPassword = pikpakPassword != null ? pikpakPassword.trim() : "";
+    public void setPikpakPassword(String leoPikpakPassword) {
+        this.leoPikpakPassword = leoPikpakPassword != null ? leoPikpakPassword.trim() : "";
     }
 
     public String getTianyiAccount() {
-        return tianyiAccount;
+        return leoTianyiAccount;
     }
 
-    public void setTianyiAccount(String tianyiAccount) {
-        this.tianyiAccount = tianyiAccount != null ? tianyiAccount.trim() : "";
+    public void setTianyiAccount(String leoTianyiAccount) {
+        this.leoTianyiAccount = leoTianyiAccount != null ? leoTianyiAccount.trim() : "";
     }
 
     public Set<String> getApiUrls() {
@@ -306,10 +323,6 @@ public class DanmakuConfig {
         this.ylhjToken = ylhjToken != null ? ylhjToken.trim() : "";
     }
 
-    /**
-     * 从JSON对象更新配置
-     * @param json JSON对象，可包含 apiUrls、autoPushEnabled、lpWidth、lpHeight、lpAlpha、pushToastEnabled、theme
-     */
     public void updateFromJson(JSONObject json) {
         if (json.has("apiUrls")) {
             Object urlsObj = json.opt("apiUrls");
@@ -323,7 +336,6 @@ public class DanmakuConfig {
                     }
                 }
             } else if (urlsObj instanceof String) {
-                // 兼容单字符串形式
                 String url = (String) urlsObj;
                 if (!url.isEmpty()) {
                     newUrls.add(url);
@@ -360,41 +372,41 @@ public class DanmakuConfig {
         if (json.has("pancheckApiUrl")) {
             setPancheckApiUrl(json.optString("pancheckApiUrl"));
         }
-        if (json.has("quarkCookie")) {
-            setQuarkCookie(json.optString("quarkCookie"));
+        if (json.has("leoQuarkCookie") || json.has("quarkCookie")) {
+            setQuarkCookie(json.optString(json.has("leoQuarkCookie") ? "leoQuarkCookie" : "quarkCookie"));
         }
-        if (json.has("ucCookie")) {
-            setUcCookie(json.optString("ucCookie"));
+        if (json.has("leoUcCookie") || json.has("ucCookie")) {
+            setUcCookie(json.optString(json.has("leoUcCookie") ? "leoUcCookie" : "ucCookie"));
         }
-        if (json.has("baiduCookie")) {
-            setBaiduCookie(json.optString("baiduCookie"));
+        if (json.has("leoBaiduCookie") || json.has("baiduCookie")) {
+            setBaiduCookie(json.optString(json.has("leoBaiduCookie") ? "leoBaiduCookie" : "baiduCookie"));
         }
-        if (json.has("aliRefreshToken")) {
-            setAliRefreshToken(json.optString("aliRefreshToken"));
+        if (json.has("leoAliRefreshToken") || json.has("aliRefreshToken")) {
+            setAliRefreshToken(json.optString(json.has("leoAliRefreshToken") ? "leoAliRefreshToken" : "aliRefreshToken"));
         }
-        if (json.has("pan115Cookie")) {
-            setPan115Cookie(json.optString("pan115Cookie"));
+        if (json.has("leoPan115Cookie") || json.has("pan115Cookie")) {
+            setPan115Cookie(json.optString(json.has("leoPan115Cookie") ? "leoPan115Cookie" : "pan115Cookie"));
         }
-        if (json.has("pan123Username")) {
-            setPan123Username(json.optString("pan123Username"));
+        if (json.has("leoPan123Username") || json.has("pan123Username")) {
+            setPan123Username(json.optString(json.has("leoPan123Username") ? "leoPan123Username" : "pan123Username"));
         }
-        if (json.has("pan123Password")) {
-            setPan123Password(json.optString("pan123Password"));
+        if (json.has("leoPan123Password") || json.has("pan123Password")) {
+            setPan123Password(json.optString(json.has("leoPan123Password") ? "leoPan123Password" : "pan123Password"));
         }
-        if (json.has("xunleiUsername")) {
-            setXunleiUsername(json.optString("xunleiUsername"));
+        if (json.has("leoXunleiUsername") || json.has("xunleiUsername")) {
+            setXunleiUsername(json.optString(json.has("leoXunleiUsername") ? "leoXunleiUsername" : "xunleiUsername"));
         }
-        if (json.has("xunleiPassword")) {
-            setXunleiPassword(json.optString("xunleiPassword"));
+        if (json.has("leoXunleiPassword") || json.has("xunleiPassword")) {
+            setXunleiPassword(json.optString(json.has("leoXunleiPassword") ? "leoXunleiPassword" : "xunleiPassword"));
         }
-        if (json.has("pikpakUsername")) {
-            setPikpakUsername(json.optString("pikpakUsername"));
+        if (json.has("leoPikpakUsername") || json.has("pikpakUsername")) {
+            setPikpakUsername(json.optString(json.has("leoPikpakUsername") ? "leoPikpakUsername" : "pikpakUsername"));
         }
-        if (json.has("pikpakPassword")) {
-            setPikpakPassword(json.optString("pikpakPassword"));
+        if (json.has("leoPikpakPassword") || json.has("pikpakPassword")) {
+            setPikpakPassword(json.optString(json.has("leoPikpakPassword") ? "leoPikpakPassword" : "pikpakPassword"));
         }
-        if (json.has("tianyiAccount")) {
-            setTianyiAccount(json.optString("tianyiAccount"));
+        if (json.has("leoTianyiAccount") || json.has("tianyiAccount")) {
+            setTianyiAccount(json.optString(json.has("leoTianyiAccount") ? "leoTianyiAccount" : "tianyiAccount"));
         }
         if (json.has("proxyType")) {
             setProxyType(json.optInt("proxyType", 0));
@@ -412,7 +424,7 @@ public class DanmakuConfig {
             JSONObject srcObj = json.optJSONObject("proxySourceConfig");
             if (srcObj != null) {
                 Map<String, SourceProxyConfig> map = new HashMap<>();
-                for (String key : new String[]{"ali", "quark", "uc"}) {
+                for (String key : new String[]{"ali", "quark", "uc", "a115", "a123", "a189", "a139", "xunlei", "pikpak", "baidu"}) {
                     if (srcObj.has(key)) {
                         JSONObject sc = srcObj.optJSONObject(key);
                         if (sc != null) {
