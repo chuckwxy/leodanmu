@@ -240,10 +240,11 @@ public class WebServer extends NanoHTTPD {
             String value = params.get("value");
             if (!TextUtils.isEmpty(field) && value != null) {
                 RemoteInputBus.postConfig(field, value);
-                Leodanmu.log("📱 配置远程输入已通过 RemoteInputBus 发送: " + field + " = " + value);
+                String displayField = field.equals("ylhj_host") ? "buye host" : field.equals("ylhj_token") ? "buye token" : field;
+                Leodanmu.log("📱 配置远程输入已通过 RemoteInputBus 发送: " + displayField + " = " + value);
                 String confirmHtml = "<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>" +
                         "<style>body { font-family: sans-serif; padding: 20px; text-align: center; } .success { color: green; }</style></head>" +
-                        "<body><h2>已发送</h2><div class='success'>" + field + " = " + value + "</div>" +
+                        "<body><h2>已发送</h2><div class='success'>" + displayField + " = " + value + "</div>" +
                         "<p><a href='/config_input'>继续配置</a></p></body></html>";
                 return newFixedLengthResponse(confirmHtml);
             }
