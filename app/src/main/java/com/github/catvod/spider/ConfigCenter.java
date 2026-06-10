@@ -861,17 +861,21 @@ public class ConfigCenter extends Spider {
     }
 
     private void showDriveScanDialog(Activity ctx, DanmakuConfig config, String driveKey, String displayName, EditText targetInput) {
-        JSONObject qrResult;
-        try {
-            Leodanmu.log("ConfigCenter: generating QR for " + driveKey);
-            qrResult = DriveQRCodeUtil.generateQRCode(driveKey);
-            Leodanmu.log("ConfigCenter: QR result " + (qrResult != null ? qrResult.toString() : "null"));
-        } catch (Exception e) {
-            Leodanmu.log("ConfigCenter: QR failed for " + driveKey + ": " + e.getMessage());
-            e.printStackTrace();
-            Utils.safeShowToast(ctx, displayName + " 获取二维码失败: " + e.getMessage());
-            return;
-        }
+        Utils.safeShowToast(ctx, displayName + " 正在生成二维码...");
+        android.os.AsyncTask.SERIAL_EXECUTOR.execute(() -> {
+            try {
+                Leodanmu.log("ConfigCenter: generating QR for " + driveKey);
+                JSONObject qrResult = DriveQRCodeUtil.generateQRCode(driveKey);
+                Leodanmu.log("ConfigCenter: QR result " + (qrResult != null ? qrResult.toString() : "null"));
+                ctx.runOnUiThread(() -> buildScanDialog(ctx, driveKey, displayName, targetInput, qrResult));
+            } catch (Exception e) {
+                Leodanmu.log("ConfigCenter: QR failed for " + driveKey + ": " + e.getMessage());
+                ctx.runOnUiThread(() -> Utils.safeShowToast(ctx, displayName + " 获取二维码失败: " + e.getMessage()));
+            }
+        });
+    }
+
+    private void buildScanDialog(Activity ctx, String driveKey, String displayName, EditText targetInput, JSONObject qrResult) {
         if (qrResult == null) {
             Leodanmu.log("ConfigCenter: QR result null for " + driveKey);
             Utils.safeShowToast(ctx, displayName + " 获取二维码失败");
@@ -922,7 +926,6 @@ public class ConfigCenter extends Spider {
         }
         outer.addView(qrView);
 
-        // If no qr_image_url, generate QR from qr_text via external service
         if (TextUtils.isEmpty(qrImageUrl) && !TextUtils.isEmpty(qrText)) {
             String encodedQrContent;
             try { encodedQrContent = java.net.URLEncoder.encode(qrText, "UTF-8"); }
@@ -938,8 +941,22 @@ public class ConfigCenter extends Spider {
                     android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeStream(is);
                     is.close();
                     ctx.runOnUiThread(() -> qrView.setImageBitmap(bmp));
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                    Leodanmu.log("ConfigCenter: qrserver.com failed, showing text fallback");
+                }
             });
+            // Add clickable link below image as fallback
+            TextView manualLink = new TextView(ctx);
+            manualLink.setText("如果二维码未能显示，请点击下方链接在手机上打开");
+            manualLink.setTextSize(11);
+            manualLink.setTextColor(0xFF007AFF);
+            manualLink.setGravity(android.view.Gravity.CENTER);
+            manualLink.setPadding(0, 8, 0, 0);
+            manualLink.setOnClickListener(v -> {
+                android.content.Intent i = new android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(qrText));
+                ctx.startActivity(i);
+            });
+            outer.addView(manualLink);
         }
 
         TextView statusView = new TextView(ctx);
@@ -968,7 +985,6 @@ public class ConfigCenter extends Spider {
         });
         dialog.show();
 
-        // Poll for scan status
         Handler handler = new Handler(Looper.getMainLooper());
         Handler.Callback callback = new Handler.Callback() {
             @Override
