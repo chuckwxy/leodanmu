@@ -345,7 +345,7 @@ public class QuarkDriveResolver implements CloudDrive {
 
         String savedFileId = "";
         JSONObject saveData = json.optJSONObject("data");
-        Leodanmu.log("Quark transferToDrive: saveData keys=" + (saveData != null ? saveData.keySet().toString() : "null"));
+        Leodanmu.log("Quark transferToDrive: saveData keys=" + (saveData != null ? (saveData.names() != null ? saveData.names().toString() : "empty object") : "null"));
         if (saveData != null) {
             JSONObject taskResp = saveData.optJSONObject("task_resp");
             if (taskResp != null) {
