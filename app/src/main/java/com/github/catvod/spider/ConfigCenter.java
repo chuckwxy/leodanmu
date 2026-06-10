@@ -675,26 +675,31 @@ public class ConfigCenter extends Spider {
                 Utils.safeShowToast(ctx, val.isEmpty() ? "已恢复默认Token" : "buye token 已设置");
                 break;
             case "drive_quarkCookie":
+                Leodanmu.log("ConfigCenter save: quarkCookie len=" + val.length() + " empty=" + val.isEmpty());
                 config.setQuarkCookie(val);
                 DanmakuConfigManager.saveConfig(ctx, config);
                 Utils.safeShowToast(ctx, val.isEmpty() ? "夸克Cookie已清除" : "夸克Cookie已设置");
                 break;
             case "drive_ucCookie":
+                Leodanmu.log("ConfigCenter save: ucCookie len=" + val.length() + " empty=" + val.isEmpty());
                 config.setUcCookie(val);
                 DanmakuConfigManager.saveConfig(ctx, config);
                 Utils.safeShowToast(ctx, val.isEmpty() ? "UC Cookie已清除" : "UC Cookie已设置");
                 break;
             case "drive_baiduCookie":
+                Leodanmu.log("ConfigCenter save: baiduCookie len=" + val.length() + " empty=" + val.isEmpty());
                 config.setBaiduCookie(val);
                 DanmakuConfigManager.saveConfig(ctx, config);
                 Utils.safeShowToast(ctx, val.isEmpty() ? "百度Cookie已清除" : "百度Cookie已设置");
                 break;
             case "drive_aliRefreshToken":
+                Leodanmu.log("ConfigCenter save: aliRefreshToken len=" + val.length() + " empty=" + val.isEmpty());
                 config.setAliRefreshToken(val);
                 DanmakuConfigManager.saveConfig(ctx, config);
                 Utils.safeShowToast(ctx, val.isEmpty() ? "阿里Token已清除" : "阿里Token已设置");
                 break;
             case "drive_pan115Cookie":
+                Leodanmu.log("ConfigCenter save: pan115Cookie len=" + val.length() + " empty=" + val.isEmpty());
                 config.setPan115Cookie(val);
                 DanmakuConfigManager.saveConfig(ctx, config);
                 Utils.safeShowToast(ctx, val.isEmpty() ? "115 Cookie已清除" : "115 Cookie已设置");

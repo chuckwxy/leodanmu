@@ -74,6 +74,7 @@ public class UcDriveResolver implements CloudDrive {
     @Override
     public JSONObject getVod(String url) {
         try {
+            Leodanmu.log("UC getVod: url=" + url + " cookie(len)=" + cookie.length() + " empty=" + TextUtils.isEmpty(cookie));
             String shareId = extractShareId(url);
             if (TextUtils.isEmpty(shareId)) return null;
 
@@ -152,11 +153,12 @@ public class UcDriveResolver implements CloudDrive {
     @Override
     public JSONObject play(String input, String flag) {
         try {
+            Leodanmu.log("UC play: input=" + input.substring(0, Math.min(input.length(), 80)) + " flag=" + flag + " cookie(len)=" + cookie.length() + " empty=" + TextUtils.isEmpty(cookie));
             String shareId = flag;
             try {
                 transferToDrive(shareId, input);
             } catch (Exception e) {
-                SpiderDebug.log("UC transfer (non-fatal): " + e.getMessage());
+                Leodanmu.log("UC transfer (non-fatal): " + e.getMessage());
             }
 
             JSONObject result = new JSONObject();

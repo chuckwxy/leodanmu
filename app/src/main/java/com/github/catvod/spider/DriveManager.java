@@ -114,11 +114,19 @@ public class DriveManager {
         try {
             CloudDrive drive = match(url);
             if (drive != null) {
-                SpiderDebug.log("DriveManager getVod: matched " + drive.getKey());
-                return drive.getVod(url);
+                Leodanmu.log("DriveManager getVod: matched " + drive.getKey() + " url=" + url);
+                JSONObject vod = drive.getVod(url);
+                if (vod != null) {
+                    Leodanmu.log("DriveManager getVod: " + drive.getKey() + " success, title="
+                            + vod.optString("vod_name", "") + " playUrl(len)=" + vod.optString("vod_play_url", "").length());
+                } else {
+                    Leodanmu.log("DriveManager getVod: " + drive.getKey() + " returned null");
+                }
+                return vod;
             }
+            Leodanmu.log("DriveManager getVod: no drive matched for " + url);
         } catch (Exception e) {
-            SpiderDebug.log("DriveManager getVod error: " + e.getMessage());
+            Leodanmu.log("DriveManager getVod error: " + e.getMessage());
         }
         return null;
     }
@@ -130,18 +138,31 @@ public class DriveManager {
                 drive = match(id);
             }
             if (drive != null) {
-                SpiderDebug.log("DriveManager play: using " + drive.getKey() + " flag=" + flag);
+                Leodanmu.log("DriveManager play: using " + drive.getKey() + " flag=" + flag + " id=" + id);
                 JSONObject result = drive.play(id, flag);
-                if (result != null && result.has("url") && !(result.opt("url") instanceof JSONArray)) {
-                    String directUrl = result.optString("url", "");
-                    if (!TextUtils.isEmpty(directUrl)) {
-                        wrapWithDualTrack(result, drive.getKey(), directUrl);
+                if (result != null) {
+                    Object urlObj = result.opt("url");
+                    Leodanmu.log("DriveManager play: " + drive.getKey() + " raw url="
+                            + (urlObj != null ? urlObj.toString().substring(0, Math.min(urlObj.toString().length(), 150)) : "null"));
+                    if (result.has("header")) {
+                        JSONObject h = result.optJSONObject("header");
+                        Leodanmu.log("DriveManager play: headers present, cookie="
+                                + (h != null && h.has("Cookie") ? h.optString("Cookie", "").substring(0, Math.min(h.optString("Cookie", "").length(), 80)) : "none"));
                     }
+                    if (!(result.opt("url") instanceof JSONArray)) {
+                        String directUrl = result.optString("url", "");
+                        if (!TextUtils.isEmpty(directUrl)) {
+                            wrapWithDualTrack(result, drive.getKey(), directUrl);
+                        }
+                    }
+                } else {
+                    Leodanmu.log("DriveManager play: " + drive.getKey() + " returned null");
                 }
                 return result;
             }
+            Leodanmu.log("DriveManager play: no drive for flag=" + flag + " id=" + id);
         } catch (Exception e) {
-            SpiderDebug.log("DriveManager play error: " + e.getMessage());
+            Leodanmu.log("DriveManager play error: " + e.getMessage());
         }
         return null;
     }
@@ -153,6 +174,9 @@ public class DriveManager {
         int chunkSize = spc != null ? spc.chunkSize : 256;
 
         String proxyUrl = buildProxyUrl(directUrl, thread, chunkSize);
+        Leodanmu.log("DriveManager wrapWithDualTrack: " + driveKey + " thread=" + thread
+                + " chunk=" + chunkSize + " proxy=" + proxyUrl.substring(0, Math.min(proxyUrl.length(), 120)));
+
         JSONArray urls = new JSONArray();
 
         boolean proxyDefault = !"baidu".equals(driveKey) && !"a123".equals(driveKey);

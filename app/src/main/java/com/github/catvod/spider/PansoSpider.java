@@ -139,20 +139,36 @@ public class PansoSpider extends Spider {
             JSONObject req = new JSONObject();
             req.put("kw", key);
             req.put("cloud_types", cloudTypes);
+            Leodanmu.log("PansoSpider search: key=" + key + " api=" + buildSearchUrl() + " drives=" + cloudTypes);
             String response = OkHttp.post(buildSearchUrl(), req.toString());
-            if (TextUtils.isEmpty(response)) return "{\"list\":[]}";
+            if (TextUtils.isEmpty(response)) {
+                Leodanmu.log("PansoSpider search: empty response");
+                return "{\"list\":[]}";
+            }
             JSONObject data = new JSONObject(response);
-            if (data.optInt("code") != 0) return "{\"list\":[]}";
+            int code = data.optInt("code");
+            if (code != 0) {
+                Leodanmu.log("PansoSpider search: api code=" + code);
+                return "{\"list\":[]}";
+            }
             JSONObject dataObj = data.optJSONObject("data");
-            if (dataObj == null) return "{\"list\":[]}";
+            if (dataObj == null) {
+                Leodanmu.log("PansoSpider search: no data object");
+                return "{\"list\":[]}";
+            }
             JSONObject merged = dataObj.optJSONObject("merged_by_type");
-            if (merged == null) return "{\"list\":[]}";
+            if (merged == null) {
+                Leodanmu.log("PansoSpider search: no merged_by_type");
+                return "{\"list\":[]}";
+            }
             JSONArray results = new JSONArray();
+            int total = 0;
             for (String dk : DRIVE_ORDER) {
                 String ct = DRIVE_MAP.get(dk);
                 if (ct == null) continue;
                 JSONArray items = merged.optJSONArray(ct);
                 if (items == null) continue;
+                int driveCount = 0;
                 for (int i = 0; i < items.length(); i++) {
                     JSONObject item = items.optJSONObject(i);
                     if (item == null) continue;
@@ -177,8 +193,12 @@ public class PansoSpider extends Spider {
                     vod.put("vod_tag", dk);
                     vod.put("vod_content", "");
                     results.put(vod);
+                    driveCount++;
+                    total++;
                 }
+                if (driveCount > 0) Leodanmu.log("PansoSpider search: " + dk + " counts=" + driveCount);
             }
+            Leodanmu.log("PansoSpider search: total results=" + total + " for key=" + key);
             JSONObject result = new JSONObject();
             result.put("list", results);
             return result.toString();
@@ -192,30 +212,43 @@ public class PansoSpider extends Spider {
     public String detailContent(List<String> ids) throws Exception {
         if (ids == null || ids.isEmpty()) return "";
         String shareUrl = ids.get(0);
+        Leodanmu.log("PansoSpider detail: url=" + shareUrl);
         try {
             JSONObject vod = driveManager.getVod(shareUrl);
             if (vod != null) {
+                String playUrl = vod.optString("vod_play_url", "");
+                String playFrom = vod.optString("vod_play_from", "");
+                Leodanmu.log("PansoSpider detail: from=" + playFrom + " playUrl(len)=" + playUrl.length());
                 JSONArray list = new JSONArray();
                 list.put(vod);
                 JSONObject result = new JSONObject();
                 result.put("list", list);
                 return result.toString();
             }
+            Leodanmu.log("PansoSpider detail: driveManager.getVod returned null for " + shareUrl);
         } catch (Exception e) {
-            SpiderDebug.log("PansoSpider detail error: " + e.getMessage());
+            Leodanmu.log("PansoSpider detail error: " + e.getMessage());
         }
         return "";
     }
 
     @Override
     public String playerContent(String flag, String id, List<String> vipFlags) throws Exception {
+        Leodanmu.log("PansoSpider player: flag=" + flag + " id=" + id);
         if (TextUtils.isEmpty(id)) return "";
         try {
             JSONObject result = driveManager.play(flag, id);
-            if (result != null) return result.toString();
+            if (result != null) {
+                Object urlObj = result.opt("url");
+                String urlStr = urlObj != null ? urlObj.toString() : "null";
+                Leodanmu.log("PansoSpider player: result url=" + urlStr.substring(0, Math.min(urlStr.length(), 200)));
+                return result.toString();
+            }
+            Leodanmu.log("PansoSpider player: driveManager.play returned null");
         } catch (Exception e) {
-            SpiderDebug.log("PansoSpider player error: " + e.getMessage());
+            Leodanmu.log("PansoSpider player error: " + e.getMessage());
         }
+        Leodanmu.log("PansoSpider player: falling back to direct url=" + id);
         try {
             JSONObject result = new JSONObject();
             result.put("parse", 0);

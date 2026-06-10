@@ -78,7 +78,12 @@ public class DanmakuConfigManager {
             config.setApiUrls(existing.getApiUrls());
         }
         sDanmakuConfig = config;
-        Leodanmu.log("cfg saved: proxyThread=" + config.getProxyThread() + " chunk=" + config.getProxyChunkSize() + " autoTune=" + config.isEnableAutoTune() + " type=" + config.getProxyType());
+        Leodanmu.log("cfg saved: proxyThread=" + config.getProxyThread() + " chunk=" + config.getProxyChunkSize() + " autoTune=" + config.isEnableAutoTune() + " type=" + config.getProxyType()
+                + " quark=" + (config.getQuarkCookie() != null ? config.getQuarkCookie().length() : 0)
+                + " bd=" + (config.getBaiduCookie() != null ? config.getBaiduCookie().length() : 0)
+                + " uc=" + (config.getUcCookie() != null ? config.getUcCookie().length() : 0)
+                + " 115=" + (config.getPan115Cookie() != null ? config.getPan115Cookie().length() : 0)
+                + " ali=" + (config.getAliRefreshToken() != null ? config.getAliRefreshToken().length() : 0));
         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         String json = gson.toJson(config);
         prefs.edit().putString(KEY_CONFIG_JSON, json).apply();

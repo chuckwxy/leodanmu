@@ -56,6 +56,7 @@ public class Pan115DriveResolver implements CloudDrive {
     @Override
     public JSONObject getVod(String url) {
         try {
+            Leodanmu.log("115 getVod: url=" + url + " cookie(len)=" + cookie.length() + " empty=" + TextUtils.isEmpty(cookie));
             Matcher m = SHARE_PATTERN.matcher(url);
             if (!m.find()) return null;
             String shareCode = m.group(1);
@@ -112,6 +113,7 @@ public class Pan115DriveResolver implements CloudDrive {
     @Override
     public JSONObject play(String input, String flag) {
         try {
+            Leodanmu.log("115 play: input=" + input.substring(0, Math.min(input.length(), 80)) + " cookie(len)=" + cookie.length() + " empty=" + TextUtils.isEmpty(cookie));
             JSONObject result = new JSONObject();
             result.put("parse", 0);
             result.put("url", input);

@@ -248,7 +248,11 @@ public class QuarkDriveResolver implements CloudDrive {
     }
 
     private void transferToDrive(ShareInfo info, TokenResult tokenResult, String fileId) throws Exception {
-        if (TextUtils.isEmpty(cookie)) return;
+        if (TextUtils.isEmpty(cookie)) {
+            Leodanmu.log("Quark transferToDrive: skipped, cookie empty");
+            return;
+        }
+        Leodanmu.log("Quark transferToDrive: shareId=" + info.pwdId + " fileId=" + fileId);
 
         JSONObject body = new JSONObject();
         JSONArray fidList = new JSONArray();
@@ -265,14 +269,19 @@ public class QuarkDriveResolver implements CloudDrive {
         OkResult result = OkHttp.post(API_BASE + "/1/clouddrive/share/sharepage/save?pr=ucpro&fr=pc&__dt=" + System.currentTimeMillis(),
                 body.toString(), headers);
         String resp = result != null ? result.getBody() : "";
-        if (TextUtils.isEmpty(resp)) throw new Exception("save response empty");
+        if (TextUtils.isEmpty(resp)) {
+            Leodanmu.log("Quark transferToDrive: save response empty");
+            throw new Exception("save response empty");
+        }
 
         JSONObject json = new JSONObject(resp);
         int code = json.optInt("status", json.optInt("code", -1));
         if (code != 0 && code != 200) {
             String msg = json.optString("message", json.optString("msg", "unknown"));
-            SpiderDebug.log("Quark transferToDrive: " + msg + " (" + code + ")");
+            Leodanmu.log("Quark transferToDrive: failed " + msg + " (" + code + ")");
             if (code != 40008) throw new Exception("save failed: " + msg);
+        } else {
+            Leodanmu.log("Quark transferToDrive: success code=" + code);
         }
 
         JSONObject data = json.optJSONObject("data");
@@ -281,7 +290,7 @@ public class QuarkDriveResolver implements CloudDrive {
             if (fids != null && fids.length() > 0) {
                 String savedFileId = fids.optString(0, "");
                 if (!TextUtils.isEmpty(savedFileId)) {
-                    Leodanmu.log("Quark saved to drive: " + savedFileId);
+                    Leodanmu.log("Quark transferToDrive: saved fileId=" + savedFileId);
                     DriveManager.cleanupRegistry.scheduleDelete("quark", savedFileId);
                 }
             }
@@ -290,8 +299,10 @@ public class QuarkDriveResolver implements CloudDrive {
 
     public JSONObject play(String input, String flag) {
         try {
+            Leodanmu.log("Quark play: input=" + input.substring(0, Math.min(input.length(), 60)) + " cookie(len)=" + cookie.length() + " empty=" + TextUtils.isEmpty(cookie));
             PlayToken token = decodePlayToken(input);
             if (token == null) {
+                Leodanmu.log("Quark play: token decode failed, falling back to proxyPlay");
                 return proxyPlay(input, flag);
             }
 
@@ -325,6 +336,7 @@ public class QuarkDriveResolver implements CloudDrive {
                 if (data != null) {
                     String videoUrl = data.optString("video_url", "");
                     if (!TextUtils.isEmpty(videoUrl)) {
+                        Leodanmu.log("Quark play: got video_url=" + videoUrl.substring(0, Math.min(videoUrl.length(), 120)));
                         JSONObject result = new JSONObject();
                         result.put("parse", 0);
                         result.put("url", videoUrl);
@@ -337,7 +349,12 @@ public class QuarkDriveResolver implements CloudDrive {
                         result.put("header", respHeaders);
                         return result;
                     }
+                    Leodanmu.log("Quark play: no video_url in response");
+                } else {
+                    Leodanmu.log("Quark play: no data in response");
                 }
+            } else {
+                Leodanmu.log("Quark play: empty response from video API");
             }
         } catch (Exception e) {
             SpiderDebug.log("Quark play error: " + e.getMessage());
@@ -365,6 +382,7 @@ public class QuarkDriveResolver implements CloudDrive {
 
     public JSONObject getVod(String url) {
         try {
+            Leodanmu.log("Quark getVod: url=" + url + " cookie(len)=" + cookie.length() + " empty=" + TextUtils.isEmpty(cookie));
             ShareInfo info = parseShareUrl(url);
             if (TextUtils.isEmpty(info.pwdId)) return null;
 

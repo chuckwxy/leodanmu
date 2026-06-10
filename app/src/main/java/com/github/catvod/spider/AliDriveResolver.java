@@ -96,11 +96,13 @@ public class AliDriveResolver implements CloudDrive {
     @Override
     public JSONObject getVod(String url) {
         try {
+            Leodanmu.log("Ali getVod: url=" + url + " refreshToken(len)=" + (refreshToken != null ? refreshToken.length() : 0));
             Matcher m = SHARE_ID_PATTERN.matcher(url);
             if (!m.find()) return null;
             String shareId = m.group(1);
 
             String token = getAccessToken();
+            Leodanmu.log("Ali getVod: accessToken empty=" + TextUtils.isEmpty(token));
             if (TextUtils.isEmpty(token)) return null;
 
             Map<String, String> headers = buildHeaders();
@@ -174,6 +176,7 @@ public class AliDriveResolver implements CloudDrive {
     public JSONObject play(String input, String flag) {
         try {
             getAccessToken();
+            Leodanmu.log("Ali play: input=" + input.substring(0, Math.min(input.length(), 80)) + " accessToken empty=" + TextUtils.isEmpty(accessToken));
             JSONObject result = new JSONObject();
             result.put("parse", 0);
             result.put("url", input);

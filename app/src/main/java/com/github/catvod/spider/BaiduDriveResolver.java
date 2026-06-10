@@ -93,6 +93,7 @@ public class BaiduDriveResolver implements CloudDrive {
     @Override
     public JSONObject getVod(String url) {
         try {
+            Leodanmu.log("Baidu getVod: url=" + url + " bduss(len)=" + (bduss != null ? bduss.length() : 0) + " empty=" + TextUtils.isEmpty(bduss));
             String surl = extractSurl(url);
             if (TextUtils.isEmpty(surl)) return null;
 
@@ -179,6 +180,7 @@ public class BaiduDriveResolver implements CloudDrive {
     @Override
     public JSONObject play(String input, String flag) {
         try {
+            Leodanmu.log("Baidu play: input=" + input.substring(0, Math.min(input.length(), 80)) + " bduss(len)=" + (bduss != null ? bduss.length() : 0));
             JSONObject result = new JSONObject();
             result.put("parse", 0);
             result.put("url", input);

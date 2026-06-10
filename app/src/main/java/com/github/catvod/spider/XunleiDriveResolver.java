@@ -86,6 +86,7 @@ public class XunleiDriveResolver implements CloudDrive {
     public JSONObject getVod(String url) {
         try {
             login();
+            Leodanmu.log("Xunlei getVod: url=" + url + " accessToken empty=" + TextUtils.isEmpty(accessToken));
             Matcher m = SHARE_PATTERN.matcher(url);
             if (!m.find()) return null;
             String shareCode = m.group(1);
