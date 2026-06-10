@@ -209,9 +209,10 @@ public class DriveManager {
         private final Runnable cleanupRunnable = new Runnable() {
             @Override
             public void run() {
+                List<CleanupEntry> toDelete;
                 synchronized (CleanupRegistry.this) {
                     long now = System.currentTimeMillis();
-                    List<CleanupEntry> toDelete = new ArrayList<>();
+                    toDelete = new ArrayList<>();
                     for (CleanupEntry entry : pending) {
                         if (now - entry.scheduledAt >= DELETE_DELAY_MS) {
                             toDelete.add(entry);
