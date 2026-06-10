@@ -1389,14 +1389,9 @@ public class DanmakuUIHelper {
 
                 LinearLayout titleLayout = new LinearLayout(activity);
                 titleLayout.setOrientation(LinearLayout.VERTICAL);
-                titleLayout.setBackgroundColor(colors.bgSecondary);
+                titleLayout.setBackgroundColor(Color.TRANSPARENT);
                 titleLayout.setPadding(dpToPx(activity, 20), dpToPx(activity, 16),
                         dpToPx(activity, 20), dpToPx(activity, 16));
-                float r16 = dpToPx(activity, 16);
-                android.graphics.drawable.GradientDrawable titleBg = new android.graphics.drawable.GradientDrawable();
-                titleBg.setColor(colors.bgSecondary);
-                titleBg.setCornerRadii(new float[]{r16, r16, r16, r16, 0, 0, 0, 0});
-                titleLayout.setBackground(titleBg);
 
                 TextView titleText = new TextView(activity);
                 titleText.setText("Leo弹幕日志");
@@ -2305,14 +2300,25 @@ public class DanmakuUIHelper {
                 int[] curThread = {spc != null ? spc.thread : 8};
                 int[] curChunk = {spc != null ? spc.chunkSize : 256};
 
+                LinearLayout outer = new LinearLayout(activity);
+                outer.setOrientation(LinearLayout.VERTICAL);
+                GradientDrawable outerBg = new GradientDrawable();
+                outerBg.setColor(Color.WHITE);
+                outerBg.setCornerRadius(dpToPx(activity, 16));
+                outer.setBackground(outerBg);
+
+                TextView proxyTitle = new TextView(activity);
+                proxyTitle.setText(displayName + " 代理配置");
+                proxyTitle.setTextSize(18);
+                proxyTitle.setTypeface(null, android.graphics.Typeface.BOLD);
+                proxyTitle.setTextColor(0xFF333333);
+                proxyTitle.setPadding(dpToPx(activity, 24), dpToPx(activity, 20),
+                        dpToPx(activity, 24), dpToPx(activity, 8));
+                outer.addView(proxyTitle);
+
                 LinearLayout layout = new LinearLayout(activity);
                 layout.setOrientation(LinearLayout.VERTICAL);
-                layout.setPadding(dpToPx(activity, 24), dpToPx(activity, 16),
-                        dpToPx(activity, 24), dpToPx(activity, 16));
-                GradientDrawable proxyBg = new GradientDrawable();
-                proxyBg.setColor(Color.WHITE);
-                proxyBg.setCornerRadius(dpToPx(activity, 16));
-                layout.setBackground(proxyBg);
+                layout.setPadding(dpToPx(activity, 24), 0, dpToPx(activity, 24), dpToPx(activity, 20));
 
                 // 线程行
                 LinearLayout threadRow = new LinearLayout(activity);
@@ -2365,8 +2371,7 @@ public class DanmakuUIHelper {
                 layout.addView(chunkRow);
 
                 AlertDialog proxyDialog = new AlertDialog.Builder(activity)
-                        .setTitle(displayName + " 代理配置")
-                        .setView(layout)
+                        .setView(outer)
                         .setPositiveButton("保存", (dialog, which) -> {
                             try {
                                 int t = Integer.parseInt(threadInput.getText().toString().trim());
