@@ -502,15 +502,49 @@ public class DanmakuUIHelper {
                 TextView apiLabel = new TextView(activity);
                 apiLabel.setText("弹幕API地址");
                 apiLabel.setTextSize(14);
-                apiLabel.setTextColor(colors.textPrimary);
-                apiLabel.setPadding(0, 0, 0, dpToPx(activity, 8));
-                mainLayout.addView(apiLabel);
+                LinearLayout apiHeaderRow = new LinearLayout(activity);
+                apiHeaderRow.setOrientation(LinearLayout.HORIZONTAL);
+                apiHeaderRow.setGravity(Gravity.CENTER_VERTICAL);
+                apiHeaderRow.setPadding(0, 0, 0, dpToPx(activity, 6));
+                apiHeaderRow.addView(apiLabel);
+                View apiSpacer = new View(activity);
+                apiSpacer.setLayoutParams(new LinearLayout.LayoutParams(0, 0, 1));
+                apiHeaderRow.addView(apiSpacer);
+                Button apiQrBtn = new Button(activity);
+                apiQrBtn.setText("📱");
+                apiQrBtn.setTextSize(14);
+                apiQrBtn.setFocusable(true);
+                apiQrBtn.setFocusableInTouchMode(true);
+                int apiQrSize = dpToPx(activity, 36);
+                LinearLayout.LayoutParams apiQrParams = new LinearLayout.LayoutParams(apiQrSize, apiQrSize);
+                apiQrBtn.setLayoutParams(apiQrParams);
+                apiQrBtn.setPadding(0, 0, 0, 0);
+                GradientDrawable apiQrBg = new GradientDrawable();
+                apiQrBg.setShape(GradientDrawable.OVAL);
+                apiQrBg.setColor(colors.bgSecondary);
+                apiQrBg.setStroke(dpToPx(activity, 1), colors.divider);
+                apiQrBtn.setBackground(apiQrBg);
+                apiQrBtn.setOnFocusChangeListener((v, hasFocus) -> {
+                    GradientDrawable focusBg = new GradientDrawable();
+                    focusBg.setShape(GradientDrawable.OVAL);
+                    focusBg.setColor(colors.bgSecondary);
+                    if (hasFocus) {
+                        focusBg.setStroke(dpToPx(activity, 2), colors.focusBorder);
+                        v.animate().scaleX(1.1f).scaleY(1.1f).setDuration(150).start();
+                    } else {
+                        focusBg.setStroke(dpToPx(activity, 1), colors.divider);
+                        v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start();
+                    }
+                    v.setBackground(focusBg);
+                });
+                apiHeaderRow.addView(apiQrBtn);
+                mainLayout.addView(apiHeaderRow);
 
                 EditText apiInput = new EditText(activity);
                 apiInput.setText(TextUtils.join("\n", config.getApiUrls()));
                 apiInput.setHint("例如: https://example.com/87654321");
-                apiInput.setMinLines(3);
-                apiInput.setMaxLines(5);
+                apiInput.setMinLines(2);
+                apiInput.setMaxLines(3);
                 apiInput.setTextColor(colors.textPrimary);
                 apiInput.setTextSize(13);
                 apiInput.setPadding(dpToPx(activity, 12), dpToPx(activity, 12),
@@ -518,6 +552,20 @@ public class DanmakuUIHelper {
                 apiInput.setHintTextColor(colors.textTertiary);
                 setupEditTextBorder(apiInput, activity, colors);
                 mainLayout.addView(apiInput);
+
+                final EditText apiInputRef = apiInput;
+                apiQrBtn.setOnClickListener(v -> {
+                    RemoteInputBus.ConfigCallback apiCb = (f, v2) -> activity.runOnUiThread(() -> {
+                        if (f.equals("api_urls")) {
+                            apiInputRef.setText(v2);
+                            Utils.safeShowToast(activity, "已收到API地址输入");
+                        }
+                    });
+                    RemoteInputBus.onConfigInput(apiCb);
+                    String localIp = NetworkUtils.getLocalIpAddress();
+                    String url = "http://" + localIp + ":9888/config_input?field=api_urls";
+                    showFloatingQRCodeDialog(activity, url, "");
+                });
 
                 // 主内容区：左侧两张卡片并排，底部二维码单独放置
                 int labelWidth = dpToPx(activity, 104);

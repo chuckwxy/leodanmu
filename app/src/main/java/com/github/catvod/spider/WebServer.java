@@ -231,7 +231,8 @@ public class WebServer extends NanoHTTPD {
             return handleConfigFields();
         }
         else if (uri.equals("/config_input")) {
-            return newFixedLengthResponse(getConfigInputHtml());
+            String field = session.getParms().get("field");
+            return newFixedLengthResponse(getConfigInputHtml(field));
         }
         else if (uri.equals("/send_config_value")) {
             Map<String, String> params = session.getParms();
@@ -464,7 +465,8 @@ public class WebServer extends NanoHTTPD {
             String[][] fields = {
                 {"http_proxy", "HTTP代理"},
                 {"ylhj_host", "不夜地址"},
-                {"ylhj_token", "不夜Token"}
+                {"ylhj_token", "不夜Token"},
+                {"api_urls", "弹幕API地址"}
             };
             for (int i = 0; i < fields.length; i++) {
                 if (i > 0) json.append(",");
@@ -475,6 +477,7 @@ public class WebServer extends NanoHTTPD {
                         case "http_proxy": val = config.getHttpProxyUrl(); break;
                         case "ylhj_host": val = config.getYlhjHost(); break;
                         case "ylhj_token": val = config.getYlhjToken(); break;
+                        case "api_urls": val = TextUtils.join("\n", config.getApiUrls()); break;
                     }
                 }
                 json.append("{\"id\":\"").append(fields[i][0])
@@ -494,14 +497,27 @@ public class WebServer extends NanoHTTPD {
         return s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t");
     }
 
-    private String getConfigInputHtml() {
+    private String getConfigInputHtml(String selectedField) {
+        String preselectJs = "";
+        if (!TextUtils.isEmpty(selectedField)) {
+            preselectJs = "const urlField = '" + selectedField.replace("'", "\\'") + "';" +
+                    "setTimeout(() => {" +
+                    "  const sel = document.getElementById('fieldSelect');" +
+                    "  for (let i = 0; i < sel.options.length; i++) {" +
+                    "    if (sel.options[i].value === urlField) { sel.selectedIndex = i; break; }" +
+                    "  }" +
+                    "  updateCurrentValue();" +
+                    "  document.getElementById('valueInput').focus();" +
+                    "}, 200);";
+        }
         return "<!DOCTYPE html><html><head><title>配置远程输入</title><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>" +
                 "<style>" +
                 "body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; }" +
                 ".container { max-width: 500px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }" +
                 "h1 { text-align: center; color: #333; margin-bottom: 24px; font-size: 20px; }" +
                 "label { display: block; margin-bottom: 6px; font-weight: bold; color: #555; font-size: 14px; }" +
-                "select, input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 5px; font-size: 16px; box-sizing: border-box; margin-bottom: 16px; }" +
+                "select, input, textarea { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 5px; font-size: 16px; box-sizing: border-box; margin-bottom: 16px; }" +
+                "textarea { min-height: 80px; resize: vertical; font-family: monospace; }" +
                 ".current-value { background: #f8f9fa; padding: 10px; border-radius: 5px; margin-bottom: 16px; font-size: 13px; color: #666; word-break: break-all; }" +
                 "button { width: 100%; padding: 14px; background: #007bff; color: white; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; }" +
                 "button:hover { background: #0056b3; }" +
@@ -513,8 +529,9 @@ public class WebServer extends NanoHTTPD {
                 "<label for='fieldSelect'>选择配置项：</label>" +
                 "<select id='fieldSelect'></select>" +
                 "<div class='current-value' id='currentValue'>当前值: </div>" +
-                "<label for='valueInput'>输入新值：</label>" +
+                "<label for='valueInput' id='inputLabel'>输入新值：</label>" +
                 "<input type='text' id='valueInput' placeholder='请输入新值...' autofocus>" +
+                "<textarea id='valueTextarea' placeholder='每行一个URL...' style='display:none'></textarea>" +
                 "<button onclick='send()'>发送到TV</button>" +
                 "<div class='status' id='status'></div>" +
                 "<a href='/' class='back-link'>返回弹幕搜索</a>" +
@@ -530,8 +547,15 @@ public class WebServer extends NanoHTTPD {
                 "    sel.appendChild(opt);" +
                 "  });" +
                 "  updateCurrentValue();" +
+                preselectJs +
                 "});" +
-                "document.getElementById('fieldSelect').onchange = updateCurrentValue;" +
+                "document.getElementById('fieldSelect').onchange = function() {" +
+                "  updateCurrentValue();" +
+                "  const f = fields.find(x => x.id === this.value);" +
+                "  const isMulti = f && f.id === 'api_urls';" +
+                "  document.getElementById('valueInput').style.display = isMulti ? 'none' : '';" +
+                "  document.getElementById('valueTextarea').style.display = isMulti ? '' : 'none';" +
+                "};" +
                 "function updateCurrentValue() {" +
                 "  const sel = document.getElementById('fieldSelect');" +
                 "  const f = fields.find(x => x.id === sel.value);" +
@@ -539,7 +563,9 @@ public class WebServer extends NanoHTTPD {
                 "}" +
                 "function send() {" +
                 "  const field = document.getElementById('fieldSelect').value;" +
-                "  const value = document.getElementById('valueInput').value.trim();" +
+                "  const f = fields.find(x => x.id === field);" +
+                "  const isMulti = f && f.id === 'api_urls';" +
+                "  const value = isMulti ? document.getElementById('valueTextarea').value.trim() : document.getElementById('valueInput').value.trim();" +
                 "  if (!value) { document.getElementById('status').textContent = '请输入值'; return; }" +
                 "  document.getElementById('status').textContent = '发送中...';" +
                 "  fetch('/send_config_value?field=' + encodeURIComponent(field) + '&value=' + encodeURIComponent(value))" +

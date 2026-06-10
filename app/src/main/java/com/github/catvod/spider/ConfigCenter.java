@@ -390,7 +390,7 @@ public class ConfigCenter extends Spider {
         qrBtn.setOnClickListener(v -> {
             RemoteInputBus.onConfigInput(configCb);
             String localIp = NetworkUtils.getLocalIpAddress();
-            String url = "http://" + localIp + ":9888/config_input";
+            String url = "http://" + localIp + ":9888/config_input?field=" + fieldId;
             DanmakuUIHelper.showFloatingQRCodeDialog(ctx, url, title);
         });
 
