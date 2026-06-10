@@ -406,6 +406,19 @@ public class ConfigCenter extends Spider {
         cancelBg.setStroke(1, 0xFFCCCCCC);
         cancelBg.setColor(0xFFF5F5F5);
         cancelBtn.setBackground(cancelBg);
+        cancelBtn.setOnFocusChangeListener((v, hasFocus) -> {
+            android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+            bg.setCornerRadius(android.util.TypedValue.applyDimension(
+                    android.util.TypedValue.COMPLEX_UNIT_DIP, 8, ctx.getResources().getDisplayMetrics()));
+            if (hasFocus) {
+                bg.setStroke(2, 0xFF007AFF);
+                bg.setColor(0xFFE8F0FE);
+            } else {
+                bg.setStroke(1, 0xFFCCCCCC);
+                bg.setColor(0xFFF5F5F5);
+            }
+            v.setBackground(bg);
+        });
 
         Button saveBtn = new Button(ctx);
         saveBtn.setText("保存");
@@ -422,6 +435,18 @@ public class ConfigCenter extends Spider {
                 android.util.TypedValue.COMPLEX_UNIT_DIP, 8, ctx.getResources().getDisplayMetrics()));
         saveBg.setColor(0xFF007AFF);
         saveBtn.setBackground(saveBg);
+        saveBtn.setOnFocusChangeListener((v, hasFocus) -> {
+            android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+            bg.setCornerRadius(android.util.TypedValue.applyDimension(
+                    android.util.TypedValue.COMPLEX_UNIT_DIP, 8, ctx.getResources().getDisplayMetrics()));
+            if (hasFocus) {
+                bg.setColor(0xFF0055CC);
+                bg.setStroke(2, 0xFFFFFFFF);
+            } else {
+                bg.setColor(0xFF007AFF);
+            }
+            v.setBackground(bg);
+        });
 
         btnRow.addView(cancelBtn);
         btnRow.addView(saveBtn);

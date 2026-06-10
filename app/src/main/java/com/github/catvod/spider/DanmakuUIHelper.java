@@ -2408,6 +2408,18 @@ public class DanmakuUIHelper {
                 proxyCancelBg.setStroke(1, 0xFFCCCCCC);
                 proxyCancelBg.setColor(0xFFF5F5F5);
                 proxyCancelBtn.setBackground(proxyCancelBg);
+                proxyCancelBtn.setOnFocusChangeListener((v, hasFocus) -> {
+                    GradientDrawable bg = new GradientDrawable();
+                    bg.setCornerRadius(dpToPx(activity, 8));
+                    if (hasFocus) {
+                        bg.setStroke(2, 0xFF007AFF);
+                        bg.setColor(0xFFE8F0FE);
+                    } else {
+                        bg.setStroke(1, 0xFFCCCCCC);
+                        bg.setColor(0xFFF5F5F5);
+                    }
+                    v.setBackground(bg);
+                });
 
                 Button proxySaveBtn = new Button(activity);
                 proxySaveBtn.setText("保存");
@@ -2422,6 +2434,17 @@ public class DanmakuUIHelper {
                 proxySaveBg.setCornerRadius(dpToPx(activity, 8));
                 proxySaveBg.setColor(0xFF007AFF);
                 proxySaveBtn.setBackground(proxySaveBg);
+                proxySaveBtn.setOnFocusChangeListener((v, hasFocus) -> {
+                    GradientDrawable bg = new GradientDrawable();
+                    bg.setCornerRadius(dpToPx(activity, 8));
+                    if (hasFocus) {
+                        bg.setColor(0xFF0055CC);
+                        bg.setStroke(2, 0xFFFFFFFF);
+                    } else {
+                        bg.setColor(0xFF007AFF);
+                    }
+                    v.setBackground(bg);
+                });
 
                 proxyBtnRow.addView(proxyCancelBtn);
                 proxyBtnRow.addView(proxySaveBtn);
