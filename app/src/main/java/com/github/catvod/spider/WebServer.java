@@ -2,6 +2,7 @@ package com.github.catvod.spider;
 
 import android.app.Activity;
 import android.text.TextUtils;
+import com.github.catvod.net.OkHttp;
 import com.github.catvod.spider.entity.DanmakuItem;
 import com.google.gson.Gson;
 import fi.iki.elonen.NanoHTTPD;
@@ -11,6 +12,7 @@ import java.io.IOException;
 import java.net.URLEncoder;
 import java.util.*;
 
+import org.json.JSONObject;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
