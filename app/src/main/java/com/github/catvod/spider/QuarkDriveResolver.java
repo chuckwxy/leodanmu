@@ -154,9 +154,16 @@ public class QuarkDriveResolver implements CloudDrive {
                 String category = item.optString("category", "").toLowerCase();
                 entry.isDir = item.optBoolean("dir", false) || item.optBoolean("is_dir", false) || "dir".equals(category) || "folder".equals(category);
                 entry.isVideo = detectVideo(item);
-                entry.shareFidToken = item.optString("share_fid_token", item.optString("fid_token", item.optString("file_token", "")));
-                if (i == 0 && allFiles.size() == 0 && page == 1) {
-                    Leodanmu.log("Quark listFiles: first item keys=" + (item.names() != null ? item.names().toString() : "{}") + " shareFidToken=" + entry.shareFidToken);
+                String rawFidToken = "";
+                if (item.has("share_fid_token")) rawFidToken = item.optString("share_fid_token");
+                else if (item.has("fid_token")) rawFidToken = item.optString("fid_token");
+                else if (item.has("obj_fid_token")) rawFidToken = item.optString("obj_fid_token");
+                else if (item.has("file_token")) rawFidToken = item.optString("file_token");
+                else if (item.has("token")) rawFidToken = item.optString("token");
+                entry.shareFidToken = rawFidToken;
+                if (allFiles.size() == 0 && page == 1) {
+                    JSONArray allKeys = item.names();
+                    Leodanmu.log("Quark listFiles: first item keys=" + allKeys + " rawFidToken='" + rawFidToken + "' fid=" + entry.fid + " file=" + entry.fileName);
                 }
                 allFiles.add(entry);
             }
@@ -262,7 +269,7 @@ public class QuarkDriveResolver implements CloudDrive {
             Leodanmu.log("Quark transferToDrive: skipped, cookie empty");
             return;
         }
-        Leodanmu.log("Quark transferToDrive: shareId=" + info.pwdId + " fileId=" + fileId + " fidToken=" + (fidToken != null ? !fidToken.isEmpty() : "null"));
+        Leodanmu.log("Quark transferToDrive: shareId=" + info.pwdId + " fileId=" + fileId + " fidToken='" + fidToken + "'");
 
         JSONObject body = new JSONObject();
         JSONArray fidList = new JSONArray();
@@ -271,6 +278,7 @@ public class QuarkDriveResolver implements CloudDrive {
         JSONArray fidTokenList = new JSONArray();
         if (!TextUtils.isEmpty(fidToken)) fidTokenList.put(fidToken);
         body.put("fid_token_list", fidTokenList);
+        Leodanmu.log("Quark transferToDrive: body=" + body.toString());
         body.put("to_pdir_fid", "0");
         body.put("pwd_id", info.pwdId);
         body.put("stoken", tokenResult.stoken);
