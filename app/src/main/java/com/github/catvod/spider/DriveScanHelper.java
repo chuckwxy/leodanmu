@@ -14,12 +14,10 @@ import java.util.Map;
 /** 复用不夜 /api/admin/drive-scan 扫码登录流程 */
 public class DriveScanHelper {
 
-    private static final String BUYE_API = "http://192.168.31.77:8160";
-
     /** 生成二维码，返回 { query_token, qr_text, qr_image_url } */
-    public static JSONObject generateQRCode(String driveKey) {
+    public static JSONObject generateQRCode(String buyeHost, String driveKey) {
         try {
-            String url = BUYE_API + "/api/admin/drive-scan/" + driveKey + "/account/loginqrcode";
+            String url = buyeHost + "/api/admin/drive-scan/" + driveKey + "/account/loginqrcode";
             String body = OkHttp.string(url);
             if (TextUtils.isEmpty(body)) return null;
             return new JSONObject(body);
@@ -30,9 +28,9 @@ public class DriveScanHelper {
     }
 
     /** 轮询扫码状态，返回 { status, key, account } */
-    public static JSONObject checkStatus(String driveKey, String queryToken) {
+    public static JSONObject checkStatus(String buyeHost, String driveKey, String queryToken) {
         try {
-            String url = BUYE_API + "/api/admin/drive-scan/" + driveKey + "/account/scancheck";
+            String url = buyeHost + "/api/admin/drive-scan/" + driveKey + "/account/scancheck";
             JSONObject req = new JSONObject();
             req.put("checkToken", queryToken);
             Map<String, String> headers = new HashMap<>();

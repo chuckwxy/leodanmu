@@ -161,10 +161,7 @@ public class ConfigCenter extends Spider {
             String val = (String) d[2];
             String scanKey = (String) d[3];
             String remark = val.isEmpty() ? "未设置，点击配置" : val.length() > 40 ? val.substring(0, 40) + "..." : val;
-            list.put(createActionVod("drive_" + field, name, "", remark));
-            if (!TextUtils.isEmpty(scanKey)) {
-                list.put(createActionVod("drive_" + field + "_scan", "📷 " + name + " 扫码登录", "", "扫码登录"));
-            }
+            list.put(createActionVod("drive_" + field, name, "", remark + (!TextUtils.isEmpty(scanKey) ? " 支持扫码" : "")));
         }
     }
 
@@ -236,32 +233,17 @@ public class ConfigCenter extends Spider {
                         case "drive_quarkCookie":
                             showDriveCookieDialog(ctx, config, "quarkCookie", "夸克云盘Cookie");
                             break;
-                        case "drive_quarkCookie_scan":
-                            showDriveScanDialog(ctx, config, "quark", "夸克云盘");
-                            break;
                         case "drive_ucCookie":
                             showDriveCookieDialog(ctx, config, "ucCookie", "UC云盘Cookie");
-                            break;
-                        case "drive_ucCookie_scan":
-                            showDriveScanDialog(ctx, config, "uc", "UC云盘");
                             break;
                         case "drive_baiduCookie":
                             showDriveCookieDialog(ctx, config, "baiduCookie", "百度云盘Cookie(BDUSS+STOKEN)");
                             break;
-                        case "drive_baiduCookie_scan":
-                            showDriveScanDialog(ctx, config, "baidu", "百度云盘");
-                            break;
                         case "drive_aliRefreshToken":
                             showDriveCookieDialog(ctx, config, "aliRefreshToken", "阿里云盘RefreshToken");
                             break;
-                        case "drive_aliRefreshToken_scan":
-                            showDriveScanDialog(ctx, config, "ali", "阿里云盘");
-                            break;
                         case "drive_pan115Cookie":
                             showDriveCookieDialog(ctx, config, "pan115Cookie", "115云盘Cookie");
-                            break;
-                        case "drive_pan115Cookie_scan":
-                            showDriveScanDialog(ctx, config, "115", "115云盘");
                             break;
                         case "drive_pan123Username":
                             showDriveAccountDialog(ctx, config, "pan123Username", "pan123Password", "123云盘", "请输入手机号");
@@ -506,6 +488,37 @@ public class ConfigCenter extends Spider {
         btnSep.setBackgroundColor(0xFFE0E0E0);
         outer.addView(btnSep);
 
+        // 扫码登录按钮（仅对支持扫码的网盘显示）
+        if (fieldId.startsWith("drive_quark") || fieldId.startsWith("drive_uc") || fieldId.startsWith("drive_baidu")
+                || fieldId.startsWith("drive_ali") || fieldId.startsWith("drive_pan115")) {
+            Button scanBtn = new Button(ctx);
+            scanBtn.setText("📷 扫码登录（打开手机App扫码）");
+            scanBtn.setTextSize(14);
+            scanBtn.setTextColor(0xFF007AFF);
+            scanBtn.setAllCaps(false);
+            LinearLayout.LayoutParams scanParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            scanParams.setMargins(48, 0, 48, 8);
+            scanBtn.setLayoutParams(scanParams);
+            android.graphics.drawable.GradientDrawable scanBg = new android.graphics.drawable.GradientDrawable();
+            scanBg.setCornerRadius(8);
+            scanBg.setStroke(1, 0xFF007AFF);
+            scanBg.setColor(0xFFE8F0FE);
+            scanBtn.setBackground(scanBg);
+            scanBtn.setOnClickListener(v -> {
+                String driveKey = fieldId.replace("drive_", "").replace("Cookie", "").replace("RefreshToken", "")
+                        .replace("pan", "").replace("115", "115");
+                // Normalize drive key
+                if (fieldId.equals("drive_aliRefreshToken")) driveKey = "ali";
+                if (fieldId.equals("drive_quarkCookie")) driveKey = "quark";
+                if (fieldId.equals("drive_ucCookie")) driveKey = "uc";
+                if (fieldId.equals("drive_baiduCookie")) driveKey = "baidu";
+                if (fieldId.equals("drive_pan115Cookie")) driveKey = "115";
+                showDriveScanDialog(ctx, config, driveKey, getItemName(fieldId), input);
+            });
+            outer.addView(scanBtn);
+        }
+
         LinearLayout btnRow = new LinearLayout(ctx);
         btnRow.setOrientation(LinearLayout.HORIZONTAL);
         btnRow.setPadding(48, 0, 48, 28);
@@ -575,11 +588,13 @@ public class ConfigCenter extends Spider {
         builder.setView(outer);
 
         final String capturedFieldId = fieldId;
+        final String unprefixedFieldId = fieldId.startsWith("drive_") ? fieldId.substring(6) : fieldId;
         RemoteInputBus.ConfigCallback configCb = (f, v) -> ctx.runOnUiThread(() -> {
-            if (f.equals(capturedFieldId)) {
+            if (f.equals(capturedFieldId) || f.equals(unprefixedFieldId)) {
                 input.setText(v);
-                String label = f.equals("ylhj_host") ? "buye host" : f.equals("ylhj_token") ? "buye token" : f;
-                Utils.safeShowToast(ctx, label + "=" + v);
+                saveField(ctx, config, capturedFieldId, v);
+                String label = getItemName(capturedFieldId);
+                Utils.safeShowToast(ctx, label + " 已设置");
             }
         });
 
@@ -591,76 +606,79 @@ public class ConfigCenter extends Spider {
 
         saveBtn.setOnClickListener(v -> {
             String val = input.getText().toString().trim();
-            switch (fieldId) {
-                case "http_proxy":
-                    config.setHttpProxyUrl(val);
-                    DanmakuConfigManager.saveConfig(ctx, config);
-                    Utils.safeShowToast(ctx, val.isEmpty() ? "已清除代理" : "代理已设置");
-                    break;
-                case "ylhj_host":
-                    if (val.endsWith("/")) val = val.substring(0, val.length() - 1);
-                    config.setYlhjHost(val);
-                    DanmakuConfigManager.saveConfig(ctx, config);
-                    Utils.safeShowToast(ctx, val.isEmpty() ? "已恢复默认地址" : "buye host 已设置");
-                    break;
-                case "ylhj_token":
-                    config.setYlhjToken(val);
-                    DanmakuConfigManager.saveConfig(ctx, config);
-                    Utils.safeShowToast(ctx, val.isEmpty() ? "已恢复默认Token" : "buye token 已设置");
-                    break;
-                case "drive_quarkCookie":
-                    config.setQuarkCookie(val);
-                    DanmakuConfigManager.saveConfig(ctx, config);
-                    Utils.safeShowToast(ctx, val.isEmpty() ? "夸克Cookie已清除" : "夸克Cookie已设置");
-                    break;
-                case "drive_ucCookie":
-                    config.setUcCookie(val);
-                    DanmakuConfigManager.saveConfig(ctx, config);
-                    Utils.safeShowToast(ctx, val.isEmpty() ? "UC Cookie已清除" : "UC Cookie已设置");
-                    break;
-                case "drive_baiduCookie":
-                    config.setBaiduCookie(val);
-                    DanmakuConfigManager.saveConfig(ctx, config);
-                    Utils.safeShowToast(ctx, val.isEmpty() ? "百度Cookie已清除" : "百度Cookie已设置");
-                    break;
-                case "drive_aliRefreshToken":
-                    config.setAliRefreshToken(val);
-                    DanmakuConfigManager.saveConfig(ctx, config);
-                    Utils.safeShowToast(ctx, val.isEmpty() ? "阿里Token已清除" : "阿里Token已设置");
-                    break;
-                case "drive_pan115Cookie":
-                    config.setPan115Cookie(val);
-                    DanmakuConfigManager.saveConfig(ctx, config);
-                    Utils.safeShowToast(ctx, val.isEmpty() ? "115 Cookie已清除" : "115 Cookie已设置");
-                    break;
-                case "drive_tianyiAccount":
-                    config.setTianyiAccount(val);
-                    DanmakuConfigManager.saveConfig(ctx, config);
-                    Utils.safeShowToast(ctx, val.isEmpty() ? "天翼Cookie已清除" : "天翼Cookie已设置");
-                    break;
-                case "drive_pansouApiUrl":
-                    config.setPansouApiUrl(val);
-                    DanmakuConfigManager.saveConfig(ctx, config);
-                    Utils.safeShowToast(ctx, val.isEmpty() ? "盘搜API已恢复默认" : "盘搜API已设置");
-                    break;
-                case "drive_pancheckApiUrl":
-                    config.setPancheckApiUrl(val);
-                    DanmakuConfigManager.saveConfig(ctx, config);
-                    Utils.safeShowToast(ctx, val.isEmpty() ? "盘检API已恢复默认" : "盘检API已设置");
-                    break;
-            }
+            saveField(ctx, config, fieldId, val);
             dialog.dismiss();
         });
 
         qrBtn.setOnClickListener(v -> {
             RemoteInputBus.onConfigInput(configCb);
             String localIp = NetworkUtils.getLocalIpAddress();
-            String qrFieldId = fieldId.startsWith("drive_") ? fieldId.substring(6) : fieldId;
-            String url = "http://" + localIp + ":9888/config_input?field=" + qrFieldId;
+            String url = "http://" + localIp + ":9888/config_input?field=" + unprefixedFieldId;
             DanmakuUIHelper.showFloatingQRCodeDialog(ctx, url, title);
         });
 
         dialog.show();
+    }
+
+    private void saveField(Activity ctx, DanmakuConfig config, String fieldId, String val) {
+        switch (fieldId) {
+            case "http_proxy":
+                config.setHttpProxyUrl(val);
+                DanmakuConfigManager.saveConfig(ctx, config);
+                Utils.safeShowToast(ctx, val.isEmpty() ? "已清除代理" : "代理已设置");
+                break;
+            case "ylhj_host":
+                if (val.endsWith("/")) val = val.substring(0, val.length() - 1);
+                config.setYlhjHost(val);
+                DanmakuConfigManager.saveConfig(ctx, config);
+                Utils.safeShowToast(ctx, val.isEmpty() ? "已恢复默认地址" : "buye host 已设置");
+                break;
+            case "ylhj_token":
+                config.setYlhjToken(val);
+                DanmakuConfigManager.saveConfig(ctx, config);
+                Utils.safeShowToast(ctx, val.isEmpty() ? "已恢复默认Token" : "buye token 已设置");
+                break;
+            case "drive_quarkCookie":
+                config.setQuarkCookie(val);
+                DanmakuConfigManager.saveConfig(ctx, config);
+                Utils.safeShowToast(ctx, val.isEmpty() ? "夸克Cookie已清除" : "夸克Cookie已设置");
+                break;
+            case "drive_ucCookie":
+                config.setUcCookie(val);
+                DanmakuConfigManager.saveConfig(ctx, config);
+                Utils.safeShowToast(ctx, val.isEmpty() ? "UC Cookie已清除" : "UC Cookie已设置");
+                break;
+            case "drive_baiduCookie":
+                config.setBaiduCookie(val);
+                DanmakuConfigManager.saveConfig(ctx, config);
+                Utils.safeShowToast(ctx, val.isEmpty() ? "百度Cookie已清除" : "百度Cookie已设置");
+                break;
+            case "drive_aliRefreshToken":
+                config.setAliRefreshToken(val);
+                DanmakuConfigManager.saveConfig(ctx, config);
+                Utils.safeShowToast(ctx, val.isEmpty() ? "阿里Token已清除" : "阿里Token已设置");
+                break;
+            case "drive_pan115Cookie":
+                config.setPan115Cookie(val);
+                DanmakuConfigManager.saveConfig(ctx, config);
+                Utils.safeShowToast(ctx, val.isEmpty() ? "115 Cookie已清除" : "115 Cookie已设置");
+                break;
+            case "drive_tianyiAccount":
+                config.setTianyiAccount(val);
+                DanmakuConfigManager.saveConfig(ctx, config);
+                Utils.safeShowToast(ctx, val.isEmpty() ? "天翼Cookie已清除" : "天翼Cookie已设置");
+                break;
+            case "drive_pansouApiUrl":
+                config.setPansouApiUrl(val);
+                DanmakuConfigManager.saveConfig(ctx, config);
+                Utils.safeShowToast(ctx, val.isEmpty() ? "盘搜API已恢复默认" : "盘搜API已设置");
+                break;
+            case "drive_pancheckApiUrl":
+                config.setPancheckApiUrl(val);
+                DanmakuConfigManager.saveConfig(ctx, config);
+                Utils.safeShowToast(ctx, val.isEmpty() ? "盘检API已恢复默认" : "盘检API已设置");
+                break;
+        }
     }
 
     private void showHttpProxyDialog(Activity ctx, DanmakuConfig config) {
@@ -806,8 +824,12 @@ public class ConfigCenter extends Spider {
         dialog.show();
     }
 
-    private void showDriveScanDialog(Activity ctx, DanmakuConfig config, String driveKey, String displayName) {
-        JSONObject qrResult = DriveScanHelper.generateQRCode(driveKey);
+    private void showDriveScanDialog(Activity ctx, DanmakuConfig config, String driveKey, String displayName, EditText targetInput) {
+        String buyeHost = config.getYlhjHost();
+        if (TextUtils.isEmpty(buyeHost)) {
+            buyeHost = "http://192.168.31.77:8160";
+        }
+        JSONObject qrResult = DriveScanHelper.generateQRCode(buyeHost, driveKey);
         if (qrResult == null) {
             Utils.safeShowToast(ctx, displayName + " 获取二维码失败，检查不夜地址");
             return;
@@ -892,24 +914,22 @@ public class ConfigCenter extends Spider {
                 if (msg.what == 0) {
                     android.os.AsyncTask.SERIAL_EXECUTOR.execute(() -> {
                         try {
-                            JSONObject result = DriveScanHelper.checkStatus(driveKey, queryToken);
+                            JSONObject result = DriveScanHelper.checkStatus(buyeHost, driveKey, queryToken);
                             if (result != null) {
                                 String status = result.optString("status", "");
                                 ctx.runOnUiThread(() -> {
                                     if ("CONFIRMED".equals(status)) {
                                         String account = DriveScanHelper.extractAccount(result);
                                         if (!TextUtils.isEmpty(account)) {
-                                            String field = getDriveFieldKey(driveKey);
-                                            setDriveField(config, field, account);
-                                            DanmakuConfigManager.saveConfig(ctx, config);
-                                            Leodanmu.log("ConfigCenter: " + displayName + " 扫码登录成功, field=" + field);
-                                            statusView.setText("✅ 登录成功");
+                                            targetInput.setText(account);
+                                            Leodanmu.log("ConfigCenter: " + displayName + " 扫码登录成功");
+                                            statusView.setText("✅ 登录成功，已填入输入框，请按「保存」确认");
                                             statusView.setTextColor(0xFF28a745);
                                         } else {
                                             statusView.setText("✅ 已确认，但未获取到账号信息");
                                         }
                                         dialog.dismiss();
-                                        Utils.safeShowToast(ctx, displayName + " 扫码登录成功");
+                                        Utils.safeShowToast(ctx, displayName + " 扫码登录成功，请按保存确认");
                                     } else if ("SCANNED".equals(status)) {
                                         statusView.setText("📱 已扫码，请在手机上确认");
                                         statusView.setTextColor(0xFFff9800);
