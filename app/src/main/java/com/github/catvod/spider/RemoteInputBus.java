@@ -3,10 +3,18 @@ package com.github.catvod.spider;
 /** 零依赖的静态事件总线，替代 EventBus 用于远程输入直发直收 */
 public class RemoteInputBus {
 
-    private static java.util.function.Consumer<String> searchListener;
-    private static java.util.function.BiConsumer<String, String> configListener;
+    public interface SearchCallback {
+        void onKeyword(String keyword);
+    }
 
-    public static void onSearchInput(java.util.function.Consumer<String> listener) {
+    public interface ConfigCallback {
+        void onValue(String field, String value);
+    }
+
+    private static SearchCallback searchListener;
+    private static ConfigCallback configListener;
+
+    public static void onSearchInput(SearchCallback listener) {
         searchListener = listener;
     }
 
@@ -16,11 +24,11 @@ public class RemoteInputBus {
 
     public static void postSearch(String keyword) {
         if (searchListener != null) {
-            searchListener.accept(keyword);
+            searchListener.onKeyword(keyword);
         }
     }
 
-    public static void onConfigInput(java.util.function.BiConsumer<String, String> listener) {
+    public static void onConfigInput(ConfigCallback listener) {
         configListener = listener;
     }
 
@@ -30,7 +38,7 @@ public class RemoteInputBus {
 
     public static void postConfig(String field, String value) {
         if (configListener != null) {
-            configListener.accept(field, value);
+            configListener.onValue(field, value);
         }
     }
 }

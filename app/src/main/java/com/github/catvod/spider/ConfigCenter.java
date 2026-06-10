@@ -377,7 +377,7 @@ public class ConfigCenter extends Spider {
         builder.setNegativeButton("取消", (dialog, which) -> {});
 
         final String capturedFieldId = fieldId;
-        java.util.function.BiConsumer<String, String> configListener = (f, v) -> {
+        RemoteInputBus.ConfigCallback configCb = (f, v) -> {
             if (f.equals(capturedFieldId)) {
                 input.setText(v);
                 Utils.safeShowToast(ctx, "已收到远程输入: " + f);
@@ -388,7 +388,7 @@ public class ConfigCenter extends Spider {
         dialog.setOnDismissListener(d -> RemoteInputBus.removeConfigInput());
 
         qrBtn.setOnClickListener(v -> {
-            RemoteInputBus.onConfigInput(configListener);
+            RemoteInputBus.onConfigInput(configCb);
             String localIp = NetworkUtils.getLocalIpAddress();
             String url = "http://" + localIp + ":9888/config_input";
             DanmakuUIHelper.showFloatingQRCodeDialog(ctx, url, title);
