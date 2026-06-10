@@ -1,9 +1,0 @@
-name=leodm-protected.jar
-stage=v3-native-full
-apk_path=app/build/outputs/apk/protectedRelease/app-protectedRelease.apk
-mapping_saved=yes
-payload_index=c.bin
-payload_meta=payload.meta.json
-payload_sha256=bdf0ebda299ba67943a8a0d6e5ce6ed23c97343f0890fcfe142a14b2528b1199
-jar_sha256=538f315c4c4b70b693175be534339094c76d09d0ad430625bb92a5bfc9179313
-built_at=2026-06-10T15:32:11Z
