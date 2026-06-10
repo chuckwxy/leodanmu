@@ -231,6 +231,7 @@ public class DriveQRCodeUtil {
         String checkUrl = isUc
                 ? "https://api.open.uc.cn/cas/ajax/getServiceTicketByQrcodeToken"
                 : "https://uop.quark.cn/cas/ajax/getServiceTicketByQrcodeToken";
+        Leodanmu.log("QR checkUcLikeStatus: polling " + platform + " token=" + queryToken);
 
         SessionData session = getSession(queryToken, platform);
         if (session == null) {
@@ -256,12 +257,14 @@ public class DriveQRCodeUtil {
         OkResult result = OkHttp.getResult(urlBuilder.toString(), headers);
         JSONObject json = parseBody(result);
         if (json == null) {
+            Leodanmu.log("QR checkUcLikeStatus: " + platform + " response null");
             JSONObject resp = new JSONObject();
             resp.put("status", STATUS_NEW);
             return resp;
         }
 
         int statusCode = json.optInt("status", 0);
+        Leodanmu.log("QR checkUcLikeStatus: " + platform + " status=" + statusCode + " body=" + json.toString());
         if (statusCode == 2000000) {
             JSONObject dataObj = json.optJSONObject("data");
             String serviceTicket = "";
@@ -414,6 +417,7 @@ public class DriveQRCodeUtil {
         OkResult result = OkHttp.post(checkUrl, bodyStr, headers);
         JSONObject json = parseBody(result);
         if (json == null) {
+            Leodanmu.log("QR checkAliStatus: response null");
             JSONObject resp = new JSONObject();
             resp.put("status", STATUS_NEW);
             return resp;
@@ -421,6 +425,7 @@ public class DriveQRCodeUtil {
 
         JSONObject content = json.optJSONObject("content");
         JSONObject data = content != null ? content.optJSONObject("data") : null;
+        Leodanmu.log("QR checkAliStatus: " + (data != null ? data.toString() : "null"));
         if (data == null) {
             JSONObject resp = new JSONObject();
             resp.put("status", STATUS_NEW);
@@ -521,12 +526,14 @@ public class DriveQRCodeUtil {
         OkResult result = OkHttp.getResult(checkUrl, headers);
         JSONObject json = parseBody(result);
         if (json == null) {
+            Leodanmu.log("QR check115Status: response null");
             JSONObject resp = new JSONObject();
             resp.put("status", STATUS_NEW);
             return resp;
         }
 
         JSONObject data = json.optJSONObject("data");
+        Leodanmu.log("QR check115Status: " + (data != null ? data.toString() : "null"));
         if (data == null) {
             JSONObject resp = new JSONObject();
             resp.put("status", STATUS_NEW);
@@ -658,6 +665,7 @@ public class DriveQRCodeUtil {
         OkResult result = OkHttp.getResult(checkUrl.toString(), headers);
         JSONObject json = parseBody(result);
         if (json == null) {
+            Leodanmu.log("QR checkBaiduStatus: response null");
             JSONObject resp = new JSONObject();
             resp.put("status", STATUS_NEW);
             return resp;
@@ -665,6 +673,7 @@ public class DriveQRCodeUtil {
 
         JSONObject data = json.optJSONObject("data");
         if (data == null) data = json;
+        Leodanmu.log("QR checkBaiduStatus: " + json.toString());
 
         String channelV = data.optString("channel_v", "");
         if (!TextUtils.isEmpty(channelV)) {

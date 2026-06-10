@@ -112,6 +112,22 @@ public class OkHttp {
         }
     }
 
+    public static byte[] getBytes(String url, Map<String, String> header) {
+        try {
+            okhttp3.Request.Builder builder = new okhttp3.Request.Builder().url(url);
+            if (header != null) {
+                for (Map.Entry<String, String> e : header.entrySet()) {
+                    builder.addHeader(e.getKey(), e.getValue());
+                }
+            }
+            okhttp3.Response response = client().newCall(builder.build()).execute();
+            return response.body().bytes();
+        } catch (Exception e) {
+            SpiderDebug.log(e);
+            return null;
+        }
+    }
+
     public static String getLocation(String url, Map<String, String> header) throws IOException {
         return getLocation(client().newBuilder().followRedirects(false).followSslRedirects(false).build().newCall(new Request.Builder().url(url).headers(Headers.of(header)).build()).execute().headers().toMultimap());
     }

@@ -908,44 +908,27 @@ public class ConfigCenter extends Spider {
         outer.addView(titleView);
 
         ImageView qrView = new ImageView(ctx);
-        qrView.setLayoutParams(new LinearLayout.LayoutParams(300, 300));
+        LinearLayout.LayoutParams qrLp = new LinearLayout.LayoutParams(300, 300);
+        qrLp.gravity = android.view.Gravity.CENTER;
+        qrView.setLayoutParams(qrLp);
         qrView.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        if (!TextUtils.isEmpty(qrImageUrl)) {
-            android.os.AsyncTask.SERIAL_EXECUTOR.execute(() -> {
-                try {
-                    java.net.URL url = new java.net.URL(qrImageUrl);
-                    java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
-                    conn.setConnectTimeout(5000);
-                    conn.setReadTimeout(5000);
-                    java.io.InputStream is = conn.getInputStream();
-                    android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeStream(is);
-                    is.close();
-                    ctx.runOnUiThread(() -> qrView.setImageBitmap(bmp));
-                } catch (Exception ignored) {}
-            });
-        }
-        outer.addView(qrView);
-
-        if (TextUtils.isEmpty(qrImageUrl) && !TextUtils.isEmpty(qrText)) {
-            String encodedQrContent;
-            try { encodedQrContent = java.net.URLEncoder.encode(qrText, "UTF-8"); }
-            catch (Exception e) { encodedQrContent = qrText; }
-            final String qrApiUrl = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=" + encodedQrContent;
-            android.os.AsyncTask.SERIAL_EXECUTOR.execute(() -> {
-                try {
-                    java.net.URL url = new java.net.URL(qrApiUrl);
-                    java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
-                    conn.setConnectTimeout(5000);
-                    conn.setReadTimeout(5000);
-                    java.io.InputStream is = conn.getInputStream();
-                    android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeStream(is);
-                    is.close();
-                    ctx.runOnUiThread(() -> qrView.setImageBitmap(bmp));
-                } catch (Exception ignored) {
-                    Leodanmu.log("ConfigCenter: qrserver.com failed, showing text fallback");
+        Runnable loadQrImage = () -> {
+            try {
+                String imgUrl = !TextUtils.isEmpty(qrImageUrl) ? qrImageUrl
+                        : "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=" + java.net.URLEncoder.encode(qrText, "UTF-8");
+                byte[] imgBytes = com.github.catvod.net.OkHttp.getBytes(imgUrl, null);
+                if (imgBytes != null) {
+                    android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeByteArray(imgBytes, 0, imgBytes.length);
+                    if (bmp != null) ctx.runOnUiThread(() -> qrView.setImageBitmap(bmp));
                 }
-            });
-            // Add clickable link below image as fallback
+            } catch (Exception e) {
+                Leodanmu.log("ConfigCenter: QR image load failed: " + e.getMessage());
+            }
+        };
+        if (!TextUtils.isEmpty(qrImageUrl)) {
+            new Thread(loadQrImage).start();
+        } else if (!TextUtils.isEmpty(qrText)) {
+            new Thread(loadQrImage).start();
             TextView manualLink = new TextView(ctx);
             manualLink.setText("如果二维码未能显示，请点击下方链接在手机上打开");
             manualLink.setTextSize(11);
@@ -958,6 +941,7 @@ public class ConfigCenter extends Spider {
             });
             outer.addView(manualLink);
         }
+        outer.addView(qrView);
 
         TextView statusView = new TextView(ctx);
         statusView.setText("⏳ 等待扫码...");
@@ -985,53 +969,48 @@ public class ConfigCenter extends Spider {
         });
         dialog.show();
 
-        Handler handler = new Handler(Looper.getMainLooper());
-        Handler.Callback callback = new Handler.Callback() {
-            @Override
-            public boolean handleMessage(android.os.Message msg) {
-                if (!dialog.isShowing()) return false;
-                if (msg.what == 0) {
-                    android.os.AsyncTask.SERIAL_EXECUTOR.execute(() -> {
-                        try {
-                            JSONObject result = DriveQRCodeUtil.checkQRStatus(driveKey, queryToken);
-                            if (result != null) {
-                                String status = result.optString("status", "");
-                                ctx.runOnUiThread(() -> {
-                                    if ("CONFIRMED".equals(status)) {
-                                        String account = result.optString("account", "");
-                                        if (!TextUtils.isEmpty(account)) {
-                                            targetInput.setText(account);
-                                            Leodanmu.log("ConfigCenter: " + displayName + " 扫码登录成功");
-                                            statusView.setText("✅ 登录成功，已填入输入框，请按「保存」确认");
-                                            statusView.setTextColor(0xFF28a745);
-                                        } else {
-                                            statusView.setText("✅ 已确认，但未获取到账号信息");
-                                        }
-                                        dialog.dismiss();
-                                        Utils.safeShowToast(ctx, displayName + " 扫码登录成功，请按保存确认");
-                                    } else if ("SCANNED".equals(status)) {
-                                        statusView.setText("📱 已扫码，请在手机上确认");
-                                        statusView.setTextColor(0xFFff9800);
-                                        handler.sendEmptyMessageDelayed(0, 2000);
-                                    } else if ("EXPIRED".equals(status) || "CANCELED".equals(status)) {
-                                        statusView.setText("❌ 已过期或已取消");
-                                        statusView.setTextColor(0xFFdc3545);
+        new Thread(() -> {
+            android.os.Looper.prepare();
+            Handler pollHandler = new Handler(Looper.myLooper());
+            pollHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    if (!dialog.isShowing()) return;
+                    try {
+                        JSONObject result = DriveQRCodeUtil.checkQRStatus(driveKey, queryToken);
+                        if (result != null) {
+                            String status = result.optString("status", "");
+                            Leodanmu.log("ConfigCenter: poll " + driveKey + " = " + status);
+                            ctx.runOnUiThread(() -> {
+                                if ("CONFIRMED".equals(status)) {
+                                    String account = result.optString("account", "");
+                                    if (!TextUtils.isEmpty(account)) {
+                                        targetInput.setText(account);
+                                        Leodanmu.log("ConfigCenter: " + displayName + " 扫码登录成功");
+                                        statusView.setText("✅ 登录成功，已填入输入框，请按「保存」确认");
+                                        statusView.setTextColor(0xFF28a745);
                                     } else {
-                                        handler.sendEmptyMessageDelayed(0, 2000);
+                                        statusView.setText("✅ 已确认，但未获取到账号信息");
                                     }
-                                });
-                            } else {
-                                handler.sendEmptyMessageDelayed(0, 2000);
-                            }
-                        } catch (Exception e) {
-                            handler.sendEmptyMessageDelayed(0, 2000);
+                                    dialog.dismiss();
+                                    Utils.safeShowToast(ctx, displayName + " 扫码登录成功，请按保存确认");
+                                } else if ("SCANNED".equals(status)) {
+                                    statusView.setText("📱 已扫码，请在手机上确认");
+                                    statusView.setTextColor(0xFFff9800);
+                                } else if ("EXPIRED".equals(status) || "CANCELED".equals(status)) {
+                                    statusView.setText("❌ 已过期或已取消");
+                                    statusView.setTextColor(0xFFdc3545);
+                                }
+                            });
                         }
-                    });
+                    } catch (Exception e) {
+                        Leodanmu.log("ConfigCenter: poll error " + driveKey + ": " + e.getMessage());
+                    }
+                    if (dialog.isShowing()) pollHandler.postDelayed(this, 2000);
                 }
-                return false;
-            }
-        };
-        handler.sendEmptyMessageDelayed(0, 2000);
+            });
+            android.os.Looper.loop();
+        }).start();
     }
 
     private String getDriveFieldKey(String driveKey) {
