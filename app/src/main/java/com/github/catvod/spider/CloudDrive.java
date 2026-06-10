@@ -7,4 +7,6 @@ public interface CloudDrive {
     boolean matchShare(String url);
     JSONObject getVod(String url) throws Exception;
     JSONObject play(String input, String flag) throws Exception;
+    JSONObject generateQRCode() throws Exception;
+    JSONObject checkQRStatus(String queryToken) throws Exception;
 }

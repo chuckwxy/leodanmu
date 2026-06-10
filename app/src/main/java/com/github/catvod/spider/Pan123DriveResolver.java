@@ -15,6 +15,16 @@ import java.util.regex.Pattern;
 
 public class Pan123DriveResolver implements CloudDrive {
 
+    @Override
+    public JSONObject generateQRCode() throws Exception {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public JSONObject checkQRStatus(String queryToken) throws Exception {
+        throw new UnsupportedOperationException();
+    }
+
     private static final String API = "https://www.123pan.com";
     private static final String UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
     private static final Pattern SHARE_PATTERN = Pattern.compile("123pan\\.com/s/([a-zA-Z0-9_-]+)");

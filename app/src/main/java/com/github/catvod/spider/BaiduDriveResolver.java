@@ -169,6 +169,16 @@ public class BaiduDriveResolver implements CloudDrive {
         }
     }
 
+    @Override
+    public JSONObject generateQRCode() throws Exception {
+        return DriveQRCodeUtil.generateBaiduQR();
+    }
+
+    @Override
+    public JSONObject checkQRStatus(String queryToken) throws Exception {
+        return DriveQRCodeUtil.checkBaiduStatus(queryToken);
+    }
+
     private Map<String, String> buildHeaders() {
         Map<String, String> headers = new HashMap<>();
         headers.put("User-Agent", UA);

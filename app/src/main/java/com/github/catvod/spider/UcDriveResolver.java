@@ -145,6 +145,16 @@ public class UcDriveResolver implements CloudDrive {
         }
     }
 
+    @Override
+    public JSONObject generateQRCode() throws Exception {
+        return DriveQRCodeUtil.generateUcQR();
+    }
+
+    @Override
+    public JSONObject checkQRStatus(String queryToken) throws Exception {
+        return DriveQRCodeUtil.checkUcLikeStatus("uc", queryToken);
+    }
+
     private Map<String, String> buildHeaders() {
         Map<String, String> headers = new HashMap<>();
         headers.put("User-Agent", UA);

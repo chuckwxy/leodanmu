@@ -101,6 +101,16 @@ public class Pan115DriveResolver implements CloudDrive {
         }
     }
 
+    @Override
+    public JSONObject generateQRCode() throws Exception {
+        return DriveQRCodeUtil.generate115QR();
+    }
+
+    @Override
+    public JSONObject checkQRStatus(String queryToken) throws Exception {
+        return DriveQRCodeUtil.check115Status(queryToken);
+    }
+
     private Map<String, String> buildHeaders() {
         Map<String, String> headers = new HashMap<>();
         headers.put("User-Agent", UA);

@@ -825,13 +825,15 @@ public class ConfigCenter extends Spider {
     }
 
     private void showDriveScanDialog(Activity ctx, DanmakuConfig config, String driveKey, String displayName, EditText targetInput) {
-        String buyeHost = config.getYlhjHost();
-        if (TextUtils.isEmpty(buyeHost)) {
-            buyeHost = "http://192.168.31.77:8160";
+        JSONObject qrResult;
+        try {
+            qrResult = DriveQRCodeUtil.generateQRCode(driveKey);
+        } catch (Exception e) {
+            Utils.safeShowToast(ctx, displayName + " 获取二维码失败: " + e.getMessage());
+            return;
         }
-        JSONObject qrResult = DriveScanHelper.generateQRCode(buyeHost, driveKey);
         if (qrResult == null) {
-            Utils.safeShowToast(ctx, displayName + " 获取二维码失败，检查不夜地址");
+            Utils.safeShowToast(ctx, displayName + " 获取二维码失败");
             return;
         }
         String queryToken = qrResult.optString("query_token", "");
@@ -879,6 +881,29 @@ public class ConfigCenter extends Spider {
         }
         outer.addView(qrView);
 
+        // If no qr_image_url, generate QR from qr_text via external service
+        if (TextUtils.isEmpty(qrImageUrl) && !TextUtils.isEmpty(qrText)) {
+            final String encodedQrContent;
+            try {
+                encodedQrContent = java.net.URLEncoder.encode(qrText, "UTF-8");
+            } catch (Exception e) {
+                encodedQrContent = qrText;
+            }
+            final String qrApiUrl = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=" + encodedQrContent;
+            android.os.AsyncTask.SERIAL_EXECUTOR.execute(() -> {
+                try {
+                    java.net.URL url = new java.net.URL(qrApiUrl);
+                    java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+                    conn.setConnectTimeout(5000);
+                    conn.setReadTimeout(5000);
+                    java.io.InputStream is = conn.getInputStream();
+                    android.graphics.Bitmap bmp = android.graphics.BitmapFactory.decodeStream(is);
+                    is.close();
+                    ctx.runOnUiThread(() -> qrView.setImageBitmap(bmp));
+                } catch (Exception ignored) {}
+            });
+        }
+
         TextView statusView = new TextView(ctx);
         statusView.setText("⏳ 等待扫码...");
         statusView.setTextSize(14);
@@ -914,12 +939,12 @@ public class ConfigCenter extends Spider {
                 if (msg.what == 0) {
                     android.os.AsyncTask.SERIAL_EXECUTOR.execute(() -> {
                         try {
-                            JSONObject result = DriveScanHelper.checkStatus(buyeHost, driveKey, queryToken);
+                            JSONObject result = DriveQRCodeUtil.checkQRStatus(driveKey, queryToken);
                             if (result != null) {
                                 String status = result.optString("status", "");
                                 ctx.runOnUiThread(() -> {
                                     if ("CONFIRMED".equals(status)) {
-                                        String account = DriveScanHelper.extractAccount(result);
+                                        String account = result.optString("account", "");
                                         if (!TextUtils.isEmpty(account)) {
                                             targetInput.setText(account);
                                             Leodanmu.log("ConfigCenter: " + displayName + " 扫码登录成功");

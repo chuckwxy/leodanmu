@@ -53,6 +53,16 @@ public class AliDriveResolver implements CloudDrive {
         return accessToken;
     }
 
+    @Override
+    public JSONObject generateQRCode() throws Exception {
+        return DriveQRCodeUtil.generateAliQR();
+    }
+
+    @Override
+    public JSONObject checkQRStatus(String queryToken) throws Exception {
+        return DriveQRCodeUtil.checkAliStatus(queryToken);
+    }
+
     private Map<String, String> buildHeaders() {
         Map<String, String> headers = new HashMap<>();
         headers.put("User-Agent", UA);

@@ -369,6 +369,16 @@ public class QuarkDriveResolver implements CloudDrive {
         }
     }
 
+    @Override
+    public JSONObject generateQRCode() throws Exception {
+        return DriveQRCodeUtil.generateQuarkQR();
+    }
+
+    @Override
+    public JSONObject checkQRStatus(String queryToken) throws Exception {
+        return DriveQRCodeUtil.checkUcLikeStatus("quark", queryToken);
+    }
+
     private Map<String, String> buildHeaders() {
         Map<String, String> headers = new HashMap<>();
         headers.put("User-Agent", UA);
