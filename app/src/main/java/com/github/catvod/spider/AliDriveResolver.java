@@ -79,7 +79,7 @@ public class AliDriveResolver implements CloudDrive {
         JSONObject resp = OkHttp.postJson(API + "/v2/share_link/share_to_drive", body.toString(), headers);
         if (resp == null) throw new Exception("transfer response null");
 
-        DriveManager.cleanupRegistry.scheduleDelete("ali", fileId);
+        DriveManager.cleanupRegistry.scheduleDelete("ali", fileId, "");
     }
 
     private Map<String, String> buildHeaders() {

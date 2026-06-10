@@ -359,7 +359,7 @@ public class QuarkDriveResolver implements CloudDrive {
         }
         if (!TextUtils.isEmpty(savedFileId)) {
             Leodanmu.log("Quark transferToDrive: saved fileId=" + savedFileId);
-            DriveManager.cleanupRegistry.scheduleDelete("quark", savedFileId);
+            DriveManager.cleanupRegistry.scheduleDelete("quark", savedFileId, cookie);
         }
         return savedFileId;
     }

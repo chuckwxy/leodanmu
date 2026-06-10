@@ -5,6 +5,8 @@ import android.os.Looper;
 import android.text.TextUtils;
 
 import com.github.catvod.crawler.SpiderDebug;
+import com.github.catvod.net.OkHttp;
+import com.github.catvod.net.OkResult;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -207,6 +209,7 @@ public class DriveManager {
 
     public static class CleanupRegistry {
         private static final long DELETE_DELAY_MS = 5 * 60 * 1000;
+        private static final String UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) quark-cloud-drive/2.5.20 Chrome/100.0.4896.160 Electron/18.3.5.4-b478491100 Safari/537.36 Channel/pckk_other_ch";
         private final List<CleanupEntry> pending = new ArrayList<>();
         private final Handler handler = new Handler(Looper.getMainLooper());
         private boolean running;
@@ -214,16 +217,18 @@ public class DriveManager {
         private static class CleanupEntry {
             String driveKey;
             String fileId;
+            String cookie;
             long scheduledAt;
-            CleanupEntry(String driveKey, String fileId) {
+            CleanupEntry(String driveKey, String fileId, String cookie) {
                 this.driveKey = driveKey;
                 this.fileId = fileId;
+                this.cookie = cookie;
                 this.scheduledAt = System.currentTimeMillis();
             }
         }
 
-        public synchronized void scheduleDelete(String driveKey, String fileId) {
-            pending.add(new CleanupEntry(driveKey, fileId));
+        public synchronized void scheduleDelete(String driveKey, String fileId, String cookie) {
+            pending.add(new CleanupEntry(driveKey, fileId, cookie));
             if (!running) {
                 running = true;
                 handler.postDelayed(cleanupRunnable, DELETE_DELAY_MS);
@@ -250,14 +255,38 @@ public class DriveManager {
                 }
                 for (CleanupEntry entry : toDelete) {
                     try {
-                        attemptDelete(entry.driveKey, entry.fileId);
+                        attemptDelete(entry.driveKey, entry.fileId, entry.cookie);
                     } catch (Exception ignored) {}
                 }
             }
         };
 
-        private void attemptDelete(String driveKey, String fileId) {
-            SpiderDebug.log("Cleanup: attempting delete " + driveKey + "/" + fileId);
+        private void attemptDelete(String driveKey, String fileId, String cookie) {
+            Leodanmu.log("Cleanup: deleting " + driveKey + "/" + fileId);
+            if (TextUtils.isEmpty(cookie)) {
+                Leodanmu.log("Cleanup: skip, no cookie for " + driveKey);
+                return;
+            }
+            Map<String, String> headers = new HashMap<>();
+            headers.put("User-Agent", UA);
+            headers.put("Referer", "https://pan.quark.cn/");
+            headers.put("Cookie", cookie);
+            headers.put("Content-Type", "application/json");
+            try {
+                JSONObject body = new JSONObject();
+                body.put("action_type", 2);
+                JSONArray fileIds = new JSONArray();
+                fileIds.put(fileId);
+                body.put("file_ids", fileIds);
+                body.put("exclude_fids", new JSONArray());
+                body.put("pdir_fid", "0");
+                OkResult result = OkHttp.post("https://pan.quark.cn/1/clouddrive/file/delete?pr=ucpro&fr=pc&__dt=" + System.currentTimeMillis(),
+                        body.toString(), headers);
+                String resp = result != null ? result.getBody() : "";
+                Leodanmu.log("Cleanup: " + driveKey + " delete resp=" + resp);
+            } catch (Exception e) {
+                SpiderDebug.log("Cleanup: " + driveKey + " delete error: " + e.getMessage());
+            }
         }
     }
 }

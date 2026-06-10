@@ -116,7 +116,7 @@ public class XunleiDriveResolver implements CloudDrive {
                 xferBody.put("dirId", "0");
                 JSONObject xferResp = OkHttp.postJson(API + "/api/v1/share/save", xferBody.toString(), headers);
                 if (xferResp != null) {
-                    DriveManager.cleanupRegistry.scheduleDelete("xunlei", firstFileId);
+                    DriveManager.cleanupRegistry.scheduleDelete("xunlei", firstFileId, "");
                 }
             } catch (Exception e) {
                 SpiderDebug.log("Xunlei transfer (non-fatal): " + e.getMessage());

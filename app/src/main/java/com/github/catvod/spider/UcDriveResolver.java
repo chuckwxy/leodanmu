@@ -68,7 +68,7 @@ public class UcDriveResolver implements CloudDrive {
             if (code != 40008) throw new Exception("save failed: " + msg);
         }
 
-        DriveManager.cleanupRegistry.scheduleDelete("uc", fileId);
+                    DriveManager.cleanupRegistry.scheduleDelete("uc", fileId, cookie);
     }
 
     @Override

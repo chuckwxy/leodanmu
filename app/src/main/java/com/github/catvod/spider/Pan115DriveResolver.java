@@ -50,7 +50,7 @@ public class Pan115DriveResolver implements CloudDrive {
             if (resp.optInt("state", 0) != 0) throw new Exception("save failed: " + msg);
         }
 
-        DriveManager.cleanupRegistry.scheduleDelete("a115", fid);
+        DriveManager.cleanupRegistry.scheduleDelete("a115", fid, cookie);
     }
 
     @Override

@@ -87,7 +87,7 @@ public class BaiduDriveResolver implements CloudDrive {
             }
         }
 
-        DriveManager.cleanupRegistry.scheduleDelete("baidu", fsId);
+        DriveManager.cleanupRegistry.scheduleDelete("baidu", fsId, "");
     }
 
     @Override
