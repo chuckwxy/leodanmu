@@ -329,16 +329,26 @@ public class ConfigCenter extends Spider {
 
     private void showRemoteInputDialog(Activity ctx, DanmakuConfig config, String fieldId, String title, String hint, String currentValue) {
         android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(ctx);
-        builder.setTitle(title);
+
+        LinearLayout outer = new LinearLayout(ctx);
+        outer.setOrientation(LinearLayout.VERTICAL);
+        android.graphics.drawable.GradientDrawable outerBg = new android.graphics.drawable.GradientDrawable();
+        outerBg.setColor(android.graphics.Color.WHITE);
+        outerBg.setCornerRadius(android.util.TypedValue.applyDimension(
+                android.util.TypedValue.COMPLEX_UNIT_DIP, 16, ctx.getResources().getDisplayMetrics()));
+        outer.setBackground(outerBg);
+
+        TextView titleView = new TextView(ctx);
+        titleView.setText(title);
+        titleView.setTextSize(18);
+        titleView.setTypeface(null, android.graphics.Typeface.BOLD);
+        titleView.setTextColor(0xFF333333);
+        titleView.setPadding(48, 24, 48, 8);
+        outer.addView(titleView);
 
         LinearLayout layout = new LinearLayout(ctx);
         layout.setOrientation(LinearLayout.VERTICAL);
-        layout.setPadding(48, 24, 48, 24);
-        android.graphics.drawable.GradientDrawable remoteBg = new android.graphics.drawable.GradientDrawable();
-        remoteBg.setColor(android.graphics.Color.WHITE);
-        remoteBg.setCornerRadius(android.util.TypedValue.applyDimension(
-                android.util.TypedValue.COMPLEX_UNIT_DIP, 16, ctx.getResources().getDisplayMetrics()));
-        layout.setBackground(remoteBg);
+        layout.setPadding(48, 0, 48, 24);
 
         EditText input = new EditText(ctx);
         input.setText(currentValue);
@@ -356,7 +366,8 @@ public class ConfigCenter extends Spider {
         qrBtn.setLayoutParams(btnParams);
         layout.addView(qrBtn);
 
-        builder.setView(layout);
+        outer.addView(layout);
+        builder.setView(outer);
 
         builder.setPositiveButton("保存", (dialog, which) -> {
             String val = input.getText().toString().trim();
@@ -370,12 +381,12 @@ public class ConfigCenter extends Spider {
                     if (val.endsWith("/")) val = val.substring(0, val.length() - 1);
                     config.setYlhjHost(val);
                     DanmakuConfigManager.saveConfig(ctx, config);
-                    Utils.safeShowToast(ctx, val.isEmpty() ? "已恢复默认地址" : "不夜地址已设置");
+                    Utils.safeShowToast(ctx, val.isEmpty() ? "已恢复默认地址" : "buye host 已设置");
                     break;
                 case "ylhj_token":
                     config.setYlhjToken(val);
                     DanmakuConfigManager.saveConfig(ctx, config);
-                    Utils.safeShowToast(ctx, val.isEmpty() ? "已恢复默认Token" : "Token已设置");
+                    Utils.safeShowToast(ctx, val.isEmpty() ? "已恢复默认Token" : "buye token 已设置");
                     break;
             }
         });
@@ -385,7 +396,8 @@ public class ConfigCenter extends Spider {
         RemoteInputBus.ConfigCallback configCb = (f, v) -> ctx.runOnUiThread(() -> {
             if (f.equals(capturedFieldId)) {
                 input.setText(v);
-                Utils.safeShowToast(ctx, "已收到远程输入: " + f);
+                String label = f.equals("ylhj_host") ? "ylhj host" : f.equals("ylhj_token") ? "ylhj token" : f;
+                Utils.safeShowToast(ctx, label + "=" + v);
             }
         });
 
@@ -409,12 +421,12 @@ public class ConfigCenter extends Spider {
     }
 
     private void showYlhjHostDialog(Activity ctx, DanmakuConfig config) {
-        showRemoteInputDialog(ctx, config, "ylhj_host", "buye host",
+        showRemoteInputDialog(ctx, config, "ylhj_host", "不夜地址",
                 "例如: http://192.168.10.10:3000", config.getYlhjHost());
     }
 
     private void showYlhjTokenDialog(Activity ctx, DanmakuConfig config) {
-        showRemoteInputDialog(ctx, config, "ylhj_token", "buye token",
+        showRemoteInputDialog(ctx, config, "ylhj_token", "不夜Token",
                 "例如: admin123", config.getYlhjToken());
     }
 }

@@ -525,6 +525,7 @@ public class DanmakuUIHelper {
                 apiQrBtn.setPadding(dpToPx(activity, 8), 0, dpToPx(activity, 8), 0);
                 apiQrBtn.setAllCaps(false);
                 apiQrBtn.setSingleLine(true);
+                apiQrBtn.setTextColor(colors.textPrimary);
                 GradientDrawable apiQrBg = new GradientDrawable();
                 apiQrBg.setShape(GradientDrawable.RECTANGLE);
                 apiQrBg.setCornerRadius(dpToPx(activity, 14));
@@ -1388,7 +1389,7 @@ public class DanmakuUIHelper {
 
                 LinearLayout titleLayout = new LinearLayout(activity);
                 titleLayout.setOrientation(LinearLayout.VERTICAL);
-                titleLayout.setBackgroundColor(colors.bgSecondary);
+                titleLayout.setBackgroundColor(Color.TRANSPARENT);
                 titleLayout.setPadding(dpToPx(activity, 20), dpToPx(activity, 16),
                         dpToPx(activity, 20), dpToPx(activity, 16));
 
