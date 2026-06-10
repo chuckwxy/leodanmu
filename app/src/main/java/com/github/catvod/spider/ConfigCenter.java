@@ -376,9 +376,75 @@ public class ConfigCenter extends Spider {
         layout.addView(qrBtn);
 
         outer.addView(layout);
+
+        // 保存/取消按钮
+        android.view.View btnSep = new android.view.View(ctx);
+        android.widget.LinearLayout.LayoutParams btnSepParams = new android.widget.LinearLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT, 1);
+        btnSepParams.setMargins(48, 0, 48, 16);
+        btnSep.setLayoutParams(btnSepParams);
+        btnSep.setBackgroundColor(0xFFE0E0E0);
+        outer.addView(btnSep);
+
+        LinearLayout btnRow = new LinearLayout(ctx);
+        btnRow.setOrientation(LinearLayout.HORIZONTAL);
+        btnRow.setPadding(48, 0, 48, 28);
+
+        Button cancelBtn = new Button(ctx);
+        cancelBtn.setText("取消");
+        cancelBtn.setTextSize(16);
+        cancelBtn.setTextColor(0xFF666666);
+        cancelBtn.setAllCaps(false);
+        LinearLayout.LayoutParams cancelParams = new LinearLayout.LayoutParams(0, 0, 1);
+        cancelParams.rightMargin = 8;
+        cancelParams.height = (int) android.util.TypedValue.applyDimension(
+                android.util.TypedValue.COMPLEX_UNIT_DIP, 44, ctx.getResources().getDisplayMetrics());
+        cancelBtn.setLayoutParams(cancelParams);
+        android.graphics.drawable.GradientDrawable cancelBg = new android.graphics.drawable.GradientDrawable();
+        cancelBg.setCornerRadius(android.util.TypedValue.applyDimension(
+                android.util.TypedValue.COMPLEX_UNIT_DIP, 8, ctx.getResources().getDisplayMetrics()));
+        cancelBg.setStroke(1, 0xFFCCCCCC);
+        cancelBg.setColor(0xFFF5F5F5);
+        cancelBtn.setBackground(cancelBg);
+
+        Button saveBtn = new Button(ctx);
+        saveBtn.setText("保存");
+        saveBtn.setTextSize(16);
+        saveBtn.setTextColor(0xFFFFFFFF);
+        saveBtn.setAllCaps(false);
+        LinearLayout.LayoutParams saveParams = new LinearLayout.LayoutParams(0, 0, 1);
+        saveParams.leftMargin = 8;
+        saveParams.height = (int) android.util.TypedValue.applyDimension(
+                android.util.TypedValue.COMPLEX_UNIT_DIP, 44, ctx.getResources().getDisplayMetrics());
+        saveBtn.setLayoutParams(saveParams);
+        android.graphics.drawable.GradientDrawable saveBg = new android.graphics.drawable.GradientDrawable();
+        saveBg.setCornerRadius(android.util.TypedValue.applyDimension(
+                android.util.TypedValue.COMPLEX_UNIT_DIP, 8, ctx.getResources().getDisplayMetrics()));
+        saveBg.setColor(0xFF007AFF);
+        saveBtn.setBackground(saveBg);
+
+        btnRow.addView(cancelBtn);
+        btnRow.addView(saveBtn);
+        outer.addView(btnRow);
+
         builder.setView(outer);
 
-        builder.setPositiveButton("保存", (dialog, which) -> {
+        final String capturedFieldId = fieldId;
+        RemoteInputBus.ConfigCallback configCb = (f, v) -> ctx.runOnUiThread(() -> {
+            if (f.equals(capturedFieldId)) {
+                input.setText(v);
+                String label = f.equals("ylhj_host") ? "buye host" : f.equals("ylhj_token") ? "buye token" : f;
+                Utils.safeShowToast(ctx, label + "=" + v);
+            }
+        });
+
+        android.app.AlertDialog dialog = builder.create();
+        dialog.setOnDismissListener(d -> RemoteInputBus.removeConfigInput());
+        dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
+
+        cancelBtn.setOnClickListener(v -> dialog.dismiss());
+
+        saveBtn.setOnClickListener(v -> {
             String val = input.getText().toString().trim();
             switch (fieldId) {
                 case "http_proxy":
@@ -398,21 +464,8 @@ public class ConfigCenter extends Spider {
                     Utils.safeShowToast(ctx, val.isEmpty() ? "已恢复默认Token" : "buye token 已设置");
                     break;
             }
+            dialog.dismiss();
         });
-        builder.setNegativeButton("取消", (dialog, which) -> {});
-
-        final String capturedFieldId = fieldId;
-        RemoteInputBus.ConfigCallback configCb = (f, v) -> ctx.runOnUiThread(() -> {
-            if (f.equals(capturedFieldId)) {
-                input.setText(v);
-                String label = f.equals("ylhj_host") ? "buye host" : f.equals("ylhj_token") ? "buye token" : f;
-                Utils.safeShowToast(ctx, label + "=" + v);
-            }
-        });
-
-        android.app.AlertDialog dialog = builder.create();
-        dialog.setOnDismissListener(d -> RemoteInputBus.removeConfigInput());
-        dialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT));
 
         qrBtn.setOnClickListener(v -> {
             RemoteInputBus.onConfigInput(configCb);

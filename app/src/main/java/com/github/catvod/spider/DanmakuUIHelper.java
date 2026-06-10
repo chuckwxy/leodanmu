@@ -2381,24 +2381,74 @@ public class DanmakuUIHelper {
                 outer.addView(proxySep);
                 outer.addView(layout);
 
+                // 保存/取消按钮
+                android.view.View proxyBtnSep = new android.view.View(activity);
+                android.widget.LinearLayout.LayoutParams proxyBtnSepParams = new android.widget.LinearLayout.LayoutParams(
+                        android.view.ViewGroup.LayoutParams.MATCH_PARENT, 1);
+                proxyBtnSepParams.setMargins(dpToPx(activity, 24), 0, dpToPx(activity, 24), dpToPx(activity, 16));
+                proxyBtnSep.setLayoutParams(proxyBtnSepParams);
+                proxyBtnSep.setBackgroundColor(0xFFE0E0E0);
+                outer.addView(proxyBtnSep);
+
+                LinearLayout proxyBtnRow = new LinearLayout(activity);
+                proxyBtnRow.setOrientation(LinearLayout.HORIZONTAL);
+                proxyBtnRow.setPadding(dpToPx(activity, 24), 0, dpToPx(activity, 24), dpToPx(activity, 24));
+
+                Button proxyCancelBtn = new Button(activity);
+                proxyCancelBtn.setText("取消");
+                proxyCancelBtn.setTextSize(16);
+                proxyCancelBtn.setTextColor(0xFF666666);
+                proxyCancelBtn.setAllCaps(false);
+                LinearLayout.LayoutParams proxyCancelParams = new LinearLayout.LayoutParams(0, 0, 1);
+                proxyCancelParams.rightMargin = dpToPx(activity, 8);
+                proxyCancelParams.height = dpToPx(activity, 44);
+                proxyCancelBtn.setLayoutParams(proxyCancelParams);
+                GradientDrawable proxyCancelBg = new GradientDrawable();
+                proxyCancelBg.setCornerRadius(dpToPx(activity, 8));
+                proxyCancelBg.setStroke(1, 0xFFCCCCCC);
+                proxyCancelBg.setColor(0xFFF5F5F5);
+                proxyCancelBtn.setBackground(proxyCancelBg);
+
+                Button proxySaveBtn = new Button(activity);
+                proxySaveBtn.setText("保存");
+                proxySaveBtn.setTextSize(16);
+                proxySaveBtn.setTextColor(0xFFFFFFFF);
+                proxySaveBtn.setAllCaps(false);
+                LinearLayout.LayoutParams proxySaveParams = new LinearLayout.LayoutParams(0, 0, 1);
+                proxySaveParams.leftMargin = dpToPx(activity, 8);
+                proxySaveParams.height = dpToPx(activity, 44);
+                proxySaveBtn.setLayoutParams(proxySaveParams);
+                GradientDrawable proxySaveBg = new GradientDrawable();
+                proxySaveBg.setCornerRadius(dpToPx(activity, 8));
+                proxySaveBg.setColor(0xFF007AFF);
+                proxySaveBtn.setBackground(proxySaveBg);
+
+                proxyBtnRow.addView(proxyCancelBtn);
+                proxyBtnRow.addView(proxySaveBtn);
+                outer.addView(proxyBtnRow);
+
                 AlertDialog proxyDialog = new AlertDialog.Builder(activity)
                         .setView(outer)
-                        .setPositiveButton("保存", (dialog, which) -> {
-                            try {
-                                int t = Integer.parseInt(threadInput.getText().toString().trim());
-                                int c = Integer.parseInt(chunkInput.getText().toString().trim());
-                                Map<String, DanmakuConfig.SourceProxyConfig> map = config.getProxySourceConfig();
-                                map.put(sourceKey, new DanmakuConfig.SourceProxyConfig(t, c));
-                                config.setProxySourceConfig(map);
-                                DanmakuConfigManager.saveConfig(activity, config);
-                                Utils.safeShowToast(activity, displayName + "配置已保存");
-                            } catch (NumberFormatException e) {
-                                Utils.safeShowToast(activity, "请输入有效数字");
-                            }
-                        })
-                        .setNegativeButton("取消", null)
                         .create();
                 proxyDialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));
+
+                proxyCancelBtn.setOnClickListener(v -> proxyDialog.dismiss());
+
+                proxySaveBtn.setOnClickListener(v -> {
+                    try {
+                        int t = Integer.parseInt(threadInput.getText().toString().trim());
+                        int c = Integer.parseInt(chunkInput.getText().toString().trim());
+                        Map<String, DanmakuConfig.SourceProxyConfig> map = config.getProxySourceConfig();
+                        map.put(sourceKey, new DanmakuConfig.SourceProxyConfig(t, c));
+                        config.setProxySourceConfig(map);
+                        DanmakuConfigManager.saveConfig(activity, config);
+                        Utils.safeShowToast(activity, displayName + "配置已保存");
+                        proxyDialog.dismiss();
+                    } catch (NumberFormatException e) {
+                        Utils.safeShowToast(activity, "请输入有效数字");
+                    }
+                });
+
                 proxyDialog.show();
             } catch (Exception e) {
                 Leodanmu.log("显示网盘代理对话框异常: " + e.getMessage());
