@@ -420,7 +420,6 @@ public class QuarkDriveResolver implements CloudDrive {
             JSONObject result = new JSONObject();
             result.put("parse", 0);
             result.put("jx", 0);
-            result.put("proxy", "/proxy/?do=quark");
             if (!TextUtils.isEmpty(input)) {
                 JSONArray urls = new JSONArray();
                 urls.put("RAW");
@@ -555,7 +554,6 @@ public class QuarkDriveResolver implements CloudDrive {
         JSONObject result = new JSONObject();
         result.put("parse", 0);
         result.put("jx", 0);
-        result.put("proxy", "/proxy/?do=quark");
         JSONObject respHeaders = new JSONObject();
         respHeaders.put("Referer", "https://pan.quark.cn/");
         respHeaders.put("User-Agent", UA);
