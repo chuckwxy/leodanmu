@@ -503,11 +503,11 @@ public class QuarkDriveResolver implements CloudDrive {
                 JSONObject item = videoList.optJSONObject(i);
                 if (item == null) continue;
                 String resolution = item.optString("resolution", "");
-                String url = item.optString("url", "");
-                if (TextUtils.isEmpty(resolution) || TextUtils.isEmpty(url)) continue;
+                String playUrl = item.optString("url", "");
+                if (TextUtils.isEmpty(resolution) || TextUtils.isEmpty(playUrl)) continue;
                 JSONObject q = new JSONObject();
                 q.put("name", resolution);
-                q.put("url", url);
+                q.put("url", playUrl);
                 out.put(q);
             }
             if (out.length() > 0) {
