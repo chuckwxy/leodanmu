@@ -94,7 +94,6 @@ public class QuarkDriveResolver implements CloudDrive {
         if (TextUtils.isEmpty(resp)) throw new Exception("empty token response");
 
         JSONObject json = new JSONObject(resp);
-        Leodanmu.log("Quark getToken: resp=" + json.toString());
         int code = json.optInt("code", -1);
         if (code == 31001) throw new Exception("share needs passcode");
         if (code == 31002) throw new Exception("share is invalid or removed");
@@ -120,7 +119,6 @@ public class QuarkDriveResolver implements CloudDrive {
                 + "&_page=1&_size=100"
                 + "&_sort=file_type:asc,updated_at:desc&__dt=" + System.currentTimeMillis();
 
-        Leodanmu.log("Quark getFreshFidToken: fetching detail for fileId=" + targetFileId);
         Map<String, String> headers = buildHeaders();
         String resp = OkHttp.string(url, headers);
         if (TextUtils.isEmpty(resp)) throw new Exception("empty detail response");
@@ -138,7 +136,6 @@ public class QuarkDriveResolver implements CloudDrive {
             String fid = item.optString("fid", "");
             if (fid.equals(targetFileId)) {
                 String freshToken = item.optString("share_fid_token", "");
-                Leodanmu.log("Quark getFreshFidToken: found fileId=" + targetFileId + " freshToken=" + freshToken);
                 if (!TextUtils.isEmpty(freshToken)) return freshToken;
                 break;
             }
@@ -199,10 +196,6 @@ public class QuarkDriveResolver implements CloudDrive {
                 else if (item.has("file_token")) rawFidToken = item.optString("file_token");
                 else if (item.has("token")) rawFidToken = item.optString("token");
                 entry.shareFidToken = rawFidToken;
-                if (allFiles.size() == 0 && page == 1) {
-                    JSONArray allKeys = item.names();
-                    Leodanmu.log("Quark listFiles: first item keys=" + allKeys + " rawFidToken='" + rawFidToken + "' fid=" + entry.fid + " file=" + entry.fileName);
-                }
                 allFiles.add(entry);
             }
 
@@ -304,11 +297,9 @@ public class QuarkDriveResolver implements CloudDrive {
 
     private String transferToDrive(ShareInfo info, TokenResult tokenResult, String fileId, String fidToken) throws Exception {
         if (TextUtils.isEmpty(cookie)) {
-            Leodanmu.log("Quark transferToDrive: skipped, cookie empty");
+            SpiderDebug.log("Quark transferToDrive: skipped, cookie empty");
             return "";
         }
-        Leodanmu.log("Quark transferToDrive: shareId=" + info.pwdId + " fileId=" + fileId + " fidToken='" + fidToken + "'");
-
         JSONObject body = new JSONObject();
         JSONArray fidList = new JSONArray();
         fidList.put(fileId);
@@ -322,15 +313,12 @@ public class QuarkDriveResolver implements CloudDrive {
         body.put("pdir_fid", info.pdirFid != null ? info.pdirFid : "0");
         body.put("scene", "SCENE_SAVE");
 
-        Leodanmu.log("Quark transferToDrive: final body=" + body.toString());
-
         Map<String, String> headers = buildHeaders();
         OkResult result = OkHttp.post(API_BASE + "/1/clouddrive/share/sharepage/save?pr=ucpro&fr=pc&__dt=" + System.currentTimeMillis(),
                 body.toString(), headers);
         String resp = result != null ? result.getBody() : "";
-        Leodanmu.log("Quark transferToDrive: response=" + resp);
         if (TextUtils.isEmpty(resp)) {
-            Leodanmu.log("Quark transferToDrive: save response empty");
+            SpiderDebug.log("Quark transferToDrive: save response empty");
             throw new Exception("save response empty");
         }
 
@@ -338,15 +326,14 @@ public class QuarkDriveResolver implements CloudDrive {
         int code = json.optInt("status", json.optInt("code", -1));
         if (code != 0 && code != 200) {
             String msg = json.optString("message", json.optString("msg", "unknown"));
-            Leodanmu.log("Quark transferToDrive: failed " + msg + " (" + code + ")");
+            SpiderDebug.log("Quark transferToDrive: failed " + msg + " (" + code + ")");
             if (code != 40008 && code != 400) throw new Exception("save failed: " + msg);
             return "";
         }
-        Leodanmu.log("Quark transferToDrive: success code=" + code);
+        SpiderDebug.log("Quark transferToDrive: success code=" + code);
 
         String savedFileId = "";
         JSONObject saveData = json.optJSONObject("data");
-        Leodanmu.log("Quark transferToDrive: saveData keys=" + (saveData != null ? (saveData.names() != null ? saveData.names().toString() : "empty object") : "null"));
         if (saveData != null) {
             JSONObject taskResp = saveData.optJSONObject("task_resp");
             if (taskResp != null) {
@@ -363,7 +350,7 @@ public class QuarkDriveResolver implements CloudDrive {
             }
         }
         if (!TextUtils.isEmpty(savedFileId)) {
-            Leodanmu.log("Quark transferToDrive: saved fileId=" + savedFileId);
+            SpiderDebug.log("Quark transferToDrive: saved fileId=" + savedFileId);
             DriveManager.cleanupRegistry.scheduleDelete("quark", savedFileId, cookie);
         }
         return savedFileId;
@@ -371,10 +358,9 @@ public class QuarkDriveResolver implements CloudDrive {
 
     public JSONObject play(String input, String flag) {
         try {
-            Leodanmu.log("Quark play: input=" + input.substring(0, Math.min(input.length(), 60)) + " cookie(len)=" + cookie.length() + " empty=" + TextUtils.isEmpty(cookie));
             PlayToken token = decodePlayToken(input);
             if (token == null) {
-                Leodanmu.log("Quark play: token decode failed, falling back to proxyPlay");
+                SpiderDebug.log("Quark play: token decode failed, falling back to proxyPlay");
                 return proxyPlay(input, flag);
             }
 
@@ -388,16 +374,15 @@ public class QuarkDriveResolver implements CloudDrive {
             String freshFidToken = token.fidToken;
             try {
                 freshFidToken = getFreshFidToken(tokenResult, info, token.fileId);
-                Leodanmu.log("Quark play: freshFidToken=" + freshFidToken);
             } catch (Exception e) {
-                Leodanmu.log("Quark play: getFreshFidToken failed, using stale token: " + e.getMessage());
+                SpiderDebug.log("Quark play: getFreshFidToken failed, using stale token: " + e.getMessage());
             }
 
             String savedFileId = "";
             try {
                 savedFileId = transferToDrive(info, tokenResult, token.fileId, freshFidToken);
             } catch (Exception e) {
-                Leodanmu.log("Quark play: transfer failed (non-fatal): " + e.getMessage());
+                SpiderDebug.log("Quark play: transfer failed (non-fatal): " + e.getMessage());
             }
 
             if (!TextUtils.isEmpty(savedFileId)) {
@@ -405,9 +390,9 @@ public class QuarkDriveResolver implements CloudDrive {
                 if (!TextUtils.isEmpty(downloadUrl)) {
                     return buildMultiQualityResult(downloadUrl, savedFileId, token.fileId);
                 }
-                Leodanmu.log("Quark play: failed to get download_url from file API");
+                SpiderDebug.log("Quark play: failed to get download_url from file API");
             } else {
-                Leodanmu.log("Quark play: no savedFileId, trying file/download with original fid");
+                SpiderDebug.log("Quark play: no savedFileId, trying file/download with original fid");
             }
         } catch (Exception e) {
             SpiderDebug.log("Quark play error: " + e.getMessage());
@@ -456,7 +441,6 @@ public class QuarkDriveResolver implements CloudDrive {
         if (dlData != null && dlData.length() > 0) {
             String url = dlData.optJSONObject(0).optString("download_url", "");
             if (!TextUtils.isEmpty(url)) {
-                Leodanmu.log("Quark getQuarkDownloadUrl: " + url.substring(0, Math.min(url.length(), 120)));
                 return url;
             }
         }
@@ -478,7 +462,7 @@ public class QuarkDriveResolver implements CloudDrive {
             if (TextUtils.isEmpty(fid)) continue;
             JSONArray result = getVideoPlayQualities(fid);
             if (result != null) return result;
-            Leodanmu.log("Quark getVideoPlayUrls: fid=" + fid + " failed, trying next");
+            SpiderDebug.log("Quark getVideoPlayUrls: fid=" + fid + " failed, trying next");
         }
         return null;
     }
@@ -499,7 +483,7 @@ public class QuarkDriveResolver implements CloudDrive {
             JSONObject json = new JSONObject(resp);
             int code = json.optInt("status", json.optInt("code", -1));
             if (code != 0 && code != 200) {
-                Leodanmu.log("Quark getVideoPlayQualities: api error code=" + code + " fid=" + fid);
+                SpiderDebug.log("Quark getVideoPlayQualities: api error code=" + code + " fid=" + fid);
                 return null;
             }
             JSONObject data = json.optJSONObject("data");
@@ -527,11 +511,10 @@ public class QuarkDriveResolver implements CloudDrive {
                 out.put(q);
             }
             if (out.length() > 0) {
-                Leodanmu.log("Quark getVideoPlayQualities: got " + out.length() + " qualities for fid=" + fid);
                 return out;
             }
         } catch (Exception e) {
-            Leodanmu.log("Quark getVideoPlayQualities error: " + e.getMessage());
+            SpiderDebug.log("Quark getVideoPlayQualities error: " + e.getMessage());
         }
         return null;
     }
@@ -563,13 +546,11 @@ public class QuarkDriveResolver implements CloudDrive {
             }
         }
         result.put("url", urls);
-        Leodanmu.log("Quark buildMultiQualityResult: url count=" + urls.length());
         return result;
     }
 
     public JSONObject getVod(String url) {
         try {
-            Leodanmu.log("Quark getVod: url=" + url + " cookie(len)=" + cookie.length() + " empty=" + TextUtils.isEmpty(cookie));
             ShareInfo info = parseShareUrl(url);
             if (TextUtils.isEmpty(info.pwdId)) return null;
 

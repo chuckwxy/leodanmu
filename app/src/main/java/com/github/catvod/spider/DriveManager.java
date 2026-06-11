@@ -116,19 +116,18 @@ public class DriveManager {
         try {
             CloudDrive drive = match(url);
             if (drive != null) {
-                Leodanmu.log("DriveManager getVod: matched " + drive.getKey() + " url=" + url);
                 JSONObject vod = drive.getVod(url);
                 if (vod != null) {
-                    Leodanmu.log("DriveManager getVod: " + drive.getKey() + " success, title="
+                    SpiderDebug.log("DriveManager getVod: " + drive.getKey() + " success, title="
                             + vod.optString("vod_name", "") + " playUrl(len)=" + vod.optString("vod_play_url", "").length());
                 } else {
-                    Leodanmu.log("DriveManager getVod: " + drive.getKey() + " returned null");
+                    SpiderDebug.log("DriveManager getVod: " + drive.getKey() + " returned null");
                 }
                 return vod;
             }
-            Leodanmu.log("DriveManager getVod: no drive matched for " + url);
+            SpiderDebug.log("DriveManager getVod: no drive matched for " + url);
         } catch (Exception e) {
-            Leodanmu.log("DriveManager getVod error: " + e.getMessage());
+            SpiderDebug.log("DriveManager getVod error: " + e.getMessage());
         }
         return null;
     }
@@ -140,17 +139,8 @@ public class DriveManager {
                 drive = match(id);
             }
             if (drive != null) {
-                Leodanmu.log("DriveManager play: using " + drive.getKey() + " flag=" + flag + " id=" + id);
                 JSONObject result = drive.play(id, flag);
                 if (result != null) {
-                    Object urlObj = result.opt("url");
-                    Leodanmu.log("DriveManager play: " + drive.getKey() + " raw url="
-                            + (urlObj != null ? urlObj.toString().substring(0, Math.min(urlObj.toString().length(), 150)) : "null"));
-                    if (result.has("header")) {
-                        JSONObject h = result.optJSONObject("header");
-                        Leodanmu.log("DriveManager play: headers present, cookie="
-                                + (h != null && h.has("Cookie") ? h.optString("Cookie", "").substring(0, Math.min(h.optString("Cookie", "").length(), 80)) : "none"));
-                    }
                     if (!(result.opt("url") instanceof JSONArray)) {
                         String directUrl = result.optString("url", "");
                         if (!TextUtils.isEmpty(directUrl)) {
@@ -158,13 +148,13 @@ public class DriveManager {
                         }
                     }
                 } else {
-                    Leodanmu.log("DriveManager play: " + drive.getKey() + " returned null");
+                    SpiderDebug.log("DriveManager play: " + drive.getKey() + " returned null");
                 }
                 return result;
             }
-            Leodanmu.log("DriveManager play: no drive for flag=" + flag + " id=" + id);
+            SpiderDebug.log("DriveManager play: no drive for flag=" + flag + " id=" + id);
         } catch (Exception e) {
-            Leodanmu.log("DriveManager play error: " + e.getMessage());
+            SpiderDebug.log("DriveManager play error: " + e.getMessage());
         }
         return null;
     }
@@ -179,8 +169,6 @@ public class DriveManager {
         String cookie = h != null ? h.optString("Cookie", "") : "";
 
         String proxyUrl = buildProxyUrl(directUrl, thread, chunkSize, cookie);
-        Leodanmu.log("DriveManager wrapWithDualTrack: " + driveKey + " thread=" + thread
-                + " chunk=" + chunkSize + " proxy=" + proxyUrl.substring(0, Math.min(proxyUrl.length(), 120)));
 
         JSONArray urls = new JSONArray();
 
@@ -269,31 +257,39 @@ public class DriveManager {
         };
 
         private void attemptDelete(String driveKey, String fileId, String cookie) {
-            Leodanmu.log("Cleanup: deleting " + driveKey + "/" + fileId);
+            SpiderDebug.log("Cleanup: deleting " + driveKey + "/" + fileId);
             if (TextUtils.isEmpty(cookie)) {
-                Leodanmu.log("Cleanup: skip, no cookie for " + driveKey);
+                SpiderDebug.log("Cleanup: skip, no cookie for " + driveKey);
                 return;
             }
-            Map<String, String> headers = new HashMap<>();
-            headers.put("User-Agent", UA);
-            headers.put("Referer", "https://pan.quark.cn/");
-            headers.put("Cookie", cookie);
-            headers.put("Content-Type", "application/json");
-            try {
-                JSONObject body = new JSONObject();
-                body.put("action_type", 2);
-                JSONArray fileIds = new JSONArray();
-                fileIds.put(fileId);
-                body.put("file_ids", fileIds);
-                body.put("exclude_fids", new JSONArray());
-                body.put("pdir_fid", "0");
-                OkResult result = OkHttp.post("https://pan.quark.cn/1/clouddrive/file/delete?pr=ucpro&fr=pc&__dt=" + System.currentTimeMillis(),
-                        body.toString(), headers);
-                String resp = result != null ? result.getBody() : "";
-                Leodanmu.log("Cleanup: " + driveKey + " delete resp=" + resp);
-            } catch (Exception e) {
-                SpiderDebug.log("Cleanup: " + driveKey + " delete error: " + e.getMessage());
-            }
+            new Thread(() -> {
+                Map<String, String> headers = new HashMap<>();
+                headers.put("User-Agent", UA);
+                headers.put("Referer", "https://pan.quark.cn/");
+                headers.put("Cookie", cookie);
+                headers.put("Content-Type", "application/json");
+                try {
+                    JSONObject body = new JSONObject();
+                    body.put("action_type", 2);
+                    JSONArray fileIds = new JSONArray();
+                    fileIds.put(fileId);
+                    body.put("file_ids", fileIds);
+                    body.put("exclude_fids", new JSONArray());
+                    body.put("pdir_fid", "0");
+                    OkResult result = OkHttp.post("https://pan.quark.cn/1/clouddrive/file/delete?pr=ucpro&fr=pc&__dt=" + System.currentTimeMillis(),
+                            body.toString(), headers);
+                    String resp = result != null ? result.getBody() : "";
+                    SpiderDebug.log("Cleanup: " + driveKey + " delete resp=" + resp);
+                    JSONObject json = new JSONObject(resp);
+                    if (json.optInt("status", -1) == 200) {
+                        SpiderDebug.log("Cleanup: " + driveKey + "/" + fileId + " deleted OK");
+                    } else {
+                        SpiderDebug.log("Cleanup: " + driveKey + " delete failed: " + json.optString("message", resp));
+                    }
+                } catch (Exception e) {
+                    SpiderDebug.log("Cleanup: " + driveKey + " delete error [" + e.getClass().getSimpleName() + "] " + e.getMessage());
+                }
+            }).start();
         }
     }
 }
