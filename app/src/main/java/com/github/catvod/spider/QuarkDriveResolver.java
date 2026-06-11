@@ -24,8 +24,10 @@ public class QuarkDriveResolver implements CloudDrive {
     private static final String UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) quark-cloud-drive/2.5.20 Chrome/100.0.4896.160 Electron/18.3.5.4-b478491100 Safari/537.36 Channel/pckk_other_ch";
     private static final Pattern SHARE_URL_PATTERN = Pattern.compile("/s/([a-zA-Z0-9]+)");
     private static final int PAGE_SIZE = 100;
+    private static final String LEOOPEN_DIR_NAME = "Leoopen";
 
     private final String cookie;
+    private String leoopenDirId;
 
     public QuarkDriveResolver(String cookie) {
         this.cookie = cookie != null ? cookie : "";
@@ -295,7 +297,50 @@ public class QuarkDriveResolver implements CloudDrive {
         }
     }
 
-    private String transferToDrive(ShareInfo info, TokenResult tokenResult, String fileId, String fidToken) throws Exception {
+    private synchronized String getOrCreateLeoopenDir() throws Exception {
+        if (!TextUtils.isEmpty(leoopenDirId)) return leoopenDirId;
+        if (TextUtils.isEmpty(cookie)) return "0";
+
+        Map<String, String> headers = buildHeaders();
+        String listUrl = API_BASE + "/1/clouddrive/file/sort?pr=ucpro&fr=pc&pdir_fid=0&_page=1&_size=50&sort=file_type:asc,file_name:asc";
+        String listResp = OkHttp.string(listUrl, headers);
+        if (!TextUtils.isEmpty(listResp)) {
+            JSONObject json = new JSONObject(listResp);
+            JSONObject data = json.optJSONObject("data");
+            if (data != null) {
+                JSONArray list = data.optJSONArray("list");
+                if (list != null) {
+                    for (int i = 0; i < list.length(); i++) {
+                        JSONObject item = list.optJSONObject(i);
+                        if (item != null && LEOOPEN_DIR_NAME.equals(item.optString("file_name")) && item.optInt("file_type", -1) == 0) {
+                            leoopenDirId = item.optString("fid");
+                            SpiderDebug.log("Quark: found existing " + LEOOPEN_DIR_NAME + " fid=" + leoopenDirId);
+                            return leoopenDirId;
+                        }
+                    }
+                }
+            }
+        }
+
+        JSONObject body = new JSONObject();
+        body.put("pdir_fid", "0");
+        body.put("file_name", LEOOPEN_DIR_NAME);
+        body.put("dir_init_lock", false);
+        body.put("file_type", 0);
+        OkResult result = OkHttp.post(API_BASE + "/1/clouddrive/file?pr=ucpro&fr=pc", body.toString(), headers);
+        String resp = result != null ? result.getBody() : "";
+        if (TextUtils.isEmpty(resp)) throw new Exception("create dir response empty");
+        JSONObject json = new JSONObject(resp);
+        JSONObject data = json.optJSONObject("data");
+        if (data != null && data.optBoolean("finish", false)) {
+            leoopenDirId = data.optString("fid");
+            SpiderDebug.log("Quark: created " + LEOOPEN_DIR_NAME + " fid=" + leoopenDirId);
+            return leoopenDirId;
+        }
+        throw new Exception("create " + LEOOPEN_DIR_NAME + " failed: " + json.optString("message", resp));
+    }
+
+    private String transferToDrive(ShareInfo info, TokenResult tokenResult, String fileId, String fidToken, String toDirFid) throws Exception {
         if (TextUtils.isEmpty(cookie)) {
             SpiderDebug.log("Quark transferToDrive: skipped, cookie empty");
             return "";
@@ -307,7 +352,7 @@ public class QuarkDriveResolver implements CloudDrive {
         JSONArray fidTokenList = new JSONArray();
         if (!TextUtils.isEmpty(fidToken)) fidTokenList.put(fidToken);
         body.put("fid_token_list", fidTokenList);
-        body.put("to_pdir_fid", "0");
+        body.put("to_pdir_fid", TextUtils.isEmpty(toDirFid) ? "0" : toDirFid);
         body.put("pwd_id", info.pwdId);
         body.put("stoken", tokenResult.stoken);
         body.put("pdir_fid", info.pdirFid != null ? info.pdirFid : "0");
@@ -351,7 +396,7 @@ public class QuarkDriveResolver implements CloudDrive {
         }
         if (!TextUtils.isEmpty(savedFileId)) {
             SpiderDebug.log("Quark transferToDrive: saved fileId=" + savedFileId);
-            DriveManager.cleanupRegistry.scheduleDelete("quark", savedFileId, cookie);
+            DriveManager.cleanupRegistry.scheduleDelete("quark", savedFileId, toDirFid, cookie);
         }
         return savedFileId;
     }
@@ -378,9 +423,16 @@ public class QuarkDriveResolver implements CloudDrive {
                 SpiderDebug.log("Quark play: getFreshFidToken failed, using stale token: " + e.getMessage());
             }
 
+            String leoopenFid = "0";
+            try {
+                leoopenFid = getOrCreateLeoopenDir();
+            } catch (Exception e) {
+                SpiderDebug.log("Quark play: getOrCreateLeoopenDir failed, saving to root: " + e.getMessage());
+            }
+
             String savedFileId = "";
             try {
-                savedFileId = transferToDrive(info, tokenResult, token.fileId, freshFidToken);
+                savedFileId = transferToDrive(info, tokenResult, token.fileId, freshFidToken, leoopenFid);
             } catch (Exception e) {
                 SpiderDebug.log("Quark play: transfer failed (non-fatal): " + e.getMessage());
             }

@@ -212,18 +212,24 @@ public class DriveManager {
         private static class CleanupEntry {
             String driveKey;
             String fileId;
+            String pdirFid;
             String cookie;
             long scheduledAt;
-            CleanupEntry(String driveKey, String fileId, String cookie) {
+            CleanupEntry(String driveKey, String fileId, String pdirFid, String cookie) {
                 this.driveKey = driveKey;
                 this.fileId = fileId;
+                this.pdirFid = pdirFid;
                 this.cookie = cookie;
                 this.scheduledAt = System.currentTimeMillis();
             }
         }
 
         public synchronized void scheduleDelete(String driveKey, String fileId, String cookie) {
-            pending.add(new CleanupEntry(driveKey, fileId, cookie));
+            scheduleDelete(driveKey, fileId, "0", cookie);
+        }
+
+        public synchronized void scheduleDelete(String driveKey, String fileId, String pdirFid, String cookie) {
+            pending.add(new CleanupEntry(driveKey, fileId, pdirFid, cookie));
             if (!running) {
                 running = true;
                 handler.postDelayed(cleanupRunnable, DELETE_DELAY_MS);
@@ -250,14 +256,14 @@ public class DriveManager {
                 }
                 for (CleanupEntry entry : toDelete) {
                     try {
-                        attemptDelete(entry.driveKey, entry.fileId, entry.cookie);
+                        attemptDelete(entry.driveKey, entry.fileId, entry.pdirFid, entry.cookie);
                     } catch (Exception ignored) {}
                 }
             }
         };
 
-        private void attemptDelete(String driveKey, String fileId, String cookie) {
-            SpiderDebug.log("Cleanup: deleting " + driveKey + "/" + fileId);
+        private void attemptDelete(String driveKey, String fileId, String pdirFid, String cookie) {
+            SpiderDebug.log("Cleanup: deleting " + driveKey + "/" + fileId + " (pdir=" + pdirFid + ")");
             if (TextUtils.isEmpty(cookie)) {
                 SpiderDebug.log("Cleanup: skip, no cookie for " + driveKey);
                 return;
@@ -275,7 +281,7 @@ public class DriveManager {
                     filelist.put(fileId);
                     body.put("filelist", filelist);
                     body.put("exclude_fids", new JSONArray());
-                    body.put("pdir_fid", "0");
+                    body.put("pdir_fid", TextUtils.isEmpty(pdirFid) ? "0" : pdirFid);
                     OkResult result = OkHttp.post("https://pan.quark.cn/1/clouddrive/file/delete?pr=ucpro&fr=pc&__dt=" + System.currentTimeMillis(),
                             body.toString(), headers);
                     String resp = result != null ? result.getBody() : "";
