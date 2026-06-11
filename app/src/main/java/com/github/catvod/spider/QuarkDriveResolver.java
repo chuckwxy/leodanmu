@@ -544,6 +544,7 @@ public class QuarkDriveResolver implements CloudDrive {
         JSONObject result = new JSONObject();
         result.put("parse", 0);
         result.put("jx", 0);
+        result.put("proxy", "/proxy/?do=quark");
         JSONObject respHeaders = new JSONObject();
         respHeaders.put("Referer", "https://pan.quark.cn/");
         respHeaders.put("User-Agent", UA);
@@ -553,9 +554,6 @@ public class QuarkDriveResolver implements CloudDrive {
         result.put("header", respHeaders);
         JSONArray qualities = getVideoPlayUrls(savedFileId, originalFileId);
         JSONArray urls = new JSONArray();
-        String proxyUrl = buildProxyUrl(downloadUrl);
-        urls.put("\u4EE3\u7406RAW");
-        urls.put(proxyUrl);
         urls.put("RAW");
         urls.put(downloadUrl);
         if (qualities != null) {
