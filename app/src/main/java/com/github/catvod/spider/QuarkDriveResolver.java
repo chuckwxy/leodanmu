@@ -419,7 +419,16 @@ public class QuarkDriveResolver implements CloudDrive {
         try {
             JSONObject result = new JSONObject();
             result.put("parse", 0);
-            result.put("url", input);
+            result.put("jx", 0);
+            result.put("proxy", "/proxy/?do=quark");
+            if (!TextUtils.isEmpty(input)) {
+                JSONArray urls = new JSONArray();
+                urls.put(flag != null ? flag : "RAW");
+                urls.put(input);
+                result.put("url", urls);
+            } else {
+                result.put("url", input);
+            }
             JSONObject respHeaders = new JSONObject();
             respHeaders.put("Referer", "https://pan.quark.cn/");
             respHeaders.put("User-Agent", UA);
@@ -506,7 +515,15 @@ public class QuarkDriveResolver implements CloudDrive {
                 String playUrl = item.optString("url", "");
                 if (TextUtils.isEmpty(resolution) || TextUtils.isEmpty(playUrl)) continue;
                 JSONObject q = new JSONObject();
-                q.put("name", resolution);
+                String label = resolution;
+                if ("raw".equals(resolution)) label = "RAW";
+                else if ("low".equals(resolution)) label = "普画";
+                else if ("normal".equals(resolution)) label = "标清";
+                else if ("high".equals(resolution)) label = "高清";
+                else if ("super".equals(resolution)) label = "超清";
+                else if ("2k".equals(resolution)) label = "2K";
+                else if ("4k".equals(resolution)) label = "4K";
+                q.put("name", label);
                 q.put("url", playUrl);
                 out.put(q);
             }
@@ -522,13 +539,12 @@ public class QuarkDriveResolver implements CloudDrive {
 
     private String buildProxyUrl(String rawUrl) {
         try {
-            String base = Proxy.getUrl();
-            if (TextUtils.isEmpty(base) || base.contains(":0/")) {
-                Proxy.init();
-                base = Proxy.getUrl();
+            String url = "http://127.0.0.1:5575/proxy?thread=10&chunkSize=256"
+                    + "&url=" + URLEncoder.encode(rawUrl, "UTF-8");
+            if (!TextUtils.isEmpty(cookie)) {
+                url += "&cookie=" + URLEncoder.encode(cookie, "UTF-8");
             }
-            return base + "?do=video&url=" + URLEncoder.encode(rawUrl, "UTF-8")
-                    + "&ck=" + URLEncoder.encode(cookie != null ? cookie : "", "UTF-8");
+            return url;
         } catch (Exception e) {
             return rawUrl;
         }
@@ -537,6 +553,8 @@ public class QuarkDriveResolver implements CloudDrive {
     private JSONObject buildMultiQualityResult(String downloadUrl, String savedFileId, String originalFileId) throws Exception {
         JSONObject result = new JSONObject();
         result.put("parse", 0);
+        result.put("jx", 0);
+        result.put("proxy", "/proxy/?do=quark");
         JSONObject respHeaders = new JSONObject();
         respHeaders.put("Referer", "https://pan.quark.cn/");
         respHeaders.put("User-Agent", UA);

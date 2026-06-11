@@ -22,7 +22,7 @@ public class Proxy {
 
     public static Object[] proxy(Map<String, String> params) {
         if ("ck".equals(params.get("do"))) return new Object[]{200, "text/plain; charset=utf-8", new ByteArrayInputStream("ok".getBytes(StandardCharsets.UTF_8))};
-        if ("video".equals(params.get("do"))) return proxyVideo(params);
+        if ("video".equals(params.get("do")) || "quark".equals(params.get("do"))) return proxyVideo(params);
         return null;
     }
 
