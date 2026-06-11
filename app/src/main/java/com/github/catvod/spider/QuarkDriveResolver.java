@@ -403,7 +403,7 @@ public class QuarkDriveResolver implements CloudDrive {
             if (!TextUtils.isEmpty(savedFileId)) {
                 String downloadUrl = getQuarkDownloadUrl(savedFileId);
                 if (!TextUtils.isEmpty(downloadUrl)) {
-                    return buildMultiQualityResult(downloadUrl, savedFileId);
+                    return buildMultiQualityResult(downloadUrl, savedFileId, token.fileId);
                 }
                 Leodanmu.log("Quark play: failed to get download_url from file API");
             } else {
@@ -456,20 +456,44 @@ public class QuarkDriveResolver implements CloudDrive {
     }
 
     private JSONArray getVideoPlayUrls(String savedFileId) {
+        return getVideoPlayUrls(savedFileId, null);
+    }
+
+    private JSONArray getVideoPlayUrls(String savedFileId, String altFileId) {
+        String[] fidsToTry;
+        if (altFileId != null && !altFileId.equals(savedFileId)) {
+            fidsToTry = new String[]{savedFileId, altFileId};
+        } else {
+            fidsToTry = new String[]{savedFileId};
+        }
+        for (String fid : fidsToTry) {
+            if (TextUtils.isEmpty(fid)) continue;
+            JSONArray result = tryVideoPlay(fid);
+            if (result != null) return result;
+            Leodanmu.log("Quark getVideoPlayUrls: fid=" + fid + " failed, trying next");
+        }
+        return null;
+    }
+
+    private JSONArray tryVideoPlay(String fid) {
         try {
             JSONObject body = new JSONObject();
-            body.put("fid", savedFileId);
+            body.put("fid", fid);
             body.put("resolutions", "low,normal,high,super,2k,4k");
             body.put("supports", "fmp4_av,m3u8,dolby_vision");
-            Map<String, String> headers = buildHeaders();
-            OkResult result = OkHttp.post(DRIVE_API_BASE + "/file/v2/play/project?pr=ucpro&fr=pc&__dt=" + System.currentTimeMillis(),
+            Map<String, String> headers = new HashMap<>();
+            if (!TextUtils.isEmpty(cookie)) headers.put("Cookie", cookie);
+            headers.put("Accept", "application/json, text/plain, */*");
+            headers.put("Referer", "https://pan.quark.cn");
+            headers.put("User-Agent", UA);
+            OkResult result = OkHttp.post(DRIVE_API_BASE + "/file/v2/play/project?pr=ucpro&fr=pc",
                     body.toString(), headers);
             String resp = result != null ? result.getBody() : "";
             if (TextUtils.isEmpty(resp)) return null;
             JSONObject json = new JSONObject(resp);
             int code = json.optInt("status", json.optInt("code", -1));
             if (code != 0 && code != 200) {
-                Leodanmu.log("Quark getVideoPlayUrls: api error code=" + code);
+                Leodanmu.log("Quark tryVideoPlay: api error code=" + code + " fid=" + fid);
                 return null;
             }
             JSONObject data = json.optJSONObject("data");
@@ -480,23 +504,23 @@ public class QuarkDriveResolver implements CloudDrive {
             for (int i = 0; i < videoList.length(); i++) {
                 JSONObject item = videoList.optJSONObject(i);
                 if (item == null) continue;
+                String resolution = item.optString("resolution", "");
+                if (TextUtils.isEmpty(resolution)) continue;
                 JSONObject videoInfo = item.optJSONObject("video_info");
                 if (videoInfo == null) continue;
                 String url = videoInfo.optString("url", "");
                 if (TextUtils.isEmpty(url)) continue;
-                String resolution = item.optString("resolution", "");
-                if (TextUtils.isEmpty(resolution)) continue;
                 JSONObject q = new JSONObject();
                 q.put("name", resolution);
                 q.put("url", url);
                 out.put(q);
             }
             if (out.length() > 0) {
-                Leodanmu.log("Quark getVideoPlayUrls: got " + out.length() + " qualities");
+                Leodanmu.log("Quark tryVideoPlay: got " + out.length() + " qualities for fid=" + fid);
                 return out;
             }
         } catch (Exception e) {
-            Leodanmu.log("Quark getVideoPlayUrls error: " + e.getMessage());
+            Leodanmu.log("Quark tryVideoPlay error: " + e.getMessage());
         }
         return null;
     }
@@ -514,7 +538,7 @@ public class QuarkDriveResolver implements CloudDrive {
         }
     }
 
-    private JSONObject buildMultiQualityResult(String downloadUrl, String savedFileId) throws Exception {
+    private JSONObject buildMultiQualityResult(String downloadUrl, String savedFileId, String originalFileId) throws Exception {
         JSONObject result = new JSONObject();
         result.put("parse", 0);
         JSONObject respHeaders = new JSONObject();
@@ -524,7 +548,7 @@ public class QuarkDriveResolver implements CloudDrive {
             respHeaders.put("Cookie", cookie);
         }
         result.put("header", respHeaders);
-        JSONArray qualities = getVideoPlayUrls(savedFileId);
+        JSONArray qualities = getVideoPlayUrls(savedFileId, originalFileId);
         JSONArray urls = new JSONArray();
         String proxyUrl = buildProxyUrl(downloadUrl);
         urls.put("\u4EE3\u7406RAW");
