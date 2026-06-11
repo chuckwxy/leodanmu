@@ -400,36 +400,9 @@ public class QuarkDriveResolver implements CloudDrive {
             }
 
             if (!TextUtils.isEmpty(savedFileId)) {
-                Leodanmu.log("Quark play: getting download URL for saved file " + savedFileId);
-                Map<String, String> headers = buildHeaders();
-                JSONObject dlBody = new JSONObject();
-                JSONArray fids = new JSONArray();
-                fids.put(savedFileId);
-                dlBody.put("fids", fids);
-                OkResult okDlResult = OkHttp.post(API_BASE + "/1/clouddrive/file/download?pr=ucpro&fr=pc&__dt=" + System.currentTimeMillis(),
-                        dlBody.toString(), headers);
-                String dlResp = okDlResult != null ? okDlResult.getBody() : "";
-                Leodanmu.log("Quark play: download API resp=" + (dlResp != null ? dlResp.substring(0, Math.min(dlResp.length(), 200)) : "null"));
-                if (!TextUtils.isEmpty(dlResp)) {
-                    JSONObject dlJson = new JSONObject(dlResp);
-                    JSONArray dlData = dlJson.optJSONArray("data");
-                    if (dlData != null && dlData.length() > 0) {
-                        String downloadUrl = dlData.optJSONObject(0).optString("download_url", "");
-                        if (!TextUtils.isEmpty(downloadUrl)) {
-                            Leodanmu.log("Quark play: got download_url=" + downloadUrl.substring(0, Math.min(downloadUrl.length(), 120)));
-                            JSONObject result = new JSONObject();
-                            result.put("parse", 0);
-                            result.put("url", downloadUrl);
-                            JSONObject respHeaders = new JSONObject();
-                            respHeaders.put("Referer", "https://pan.quark.cn/");
-                            respHeaders.put("User-Agent", UA);
-                            if (!TextUtils.isEmpty(cookie)) {
-                                respHeaders.put("Cookie", cookie);
-                            }
-                            result.put("header", respHeaders);
-                            return result;
-                        }
-                    }
+                String downloadUrl = getQuarkDownloadUrl(savedFileId);
+                if (!TextUtils.isEmpty(downloadUrl)) {
+                    return buildMultiQualityResult(downloadUrl, savedFileId);
                 }
                 Leodanmu.log("Quark play: failed to get download_url from file API");
             } else {
@@ -457,6 +430,116 @@ public class QuarkDriveResolver implements CloudDrive {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    private String getQuarkDownloadUrl(String savedFileId) throws Exception {
+        Map<String, String> headers = buildHeaders();
+        JSONObject dlBody = new JSONObject();
+        JSONArray fids = new JSONArray();
+        fids.put(savedFileId);
+        dlBody.put("fids", fids);
+        OkResult okDlResult = OkHttp.post(API_BASE + "/1/clouddrive/file/download?pr=ucpro&fr=pc&__dt=" + System.currentTimeMillis(),
+                dlBody.toString(), headers);
+        String dlResp = okDlResult != null ? okDlResult.getBody() : "";
+        if (TextUtils.isEmpty(dlResp)) return "";
+        JSONObject dlJson = new JSONObject(dlResp);
+        JSONArray dlData = dlJson.optJSONArray("data");
+        if (dlData != null && dlData.length() > 0) {
+            String url = dlData.optJSONObject(0).optString("download_url", "");
+            if (!TextUtils.isEmpty(url)) {
+                Leodanmu.log("Quark getQuarkDownloadUrl: " + url.substring(0, Math.min(url.length(), 120)));
+                return url;
+            }
+        }
+        return "";
+    }
+
+    private JSONArray getVideoPlayUrls(String savedFileId) {
+        try {
+            JSONObject body = new JSONObject();
+            body.put("fid", savedFileId);
+            body.put("resolutions", "low,normal,high,super,2k,4k");
+            body.put("supports", "fmp4_av,m3u8,dolby_vision");
+            Map<String, String> headers = buildHeaders();
+            OkResult result = OkHttp.post(API_BASE + "/1/clouddrive/file/v2/play/project?pr=ucpro&fr=pc&__dt=" + System.currentTimeMillis(),
+                    body.toString(), headers);
+            String resp = result != null ? result.getBody() : "";
+            if (TextUtils.isEmpty(resp)) return null;
+            JSONObject json = new JSONObject(resp);
+            int code = json.optInt("status", json.optInt("code", -1));
+            if (code != 0 && code != 200) {
+                Leodanmu.log("Quark getVideoPlayUrls: api error code=" + code);
+                return null;
+            }
+            JSONObject data = json.optJSONObject("data");
+            if (data == null) return null;
+            JSONArray videoList = data.optJSONArray("video_list");
+            if (videoList == null || videoList.length() == 0) return null;
+            JSONArray out = new JSONArray();
+            for (int i = 0; i < videoList.length(); i++) {
+                JSONObject item = videoList.optJSONObject(i);
+                if (item == null) continue;
+                JSONObject videoInfo = item.optJSONObject("video_info");
+                if (videoInfo == null) continue;
+                String url = videoInfo.optString("url", "");
+                if (TextUtils.isEmpty(url)) continue;
+                String resolution = item.optString("resolution", "");
+                if (TextUtils.isEmpty(resolution)) continue;
+                JSONObject q = new JSONObject();
+                q.put("name", resolution);
+                q.put("url", url);
+                out.put(q);
+            }
+            if (out.length() > 0) {
+                Leodanmu.log("Quark getVideoPlayUrls: got " + out.length() + " qualities");
+                return out;
+            }
+        } catch (Exception e) {
+            Leodanmu.log("Quark getVideoPlayUrls error: " + e.getMessage());
+        }
+        return null;
+    }
+
+    private String buildProxyUrl(String rawUrl) {
+        try {
+            String url = "http://127.0.0.1:5575/proxy?thread=8&chunkSize=256"
+                    + "&url=" + URLEncoder.encode(rawUrl, "UTF-8");
+            if (!TextUtils.isEmpty(cookie)) {
+                url += "&cookie=" + URLEncoder.encode(cookie, "UTF-8");
+            }
+            return url;
+        } catch (Exception e) {
+            return rawUrl;
+        }
+    }
+
+    private JSONObject buildMultiQualityResult(String downloadUrl, String savedFileId) throws Exception {
+        JSONObject result = new JSONObject();
+        result.put("parse", 0);
+        JSONObject respHeaders = new JSONObject();
+        respHeaders.put("Referer", "https://pan.quark.cn/");
+        respHeaders.put("User-Agent", UA);
+        if (!TextUtils.isEmpty(cookie)) {
+            respHeaders.put("Cookie", cookie);
+        }
+        result.put("header", respHeaders);
+        JSONArray qualities = getVideoPlayUrls(savedFileId);
+        JSONArray urls = new JSONArray();
+        String proxyUrl = buildProxyUrl(downloadUrl);
+        urls.put("\u4EE3\u7406RAW");
+        urls.put(proxyUrl);
+        urls.put("RAW");
+        urls.put(downloadUrl);
+        if (qualities != null) {
+            for (int i = 0; i < qualities.length(); i++) {
+                JSONObject q = qualities.getJSONObject(i);
+                urls.put(q.getString("name"));
+                urls.put(q.getString("url"));
+            }
+        }
+        result.put("url", urls);
+        Leodanmu.log("Quark buildMultiQualityResult: url count=" + (urls.length() / 2));
+        return result;
     }
 
     public JSONObject getVod(String url) {
