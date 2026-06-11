@@ -16,7 +16,8 @@ import java.util.regex.Pattern;
 public class BaiduDriveResolver implements CloudDrive {
 
     private static final String API_BASE = "https://pan.baidu.com";
-    private static final String UA = "netdisk;P2SP;2.2.91.136;android-android;";
+    private static final String UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+    private static final String NETDISK_UA = "netdisk;P2SP;2.2.91.136;android-android;";
     private static final Pattern SURL_PATTERN = Pattern.compile("/s/([a-zA-Z0-9_-]+)");
     private static final Pattern SIGN_PATTERN = Pattern.compile("\"sign\":\"([^\"]+)\"");
     private static final Pattern TIMESTAMP_PATTERN = Pattern.compile("\"timestamp\":(\\d+)");
@@ -204,6 +205,7 @@ public class BaiduDriveResolver implements CloudDrive {
             Leodanmu.log("Baidu play: fileId=" + fileId + " shareId=" + shareId + " uk=" + uk);
 
             Map<String, String> headers = buildApiHeaders();
+            headers.put("User-Agent", NETDISK_UA);
 
             JSONObject downloadBody = new JSONObject();
             downloadBody.put("shareid", shareId);
@@ -227,7 +229,7 @@ public class BaiduDriveResolver implements CloudDrive {
 
             result.put("url", downloadUrl);
             JSONObject respHeaders = new JSONObject();
-            respHeaders.put("User-Agent", UA);
+            respHeaders.put("User-Agent", NETDISK_UA);
             result.put("header", respHeaders);
             return result;
         } catch (Exception e) {
