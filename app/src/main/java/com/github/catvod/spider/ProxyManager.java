@@ -566,10 +566,24 @@ public class ProxyManager {
 
     private static int resolveBackendPort() {
         int type = activeProxyType.get();
-        if (type == PROXY_TYPE_GO && isGoProxyBackendHealthy()) return GoProxyManager.getCurrentBackendPort();
-        if (type == PROXY_TYPE_JAVA && isJavaProxyBackendHealthy()) return JAVA_BACKEND_PORT;
-        if (isJavaProxyBackendHealthy()) return JAVA_BACKEND_PORT;
-        if (isGoProxyBackendHealthy()) return GoProxyManager.getCurrentBackendPort();
+        log("[中继] resolveBackendPort type=" + type + " preferred=" + preferredProxyType);
+        if (type == PROXY_TYPE_GO) {
+            boolean goHealthy = isGoProxyBackendHealthy();
+            log("[中继] Go检查 healthy=" + goHealthy + " port=" + GoProxyManager.getCurrentBackendPort());
+            if (goHealthy) return GoProxyManager.getCurrentBackendPort();
+        }
+        if (type == PROXY_TYPE_JAVA) {
+            boolean javaHealthy = isJavaProxyBackendHealthy();
+            log("[中继] Java检查 healthy=" + javaHealthy + " port=" + JAVA_BACKEND_PORT);
+            if (javaHealthy) return JAVA_BACKEND_PORT;
+        }
+        boolean javaFallback = isJavaProxyBackendHealthy();
+        log("[中继] Java回退检查 healthy=" + javaFallback);
+        if (javaFallback) return JAVA_BACKEND_PORT;
+        boolean goFallback = isGoProxyBackendHealthy();
+        log("[中继] Go回退检查 healthy=" + goFallback);
+        if (goFallback) return GoProxyManager.getCurrentBackendPort();
+        log("[中继] 所有后端不可用，返回 -1");
         return -1;
     }
 
