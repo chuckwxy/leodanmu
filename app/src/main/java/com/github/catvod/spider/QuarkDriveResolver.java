@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+
 public class QuarkDriveResolver implements CloudDrive {
 
     private static final String API_BASE = "https://pan.quark.cn";
@@ -26,7 +27,7 @@ public class QuarkDriveResolver implements CloudDrive {
     private static final int PAGE_SIZE = 100;
     private static final String LEOOPEN_DIR_NAME = "Leoopen";
 
-    private final String cookie;
+    private String cookie;
     private String leoopenDirId;
 
     public QuarkDriveResolver(String cookie) {
@@ -486,6 +487,24 @@ public class QuarkDriveResolver implements CloudDrive {
         dlBody.put("fids", fids);
         OkResult okDlResult = OkHttp.post(API_BASE + "/1/clouddrive/file/download?pr=ucpro&fr=pc&__dt=" + System.currentTimeMillis(),
                 dlBody.toString(), headers);
+        if (okDlResult != null) {
+            Map<String, List<String>> respHeaders = okDlResult.getResp();
+            if (respHeaders != null) {
+                for (Map.Entry<String, List<String>> entry : respHeaders.entrySet()) {
+                    if (entry.getKey() != null && entry.getKey().equalsIgnoreCase("Set-Cookie")) {
+                        for (String value : entry.getValue()) {
+                            if (!TextUtils.isEmpty(value)) {
+                                String cookiePart = value.split(";")[0].trim();
+                                int eqIdx = cookiePart.indexOf('=');
+                                if (eqIdx > 0) {
+                                    this.cookie = updateCookie(this.cookie, cookiePart.substring(0, eqIdx), cookiePart.substring(eqIdx + 1));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
         String dlResp = okDlResult != null ? okDlResult.getBody() : "";
         if (TextUtils.isEmpty(dlResp)) return "";
         JSONObject dlJson = new JSONObject(dlResp);
@@ -497,6 +516,31 @@ public class QuarkDriveResolver implements CloudDrive {
             }
         }
         return "";
+    }
+
+    private String updateCookie(String oldCookie, String name, String value) {
+        if (TextUtils.isEmpty(oldCookie)) return name + "=" + value;
+        String[] parts = oldCookie.split(";");
+        StringBuilder sb = new StringBuilder();
+        boolean found = false;
+        for (String part : parts) {
+            String trimmed = part.trim();
+            if (trimmed.startsWith(name + "=")) {
+                if (!found) {
+                    if (sb.length() > 0) sb.append("; ");
+                    sb.append(name).append("=").append(value);
+                    found = true;
+                }
+            } else {
+                if (sb.length() > 0) sb.append("; ");
+                sb.append(trimmed);
+            }
+        }
+        if (!found) {
+            if (sb.length() > 0) sb.append("; ");
+            sb.append(name).append("=").append(value);
+        }
+        return sb.toString();
     }
 
     private JSONArray getVideoPlayUrls(String savedFileId) {
@@ -584,7 +628,7 @@ public class QuarkDriveResolver implements CloudDrive {
         }
         result.put("header", respHeaders);
         JSONArray qualities = getVideoPlayUrls(savedFileId, originalFileId);
-        String proxyUrl = "http://127.0.0.1:5575/proxy?thread=10&chunkSize=256&url=" + URLEncoder.encode(downloadUrl, "UTF-8");
+        String proxyUrl = "http://127.0.0.1:5575/proxy?thread=10&chunkSize=256&url=" + URLEncoder.encode(downloadUrl, "UTF-8") + "&ck=" + URLEncoder.encode(cookie != null ? cookie : "", "UTF-8");
         JSONArray urls = new JSONArray();
         urls.put("\u4EE3\u7406RAW");
         urls.put(proxyUrl);
