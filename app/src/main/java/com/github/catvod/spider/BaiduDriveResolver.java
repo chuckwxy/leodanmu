@@ -191,6 +191,7 @@ public class BaiduDriveResolver implements CloudDrive {
             JSONObject result = new JSONObject();
             result.put("parse", 0);
             result.put("jx", 0);
+            result.put("format", "video/mp4");
 
             byte[] tokenBytes = hexToBytes(input);
             String tokenStr = new String(tokenBytes, "UTF-8");
