@@ -16,7 +16,7 @@ import java.util.regex.Pattern;
 public class BaiduDriveResolver implements CloudDrive {
 
     private static final String API_BASE = "https://pan.baidu.com";
-    private static final String UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+    private static final String UA = "netdisk;P2SP;2.2.91.136;android-android;";
     private static final Pattern SURL_PATTERN = Pattern.compile("/s/([a-zA-Z0-9_-]+)");
     private static final Pattern SIGN_PATTERN = Pattern.compile("\"sign\":\"([^\"]+)\"");
     private static final Pattern TIMESTAMP_PATTERN = Pattern.compile("\"timestamp\":(\\d+)");
@@ -71,7 +71,7 @@ public class BaiduDriveResolver implements CloudDrive {
     private void transferToDrive(String shareid, String fsId) throws Exception {
         if (bduss.isEmpty()) return;
 
-        Map<String, String> headers = buildHeaders();
+        Map<String, String> headers = buildApiHeaders();
         JSONObject body = new JSONObject();
         body.put("shareid", shareid);
         body.put("fs_id", fsId);
@@ -97,7 +97,7 @@ public class BaiduDriveResolver implements CloudDrive {
             String surl = extractSurl(url);
             if (TextUtils.isEmpty(surl)) return null;
 
-            Map<String, String> headers = buildHeaders();
+            Map<String, String> headers = buildApiHeaders();
 
             String initResp = OkHttp.string(API_BASE + "/share/init?surl=" + surl, headers);
             if (TextUtils.isEmpty(initResp)) return null;
@@ -108,6 +108,10 @@ public class BaiduDriveResolver implements CloudDrive {
             String shareid = extractByPattern(initResp, SHAREID_PATTERN);
             String uk = extractByPattern(initResp, UK_PATTERN);
             String title = extractByPattern(initResp, Pattern.compile("\"share_name\":\"([^\"]+)\""));
+            String pwd = "";
+            if (url.contains("pwd=")) {
+                pwd = url.replaceAll(".*pwd=([^&#]+).*", "$1");
+            }
 
             if (TextUtils.isEmpty(shareid)) return null;
 
@@ -137,27 +141,36 @@ public class BaiduDriveResolver implements CloudDrive {
                 SpiderDebug.log("Baidu transfer (non-fatal): " + e.getMessage());
             }
 
-            JSONObject downloadBody = new JSONObject();
-            downloadBody.put("shareid", shareid);
-            downloadBody.put("uk", uk);
-            downloadBody.put("primaryid", shareid);
-            downloadBody.put("fid_list", new JSONArray().put(fsId));
+            StringBuilder playUrlSb = new StringBuilder();
+            for (int i = 0; i < list.length(); i++) {
+                JSONObject file = list.optJSONObject(i);
+                if (file == null) continue;
+                String fName = file.optString("server_filename", "");
+                String fId = file.optString("fs_id", "");
+                if (TextUtils.isEmpty(fId)) continue;
 
-            JSONObject dlResp = OkHttp.postJson(API_BASE + "/share/download?channel=chunlei&clienttype=0&web=1", downloadBody.toString(), headers);
-            JSONObject dlData = dlResp != null ? dlResp.optJSONObject("data") : null;
-            String downloadUrl = dlData != null ? dlData.optString("dlink", dlData.optString("url", "")) : "";
+                JSONObject token = new JSONObject();
+                token.put("id", fId);
+                token.put("share_id", Long.parseLong(shareid));
+                token.put("uk", Long.parseLong(uk));
+                token.put("shareId", surl);
+                token.put("pwd", pwd);
+                String tokenHex = bytesToHex(token.toString().getBytes("UTF-8"));
 
-            if (!TextUtils.isEmpty(downloadUrl) && downloadUrl.contains("baidu.com")) {
-                downloadUrl += "&app_id=250528";
+                String epName = fName;
+                if (epName.contains(".")) epName = epName.substring(0, epName.lastIndexOf('.'));
+                long sizeMB = fName.contains(".") ? 0 : 0;
+                if (file.has("size")) {
+                    sizeMB = file.optLong("size") / (1024 * 1024);
+                }
+                String displayName = (sizeMB > 0 ? "[" + sizeMB + "MB]" : "") + epName;
+
+                if (i > 0) playUrlSb.append("#");
+                playUrlSb.append(displayName).append("$").append(tokenHex);
             }
 
             if (TextUtils.isEmpty(title)) title = fileName;
             if (TextUtils.isEmpty(title)) title = "\u767E\u5EA6\u7F51\u76D8\u8D44\u6E90";
-
-            StringBuilder playUrlSb = new StringBuilder();
-            String epName = fileName;
-            if (epName.contains(".")) epName = epName.substring(0, epName.lastIndexOf('.'));
-            playUrlSb.append(epName).append("$").append(!TextUtils.isEmpty(downloadUrl) ? downloadUrl : url);
 
             JSONObject vod = new JSONObject();
             vod.put("vod_id", url);
@@ -172,31 +185,77 @@ public class BaiduDriveResolver implements CloudDrive {
         }
     }
 
-    private String extractByPattern(String text, Pattern pattern) {
-        Matcher m = pattern.matcher(text);
-        return m.find() ? m.group(1) : "";
-    }
-
     @Override
     public JSONObject play(String input, String flag) {
         try {
             Leodanmu.log("Baidu play: input=" + input.substring(0, Math.min(input.length(), 80)) + " bduss(len)=" + (bduss != null ? bduss.length() : 0));
             JSONObject result = new JSONObject();
             result.put("parse", 0);
-            result.put("url", input);
-            JSONObject respHeaders = new JSONObject();
-            respHeaders.put("Referer", API_BASE + "/");
-            respHeaders.put("User-Agent", UA);
-            if (!TextUtils.isEmpty(bduss)) {
-                String cookieStr = "BDUSS=" + bduss;
-                if (!TextUtils.isEmpty(stoken)) cookieStr += "; STOKEN=" + stoken;
-                respHeaders.put("Cookie", cookieStr);
+            result.put("jx", 0);
+
+            byte[] tokenBytes = hexToBytes(input);
+            String tokenStr = new String(tokenBytes, "UTF-8");
+            JSONObject token = new JSONObject(tokenStr);
+            String fileId = token.optString("id", "");
+            String shareId = token.optString("share_id", token.optString("shareId", ""));
+            String uk = token.optString("uk", "");
+            String surl = token.optString("shareId", "");
+
+            Leodanmu.log("Baidu play: fileId=" + fileId + " shareId=" + shareId + " uk=" + uk);
+
+            Map<String, String> headers = buildApiHeaders();
+
+            JSONObject downloadBody = new JSONObject();
+            downloadBody.put("shareid", shareId);
+            downloadBody.put("uk", uk);
+            downloadBody.put("primaryid", shareId);
+            downloadBody.put("fid_list", new JSONArray().put(fileId));
+
+            String dlUrl = API_BASE + "/share/download?channel=chunlei&clienttype=0&web=1";
+
+            JSONObject dlResp = OkHttp.postJson(dlUrl, downloadBody.toString(), headers);
+            JSONObject dlData = dlResp != null ? dlResp.optJSONObject("data") : null;
+            String downloadUrl = dlData != null ? dlData.optString("dlink", dlData.optString("url", "")) : "";
+
+            if (TextUtils.isEmpty(downloadUrl)) {
+                Leodanmu.log("Baidu play: no download url from API");
+                if (dlResp != null) {
+                    Leodanmu.log("Baidu play: API response: " + dlResp.toString());
+                }
+                return result;
             }
+
+            result.put("url", downloadUrl);
+            JSONObject respHeaders = new JSONObject();
+            respHeaders.put("User-Agent", UA);
             result.put("header", respHeaders);
             return result;
         } catch (Exception e) {
+            SpiderDebug.log("Baidu play error: " + e.getMessage());
             return null;
         }
+    }
+
+    private static String bytesToHex(byte[] bytes) {
+        StringBuilder sb = new StringBuilder();
+        for (byte b : bytes) {
+            sb.append(String.format("%02x", b & 0xff));
+        }
+        return sb.toString();
+    }
+
+    private static byte[] hexToBytes(String hex) {
+        int len = hex.length();
+        byte[] bytes = new byte[len / 2];
+        for (int i = 0; i < len; i += 2) {
+            bytes[i / 2] = (byte) Integer.parseInt(hex.substring(i, i + 2), 16);
+        }
+        return bytes;
+    }
+
+    private String extractByPattern(String text, Pattern pattern) {
+        Matcher m = pattern.matcher(text);
+        return m.find() ? m.group(1) : "";
     }
 
     @Override
@@ -209,7 +268,7 @@ public class BaiduDriveResolver implements CloudDrive {
         return DriveQRCodeUtil.checkBaiduStatus(queryToken);
     }
 
-    private Map<String, String> buildHeaders() {
+    private Map<String, String> buildApiHeaders() {
         Map<String, String> headers = new HashMap<>();
         headers.put("User-Agent", UA);
         headers.put("Referer", API_BASE + "/");
