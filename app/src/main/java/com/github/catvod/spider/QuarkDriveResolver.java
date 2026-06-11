@@ -536,24 +536,13 @@ public class QuarkDriveResolver implements CloudDrive {
         return null;
     }
 
-    private String buildProxyUrl(String rawUrl) {
-        return DriveManager.buildProxyUrl(rawUrl, 8, 256, cookie);
-    }
-
     private JSONObject buildMultiQualityResult(String downloadUrl, String savedFileId, String originalFileId) throws Exception {
         JSONObject result = new JSONObject();
-        result.put("parse", 0);
-        result.put("jx", 0);
-        result.put("proxy", "/proxy/?do=quark");
-        JSONObject respHeaders = new JSONObject();
-        respHeaders.put("Referer", "https://pan.quark.cn/");
-        respHeaders.put("User-Agent", UA);
-        if (!TextUtils.isEmpty(cookie)) {
-            respHeaders.put("Cookie", cookie);
-        }
-        result.put("header", respHeaders);
         JSONArray qualities = getVideoPlayUrls(savedFileId, originalFileId);
         JSONArray urls = new JSONArray();
+        String proxyUrl = "http://127.0.0.1:5575/proxy?thread=8&chunkSize=256&url=" + URLEncoder.encode(downloadUrl, "UTF-8");
+        urls.put("\u4EE3\u7406RAW");
+        urls.put(proxyUrl);
         urls.put("RAW");
         urls.put(downloadUrl);
         if (qualities != null) {
