@@ -27,8 +27,10 @@ public class BaiduDriveResolver implements CloudDrive {
 
     private String bduss;
     private String stoken;
+    private String fullCookie;
 
     public BaiduDriveResolver(String cookie) {
+        this.fullCookie = cookie != null ? cookie : "";
         if (!TextUtils.isEmpty(cookie)) {
             Map<String, String> parsed = parseCookie(cookie);
             this.bduss = parsed.containsKey("BDUSS") ? parsed.get("BDUSS") : "";
@@ -288,10 +290,14 @@ public class BaiduDriveResolver implements CloudDrive {
         Map<String, String> headers = new HashMap<>();
         headers.put("User-Agent", UA);
         headers.put("Referer", API_BASE + "/");
-        String cookieStr = "";
-        if (!TextUtils.isEmpty(bduss)) cookieStr += "BDUSS=" + bduss + "; ";
-        if (!TextUtils.isEmpty(stoken)) cookieStr += "STOKEN=" + stoken + "; ";
-        if (!TextUtils.isEmpty(cookieStr)) headers.put("Cookie", cookieStr);
+        if (!TextUtils.isEmpty(fullCookie)) {
+            headers.put("Cookie", fullCookie);
+        } else {
+            String cookieStr = "";
+            if (!TextUtils.isEmpty(bduss)) cookieStr += "BDUSS=" + bduss + "; ";
+            if (!TextUtils.isEmpty(stoken)) cookieStr += "STOKEN=" + stoken + "; ";
+            if (!TextUtils.isEmpty(cookieStr)) headers.put("Cookie", cookieStr);
+        }
         return headers;
     }
 }
