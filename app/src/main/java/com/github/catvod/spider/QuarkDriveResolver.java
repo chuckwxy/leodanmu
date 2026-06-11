@@ -166,7 +166,7 @@ public class QuarkDriveResolver implements CloudDrive {
                     + "&stoken=" + URLEncoder.encode(token.stoken, "UTF-8")
                     + "&pdir_fid=" + URLEncoder.encode(info.pdirFid != null ? info.pdirFid : "", "UTF-8")
                     + "&_page=" + page + "&_size=" + PAGE_SIZE
-                    + "&_sort=file_type:asc,updated_at:desc&__dt=" + System.currentTimeMillis();
+                    + "&_sort=file_name:asc&__dt=" + System.currentTimeMillis();
 
             Map<String, String> headers = buildHeaders();
             String resp = OkHttp.string(url, headers);
@@ -520,19 +520,6 @@ public class QuarkDriveResolver implements CloudDrive {
         return null;
     }
 
-    private String buildProxyUrl(String rawUrl) {
-        try {
-            String url = "http://127.0.0.1:5575/proxy?thread=8&chunkSize=256"
-                    + "&url=" + URLEncoder.encode(rawUrl, "UTF-8");
-            if (!TextUtils.isEmpty(cookie)) {
-                url += "&cookie=" + URLEncoder.encode(cookie, "UTF-8");
-            }
-            return url;
-        } catch (Exception e) {
-            return rawUrl;
-        }
-    }
-
     private JSONObject buildMultiQualityResult(String downloadUrl, String savedFileId, String originalFileId) throws Exception {
         JSONObject result = new JSONObject();
         result.put("parse", 0);
@@ -545,9 +532,6 @@ public class QuarkDriveResolver implements CloudDrive {
         result.put("header", respHeaders);
         JSONArray qualities = getVideoPlayUrls(savedFileId, originalFileId);
         JSONArray urls = new JSONArray();
-        String proxyUrl = buildProxyUrl(downloadUrl);
-        urls.put("\u4EE3\u7406RAW");
-        urls.put(proxyUrl);
         urls.put("RAW");
         urls.put(downloadUrl);
         if (qualities != null) {
