@@ -6,9 +6,14 @@ import com.github.catvod.crawler.SpiderDebug;
 import com.github.catvod.net.OkHttp;
 
 import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.io.PipedInputStream;
+import java.io.PipedOutputStream;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import okhttp3.OkHttpClient;
@@ -25,6 +30,8 @@ public class Proxy {
         if ("video".equals(params.get("do")) || "quark".equals(params.get("do"))) return proxyVideo(params);
         return null;
     }
+
+    private static final ExecutorService proxyExecutor = Executors.newCachedThreadPool();
 
     private static Object[] proxyVideo(Map<String, String> params) {
         try {
@@ -52,12 +59,31 @@ public class Proxy {
             Response response = proxyClient.newCall(builder.build()).execute();
             int code = response.code();
             String contentType = response.header("Content-Type", "application/octet-stream");
-            byte[] data = response.body().bytes();
-            return new Object[]{code, contentType, new ByteArrayInputStream(data)};
+
+            PipedInputStream pipedIn = new PipedInputStream(262144);
+            PipedOutputStream pipedOut = new PipedOutputStream(pipedIn);
+            proxyExecutor.execute(() -> {
+                try (InputStream in = response.body().byteStream()) {
+                    byte[] buf = new byte[8192];
+                    int n;
+                    while ((n = in.read(buf)) != -1) {
+                        pipedOut.write(buf, 0, n);
+                        pipedOut.flush();
+                    }
+                } catch (Exception ignored) {
+                } finally {
+                    closeQuietly(pipedOut);
+                }
+            });
+            return new Object[]{code, contentType, pipedIn};
         } catch (Exception e) {
             SpiderDebug.log("Proxy proxyVideo error: " + e.getMessage());
             return null;
         }
+    }
+
+    private static void closeQuietly(java.io.Closeable c) {
+        if (c != null) try { c.close(); } catch (Exception ignored) {}
     }
 
     public static void init() {
