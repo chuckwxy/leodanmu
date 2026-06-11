@@ -30,8 +30,8 @@ public class BaiduDriveResolver implements CloudDrive {
     public BaiduDriveResolver(String cookie) {
         if (!TextUtils.isEmpty(cookie)) {
             Map<String, String> parsed = parseCookie(cookie);
-            this.bduss = parsed.getOrDefault("BDUSS", "");
-            this.stoken = parsed.getOrDefault("STOKEN", "");
+            this.bduss = parsed.containsKey("BDUSS") ? parsed.get("BDUSS") : "";
+            this.stoken = parsed.containsKey("STOKEN") ? parsed.get("STOKEN") : "";
         }
     }
 
