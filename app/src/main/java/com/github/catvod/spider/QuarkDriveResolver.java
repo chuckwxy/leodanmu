@@ -520,6 +520,20 @@ public class QuarkDriveResolver implements CloudDrive {
         return null;
     }
 
+    private String buildProxyUrl(String rawUrl) {
+        try {
+            String base = Proxy.getUrl();
+            if (TextUtils.isEmpty(base) || base.contains(":0/")) {
+                Proxy.init();
+                base = Proxy.getUrl();
+            }
+            return base + "?do=video&url=" + URLEncoder.encode(rawUrl, "UTF-8")
+                    + "&ck=" + URLEncoder.encode(cookie != null ? cookie : "", "UTF-8");
+        } catch (Exception e) {
+            return rawUrl;
+        }
+    }
+
     private JSONObject buildMultiQualityResult(String downloadUrl, String savedFileId, String originalFileId) throws Exception {
         JSONObject result = new JSONObject();
         result.put("parse", 0);
@@ -532,6 +546,9 @@ public class QuarkDriveResolver implements CloudDrive {
         result.put("header", respHeaders);
         JSONArray qualities = getVideoPlayUrls(savedFileId, originalFileId);
         JSONArray urls = new JSONArray();
+        String proxyUrl = buildProxyUrl(downloadUrl);
+        urls.put("\u4EE3\u7406RAW");
+        urls.put(proxyUrl);
         urls.put("RAW");
         urls.put(downloadUrl);
         if (qualities != null) {

@@ -1,5 +1,7 @@
 package com.github.catvod.spider;
 
+import android.text.TextUtils;
+
 import com.github.catvod.crawler.SpiderDebug;
 import com.github.catvod.net.OkHttp;
 
@@ -7,6 +9,12 @@ import java.io.ByteArrayInputStream;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
+
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
+
 public class Proxy {
 
     private static Method method;
@@ -14,7 +22,42 @@ public class Proxy {
 
     public static Object[] proxy(Map<String, String> params) {
         if ("ck".equals(params.get("do"))) return new Object[]{200, "text/plain; charset=utf-8", new ByteArrayInputStream("ok".getBytes(StandardCharsets.UTF_8))};
+        if ("video".equals(params.get("do"))) return proxyVideo(params);
         return null;
+    }
+
+    private static Object[] proxyVideo(Map<String, String> params) {
+        try {
+            String targetUrl = params.get("url");
+            if (TextUtils.isEmpty(targetUrl)) return null;
+
+            Request.Builder builder = new Request.Builder().url(targetUrl);
+
+            String cookie = params.get("ck");
+            if (!TextUtils.isEmpty(cookie)) {
+                builder.header("Cookie", cookie);
+            }
+            builder.header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) quark-cloud-drive/2.5.20 Chrome/100.0.4896.160 Electron/18.3.5.4-b478491100 Safari/537.36 Channel/pckk_other_ch");
+            builder.header("Referer", "https://pan.quark.cn/");
+
+            String range = params.get("range");
+            if (!TextUtils.isEmpty(range)) {
+                builder.header("Range", range);
+            }
+
+            OkHttpClient proxyClient = OkHttp.client().newBuilder()
+                    .connectTimeout(30, TimeUnit.SECONDS)
+                    .readTimeout(60, TimeUnit.SECONDS)
+                    .build();
+            Response response = proxyClient.newCall(builder.build()).execute();
+            int code = response.code();
+            String contentType = response.header("Content-Type", "application/octet-stream");
+            byte[] data = response.body().bytes();
+            return new Object[]{code, contentType, new ByteArrayInputStream(data)};
+        } catch (Exception e) {
+            SpiderDebug.log("Proxy proxyVideo error: " + e.getMessage());
+            return null;
+        }
     }
 
     public static void init() {
