@@ -551,12 +551,15 @@ public class QuarkDriveResolver implements CloudDrive {
         JSONArray qualities = getVideoPlayUrls(savedFileId, originalFileId);
         String proxyUrl = "http://127.0.0.1:5575/proxy?thread=10&chunkSize=256&url=" + URLEncoder.encode(downloadUrl, "UTF-8");
         JSONArray urls = new JSONArray();
-        urls.put("\u4EE3\u7406RAW$" + proxyUrl);
-        urls.put("RAW$" + downloadUrl);
+        urls.put("\u4EE3\u7406RAW");
+        urls.put(proxyUrl);
+        urls.put("RAW");
+        urls.put(downloadUrl);
         if (qualities != null) {
             for (int i = 0; i < qualities.length(); i++) {
                 JSONObject q = qualities.getJSONObject(i);
-                urls.put(q.getString("name") + "$" + q.getString("url"));
+                urls.put(q.getString("name"));
+                urls.put(q.getString("url"));
             }
         }
         result.put("url", urls);
