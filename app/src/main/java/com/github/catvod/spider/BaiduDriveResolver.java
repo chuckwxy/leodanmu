@@ -95,12 +95,20 @@ public class BaiduDriveResolver implements CloudDrive {
     public JSONObject getVod(String url) {
         try {
             String surl = extractSurl(url);
-            if (TextUtils.isEmpty(surl)) return null;
+            if (TextUtils.isEmpty(surl)) {
+                SpiderDebug.log("Baidu getVod: no surl");
+                return null;
+            }
 
             Map<String, String> headers = buildApiHeaders();
+            SpiderDebug.log("Baidu getVod: bduss=" + (bduss != null ? bduss.substring(0, Math.min(8, bduss.length())) + "..." : "null") + " stoken=" + (stoken != null ? "set(" + stoken.length() + ")" : "null"));
 
             String initResp = OkHttp.string(API_BASE + "/share/init?surl=" + surl, headers);
-            if (TextUtils.isEmpty(initResp)) return null;
+            if (TextUtils.isEmpty(initResp)) {
+                SpiderDebug.log("Baidu getVod: init empty");
+                return null;
+            }
+            SpiderDebug.log("Baidu getVod: init OK len=" + initResp.length());
 
             String sign = extractByPattern(initResp, SIGN_PATTERN);
             String timestamp = extractByPattern(initResp, TIMESTAMP_PATTERN);
@@ -113,7 +121,10 @@ public class BaiduDriveResolver implements CloudDrive {
                 pwd = url.replaceAll(".*pwd=([^&#]+).*", "$1");
             }
 
-            if (TextUtils.isEmpty(shareid)) return null;
+            if (TextUtils.isEmpty(shareid)) {
+                SpiderDebug.log("Baidu getVod: no shareid in init");
+                return null;
+            }
 
             JSONObject body = new JSONObject();
             body.put("sign", sign);
@@ -124,12 +135,22 @@ public class BaiduDriveResolver implements CloudDrive {
             body.put("surl", surl);
 
             JSONObject listResp = OkHttp.postJson(API_BASE + "/share/list?channel=chunlei&clienttype=0&web=1", body.toString(), headers);
-            if (listResp == null) return null;
+            if (listResp == null) {
+                SpiderDebug.log("Baidu getVod: list null");
+                return null;
+            }
 
             JSONObject data = listResp.optJSONObject("data");
-            if (data == null) return null;
+            if (data == null) {
+                SpiderDebug.log("Baidu getVod: no data errno=" + listResp.optInt("errno", -1) + " errmsg=" + listResp.optString("errmsg", listResp.optString("error_msg", "")));
+                return null;
+            }
             JSONArray list = data.optJSONArray("list");
-            if (list == null || list.length() == 0) return null;
+            if (list == null || list.length() == 0) {
+                SpiderDebug.log("Baidu getVod: empty list");
+                return null;
+            }
+            SpiderDebug.log("Baidu getVod: list count=" + list.length());
 
             JSONObject first = list.optJSONObject(0);
             String fileName = first != null ? first.optString("server_filename", "") : "";
@@ -191,7 +212,6 @@ public class BaiduDriveResolver implements CloudDrive {
             JSONObject result = new JSONObject();
             result.put("parse", 0);
             result.put("jx", 0);
-            result.put("format", "video/mp4");
 
             byte[] tokenBytes = hexToBytes(input);
             String tokenStr = new String(tokenBytes, "UTF-8");

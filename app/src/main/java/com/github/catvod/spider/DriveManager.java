@@ -271,9 +271,7 @@ public class DriveManager {
                 try {
                     JSONObject body = new JSONObject();
                     body.put("action_type", 2);
-                    JSONArray fileIds = new JSONArray();
-                    fileIds.put(fileId);
-                    body.put("file_ids", fileIds);
+                    body.put("filelist", fileId);
                     body.put("exclude_fids", new JSONArray());
                     body.put("pdir_fid", "0");
                     OkResult result = OkHttp.post("https://pan.quark.cn/1/clouddrive/file/delete?pr=ucpro&fr=pc&__dt=" + System.currentTimeMillis(),
