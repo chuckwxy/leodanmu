@@ -4,6 +4,7 @@ import android.text.TextUtils;
 
 import com.github.catvod.crawler.SpiderDebug;
 import com.github.catvod.net.OkHttp;
+import com.github.catvod.net.OkResult;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -105,9 +106,11 @@ public class BaiduDriveResolver implements CloudDrive {
             Map<String, String> headers = buildApiHeaders();
             SpiderDebug.log("Baidu getVod: bduss=" + (bduss != null ? bduss.substring(0, Math.min(8, bduss.length())) + "..." : "null") + " stoken=" + (stoken != null ? "set(" + stoken.length() + ")" : "null"));
 
-            String initResp = OkHttp.string(API_BASE + "/share/init?surl=" + surl, headers);
+            OkResult initResult = OkHttp.getResult(API_BASE + "/share/init?surl=" + surl, headers);
+            String initResp = initResult != null ? initResult.getBody() : "";
             if (TextUtils.isEmpty(initResp)) {
-                SpiderDebug.log("Baidu getVod: init empty");
+                int code = initResult != null ? initResult.getCode() : -1;
+                SpiderDebug.log("Baidu getVod: init empty code=" + code + " body=" + initResp);
                 return null;
             }
             SpiderDebug.log("Baidu getVod: init OK len=" + initResp.length());
