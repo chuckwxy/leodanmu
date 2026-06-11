@@ -20,6 +20,7 @@ import java.util.regex.Pattern;
 public class QuarkDriveResolver implements CloudDrive {
 
     private static final String API_BASE = "https://pan.quark.cn";
+    private static final String DRIVE_API_BASE = "https://drive.quark.cn/1/clouddrive";
     private static final String UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) quark-cloud-drive/2.5.20 Chrome/100.0.4896.160 Electron/18.3.5.4-b478491100 Safari/537.36 Channel/pckk_other_ch";
     private static final Pattern SHARE_URL_PATTERN = Pattern.compile("/s/([a-zA-Z0-9]+)");
     private static final int PAGE_SIZE = 100;
@@ -461,7 +462,7 @@ public class QuarkDriveResolver implements CloudDrive {
             body.put("resolutions", "low,normal,high,super,2k,4k");
             body.put("supports", "fmp4_av,m3u8,dolby_vision");
             Map<String, String> headers = buildHeaders();
-            OkResult result = OkHttp.post(API_BASE + "/1/clouddrive/file/v2/play/project?pr=ucpro&fr=pc&__dt=" + System.currentTimeMillis(),
+            OkResult result = OkHttp.post(DRIVE_API_BASE + "/file/v2/play/project?pr=ucpro&fr=pc&__dt=" + System.currentTimeMillis(),
                     body.toString(), headers);
             String resp = result != null ? result.getBody() : "";
             if (TextUtils.isEmpty(resp)) return null;
