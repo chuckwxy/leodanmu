@@ -6,8 +6,6 @@ import com.github.catvod.crawler.SpiderDebug;
 import com.github.catvod.net.OkHttp;
 
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.InputStream;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
@@ -49,24 +47,13 @@ public class Proxy {
 
             OkHttpClient proxyClient = OkHttp.client().newBuilder()
                     .connectTimeout(30, TimeUnit.SECONDS)
-                    .readTimeout(60, TimeUnit.SECONDS)
+                    .readTimeout(0, TimeUnit.SECONDS)
                     .build();
             Response response = proxyClient.newCall(builder.build()).execute();
             int code = response.code();
             String contentType = response.header("Content-Type", "application/octet-stream");
 
-            InputStream body = response.body().byteStream();
-            ByteArrayOutputStream baos = new ByteArrayOutputStream(65536);
-            byte[] buf = new byte[8192];
-            int total = 0;
-            int limit = 10 * 1024 * 1024;
-            int n;
-            while (total < limit && (n = body.read(buf)) != -1) {
-                baos.write(buf, 0, n);
-                total += n;
-            }
-            body.close();
-            return new Object[]{code, contentType, new ByteArrayInputStream(baos.toByteArray())};
+            return new Object[]{code, contentType, response.body().byteStream()};
         } catch (Exception e) {
             SpiderDebug.log("Proxy proxyVideo error: " + e.getMessage());
             return null;
