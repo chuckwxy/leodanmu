@@ -798,6 +798,18 @@ public class DriveQRCodeUtil {
             StringBuilder result = new StringBuilder();
             result.append("BDUSS=").append(finalBduss).append("; ");
             if (!TextUtils.isEmpty(finalStokenCookie)) result.append(finalStokenCookie).append("; ");
+
+            List<String> setCookies = finalResult.getResp().get("Set-Cookie");
+            if (setCookies == null) setCookies = finalResult.getResp().get("set-cookie");
+            if (setCookies != null) {
+                String[] extraNames = {"BAIDUID", "BIDUPSID", "PSTM"};
+                for (String name : extraNames) {
+                    String val = pickCookieValue(finalResult.getResp(), name);
+                    if (!TextUtils.isEmpty(val)) {
+                        result.append(name).append("=").append(val).append("; ");
+                    }
+                }
+            }
             return result.toString();
         }
 
