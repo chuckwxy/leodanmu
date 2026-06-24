@@ -14,6 +14,7 @@ public abstract class Spider {
     public String siteKey;
 
     public void init(String extend) throws Exception {
+        init();
     }
     
     public void init(Context context) throws Exception {
