@@ -13,7 +13,7 @@ import org.json.JSONObject;
 import java.net.URLEncoder;
 import java.util.*;
 
-公共 class Douban extends Spider {
+public class Douban extends Spider {
 
     private final String siteUrl = "https://frodo.douban.com/api/v2";
     private final String apikey = "?apikey=0ac44ae016490db2204ce0a042db2916";
