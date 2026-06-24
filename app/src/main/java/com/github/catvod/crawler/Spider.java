@@ -1,48 +1,59 @@
 package com.github.catvod.crawler;
 
-import com.github.catvod.net.OkHttp;
-import okhttp3.Dns;
-import okhttp3.OkHttpClient;
+import android.content.Context;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class Spider {
-    public void init() throws Exception {
+import okhttp3.Dns;
+import okhttp3.OkHttpClient;
 
+public abstract class Spider {
+
+    public String siteKey;
+
+    public void init(Context context) throws Exception {
+    }
+
+    public void init(Context context, String extend) throws Exception {
+        init(context);
     }
 
     public void init(String extend) throws Exception {
-        init();
+        init(context);
     }
 
     public String homeContent(boolean filter) throws Exception {
-        return "{}";
+        return "";
     }
 
     public String homeVideoContent() throws Exception {
-        return "{}";
+        return "";
     }
 
     public String categoryContent(String tid, String pg, boolean filter, HashMap<String, String> extend) throws Exception {
-        return "{}";
+        return "";
     }
 
     public String detailContent(List<String> ids) throws Exception {
-        return "{}";
+        return "";
     }
 
     public String searchContent(String key, boolean quick) throws Exception {
-        return "{}";
+        return "";
     }
 
     public String searchContent(String key, boolean quick, String pg) throws Exception {
-        return "{}";
+        return "";
     }
 
     public String playerContent(String flag, String id, List<String> vipFlags) throws Exception {
-        return "{}";
+        return "";
+    }
+
+    public String liveContent(String url) throws Exception {
+        return "";
     }
 
     public boolean manualVideoCheck() throws Exception {
@@ -53,19 +64,22 @@ public class Spider {
         return false;
     }
 
-    public Object[] proxyLocal(Map<String, String> params) throws Exception {
-        return new Object[0];
+    public Object[] proxy(Map<String, String> params) throws Exception {
+        return null;
+    }
+
+    public String action(String action) throws Exception {
+        return null;
     }
 
     public void destroy() {
-
     }
 
     public static Dns safeDns() {
-        return Dns.SYSTEM;
+        return null;
     }
 
-    public OkHttpClient client() {
-        return OkHttp.client();
+    public static OkHttpClient client() {
+        return null;
     }
 }
