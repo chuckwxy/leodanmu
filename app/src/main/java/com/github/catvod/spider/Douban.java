@@ -28,10 +28,10 @@ public class Douban extends Spider {
         return header;
     }
 
-    @Override
-    public void init(String extend) throws Exception {
-        this.extend = extend;
-    }
+    //@Override
+    //public void init(String extend) throws Exception {
+    //    this.extend = extend;
+    //}
 
     @Override
     public String homeContent(boolean filter) throws Exception {
