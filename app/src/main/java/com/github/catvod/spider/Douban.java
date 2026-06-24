@@ -29,8 +29,8 @@ public class Douban extends Spider {
     }
 
     @Override
-    public void init(Context context) throws Exception {
-        this.extend = context;
+    public void init(String extend) throws Exception {
+        this.extend = extend;
     }
 
     @Override
