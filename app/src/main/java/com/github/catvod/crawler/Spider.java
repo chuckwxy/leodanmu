@@ -12,7 +12,9 @@ import okhttp3.OkHttpClient;
 public abstract class Spider {
 
     public String siteKey;
-
+    
+    public void init() throws Exception {
+    }
     public void init(String extend) throws Exception {
         init();
     }
