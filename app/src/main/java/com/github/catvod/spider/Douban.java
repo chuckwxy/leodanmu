@@ -30,7 +30,7 @@ public class Douban extends Spider {
     }
 
     @Override
-    public void init(String extend) throws Exception {
+    public void init(Context context, String extend) throws Exception {
         this.extend = extend;
     }
 
