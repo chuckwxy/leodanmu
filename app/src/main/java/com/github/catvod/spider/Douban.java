@@ -18,7 +18,7 @@ public class Douban extends Spider {
 
     private final String siteUrl = "https://frodo.douban.com/api/v2";
     private final String apikey = "?apikey=0ac44ae016490db2204ce0a042db2916";
-    private Context extend;
+    private String extend;
 
     private Map<String, String> getHeader() {
         Map<String, String> header = new HashMap<>();
@@ -30,7 +30,7 @@ public class Douban extends Spider {
     }
 
     @Override
-    public void init(Context extend) throws Exception {
+    public void init(String extend) throws Exception {
         this.extend = extend;
     }
 
