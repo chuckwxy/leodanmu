@@ -15,7 +15,10 @@ public abstract class Spider {
 
     public void init(String extend) throws Exception {
     }
-
+    
+    public void init(Context context) throws Exception {
+    }
+    
     public void init(Context context, String extend) throws Exception {
         init(context);
     }
