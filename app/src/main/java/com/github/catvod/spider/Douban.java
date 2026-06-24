@@ -1,5 +1,6 @@
 package com.github.catvod.spider;
 
+import android.content.Context;
 import com.github.catvod.bean.Class;
 import com.github.catvod.bean.Result;
 import com.github.catvod.bean.Vod;
@@ -17,7 +18,7 @@ public class Douban extends Spider {
 
     private final String siteUrl = "https://frodo.douban.com/api/v2";
     private final String apikey = "?apikey=0ac44ae016490db2204ce0a042db2916";
-    private String extend;
+    private Context extend;
 
     private Map<String, String> getHeader() {
         Map<String, String> header = new HashMap<>();
@@ -28,10 +29,10 @@ public class Douban extends Spider {
         return header;
     }
 
-    //@Override
-    //public void init(String extend) throws Exception {
-    //    this.extend = extend;
-    //}
+    @Override
+    public void init(Context extend) throws Exception {
+        this.extend = extend;
+    }
 
     @Override
     public String homeContent(boolean filter) throws Exception {
