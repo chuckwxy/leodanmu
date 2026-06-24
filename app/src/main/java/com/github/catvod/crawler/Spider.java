@@ -21,7 +21,6 @@ public abstract class Spider {
     }
 
     public void init(String extend) throws Exception {
-        init(context);
     }
 
     public String homeContent(boolean filter) throws Exception {
