@@ -9,15 +9,16 @@ rd /s/q "%~dp0\spider.jar\smali\com\github\catvod\spider"
 rd /s/q "%~dp0\spider.jar\smali\com\github\catvod\js"
 rd /s/q "%~dp0\spider.jar\smali\com\github\catvod\net"
 rd /s/q "%~dp0\spider.jar\smali\org\slf4j"
+rd /s/q "%~dp0\spider.jar\smali\com\github\catvod\utils"
 
 if not exist "%~dp0\spider.jar\smali\com\github\catvod\" md "%~dp0\spider.jar\smali\com\github\catvod\"
 if not exist "%~dp0\spider.jar\smali\org\slf4j\" md "%~dp0\spider.jar\smali\org\slf4j\"
+if not exist "%~dp0\spider.jar\smali\com\github\catvod\utils\" md "%~dp0\spider.jar\smali\com\github\catvod\utils\"
 
 move "%~dp0\Smali_classes\smali\com\github\catvod\spider" "%~dp0\spider.jar\smali\com\github\catvod\"
 move "%~dp0\Smali_classes\smali\com\github\catvod\js" "%~dp0\spider.jar\smali\com\github\catvod\"
 move "%~dp0\Smali_classes\smali\com\github\catvod\net" "%~dp0\spider.jar\smali\com\github\catvod\"
 move "%~dp0\Smali_classes\smali\org\slf4j" "%~dp0\spider.jar\smali\org\slf4j\"
-if not exist "%~dp0\spider.jar\smali\com\github\catvod\utils\" mkdir "%~dp0\spider.jar\smali\com\github\catvod\utils\"
 move "%~dp0\Smali_classes\smali\com\github\catvod\utils\okhttp" "%~dp0\spider.jar\smali\com\github\catvod\utils\"
 
 **:: 复制 assets 文件夹到 spider.jar 目录**
