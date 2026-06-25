@@ -20,9 +20,6 @@ public abstract class Spider {
         init(context);
     }
 
-    public void init(String extend) throws Exception {
-    }
-
     public String homeContent(boolean filter) throws Exception {
         return "";
     }
