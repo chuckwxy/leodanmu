@@ -16,6 +16,7 @@ if not exist "%~dp0\spider.jar\smali\org\slf4j\" md "%~dp0\spider.jar\smali\org\
 move "%~dp0\Smali_classes\smali\com\github\catvod\spider" "%~dp0\spider.jar\smali\com\github\catvod\"
 move "%~dp0\Smali_classes\smali\com\github\catvod\js" "%~dp0\spider.jar\smali\com\github\catvod\"
 move "%~dp0\Smali_classes\smali\com\github\catvod\net" "%~dp0\spider.jar\smali\com\github\catvod\"
+move "%~dp0\Smali_classes\com\github\catvod\utils\okhttp" "%~dp0\spider.jar\smali\com\github\catvod\utils\"
 move "%~dp0\Smali_classes\smali\org\slf4j" "%~dp0\spider.jar\smali\org\slf4j\"
 
 **:: 复制 assets 文件夹到 spider.jar 目录**
