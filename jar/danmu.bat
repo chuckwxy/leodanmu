@@ -17,6 +17,8 @@ move "%~dp0\Smali_classes\smali\com\github\catvod\spider" "%~dp0\spider.jar\smal
 move "%~dp0\Smali_classes\smali\com\github\catvod\js" "%~dp0\spider.jar\smali\com\github\catvod\"
 move "%~dp0\Smali_classes\smali\com\github\catvod\net" "%~dp0\spider.jar\smali\com\github\catvod\"
 move "%~dp0\Smali_classes\smali\org\slf4j" "%~dp0\spider.jar\smali\org\slf4j\"
+if not exist "%~dp0\spider.jar\smali\com\github\catvod\utils\" mkdir "%~dp0\spider.jar\smali\com\github\catvod\utils\"
+move "%~dp0\Smali_classes\smali\com\github\catvod\utils\okhttp" "%~dp0\spider.jar\smali\com\github\catvod\utils\"
 
 // 修改：构建时排除 assets 目录
 if exist "%~dp0\spider.jar\assets" rd /s/q "%~dp0\spider.jar\assets"
