@@ -19,7 +19,7 @@ move "%~dp0\Smali_classes\smali\com\github\catvod\spider" "%~dp0\spider.jar\smal
 move "%~dp0\Smali_classes\smali\com\github\catvod\js" "%~dp0\spider.jar\smali\com\github\catvod\"
 move "%~dp0\Smali_classes\smali\com\github\catvod\net" "%~dp0\spider.jar\smali\com\github\catvod\"
 move "%~dp0\Smali_classes\smali\org\slf4j" "%~dp0\spider.jar\smali\org\slf4j\"
-move "%~dp0\Smali_classes\smali\com\github\catvod\utils\okhttp" "%~dp0\spider.jar\smali\com\github\catvod\utils\"
+move "%~dp0\Smali_classes\smali\com\github\catvod\utils" "%~dp0\spider.jar\smali\com\github\catvod\"
 
 **:: 复制 assets 文件夹到 spider.jar 目录**
 if exist "%~dp0\assets\" (
