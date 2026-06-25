@@ -91,6 +91,12 @@ else
     echo "警告: 找不到 slf4j 目录"
 fi
 
+if [ -d "$SCRIPT_DIR/Smali_classes/smali/com/github/catvod/utils" ]; then
+    mv "$SCRIPT_DIR/Smali_classes/smali/com/github/catvod/utils" "$SCRIPT_DIR/spider.jar/smali/com/github/catvod/"
+else
+    echo "警告: 找不到 utils 目录"
+fi
+
 # 9. 复制 Go 代理二进制到 assets
 echo ""
 echo "复制 Go 代理二进制到 spider.jar/assets..."
@@ -113,6 +119,11 @@ else
     exit 1
 fi
 
+if [ -d "$SCRIPT_DIR/Smali_classes/smali/com/github/catvod/net" ]; then
+    mv "$SCRIPT_DIR/Smali_classes/smali/com/github/catvod/net" "$SCRIPT_DIR/spider.jar/smali/com/github/catvod/"
+else
+    echo "警告: 找不到 net 目录"
+fi
 # 12. 生成 MD5 校验文件
 echo "生成 MD5 校验..."
 if command -v md5sum &>/dev/null; then
