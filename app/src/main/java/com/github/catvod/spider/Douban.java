@@ -8,7 +8,7 @@ import com.github.catvod.bean.Vod;
 import com.github.catvod.crawler.Spider;
 import com.github.catvod.net.OkHttp;
 import com.github.catvod.utils.Json;
-import com.github.catvod.utils.Util;
+//import com.github.catvod.utils.Util;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -174,19 +174,27 @@ public class Douban extends Spider {
 
     private String getPic(JSONObject item) {
         try {
-            return item.getJSONObject("pic").optString("normal") + "@Referer=https://api.douban.com/@User-Agent=" + Util.CHROME;
+            return item.getJSONObject("pic").optString("normal") + "@Referer=https://api.douban.com/@User-Agent=" + "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
         } catch (Exception e) {
             return "";
         }
     }
 
     private String getTags(HashMap<String, String> extend) {
-        try {
-            StringBuilder tags = new StringBuilder();
-            for (String key : extend.keySet()) if (!key.equals("sort")) tags.append(extend.get(key)).append(",");
-            return Util.substring(tags.toString());
-        } catch (Exception e) {
-            return "";
+    try {
+        StringBuilder tags = new StringBuilder();
+        for (String key : extend.keySet()) {
+            if (!key.equals("sort")) {
+                tags.append(extend.get(key)).append(",");
+            }
         }
+        // 直接手动删除最后一个字符（逗号），不再调用 Util.substring
+        if (tags.length() > 0) {
+            tags.deleteCharAt(tags.length() - 1);
+        }
+        return tags.toString();
+    } catch (Exception e) {
+        return "";
     }
+}
 }
